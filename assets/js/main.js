@@ -353,11 +353,11 @@ jQuery(document).ready(function($) {
                 
                 var msg = 'Login gagal.';
                 if (xhr.responseJSON && xhr.responseJSON.code === 'rest_no_route') {
-                    msg = 'Error Sistem: Jalur API tidak ditemukan. Mohon Admin simpan ulang Permalinks.';
+                    msg = '<strong>Error Rute API:</strong> Jalur API tidak ditemukan. Mohon masuk ke Admin > Settings > Permalinks dan klik "Save Changes" untuk memperbaiki ini.';
                 } else if (xhr.responseJSON && xhr.responseJSON.message) {
                     msg = xhr.responseJSON.message;
                 } else if (xhr.status === 404) {
-                    msg = 'Error 404: Endpoint API tidak ditemukan. Pastikan Plugin aktif.';
+                    msg = 'Error 404: Endpoint API tidak ditemukan (' + loginEndpoint + '). Pastikan Plugin Desa Wisata Core aktif.';
                 }
 
                 handleError(msg);
@@ -366,7 +366,7 @@ jQuery(document).ready(function($) {
 
         // Helper UI Error Login
         function handleError(message) {
-            $alert.text(message).addClass('bg-red-500 block').removeClass('hidden');
+            $alert.html(message).addClass('bg-red-500 block').removeClass('hidden');
             $btn.prop('disabled', false);
             $btnText.text('Masuk');
             $loader.addClass('hidden');
