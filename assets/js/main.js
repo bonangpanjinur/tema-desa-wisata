@@ -22,52 +22,61 @@ jQuery(document).ready(function($) {
         $loader.removeClass('hidden');
         $alert.addClass('hidden').removeClass('bg-red-500 bg-green-500');
 
+        // LANGKAH 1: Login ke API (Dapatkan Token JWT)
         $.ajax({
             type: 'POST',
-            url: dwData.api_url + 'auth/login', // API Plugin (Login JWT)
+            url: dwData.api_url + 'auth/login', 
             contentType: 'application/json',
             data: JSON.stringify({
                 username: username,
                 password: password
             }),
             success: function(response) {
-                // Login API Berhasil
-                $alert.text('Login berhasil! Mengalihkan...').addClass('bg-green-500 block').removeClass('hidden');
-                
-                // Simpan token
+                // Token API didapat
                 localStorage.setItem('dw_jwt_token', response.token);
 
-                // Login Sesi WordPress (Cookie)
+                // LANGKAH 2: Login ke Sesi WordPress (Set Cookie)
                 $.ajax({
                     type: 'POST',
                     url: dwData.ajax_url,
                     data: {
-                        action: 'tema_dw_ajax_login', // UPDATE: Action name baru agar tidak bentrok
+                        action: 'tema_dw_ajax_login', 
                         username: username,
                         password: password,
                         security: dwData.nonce
                     },
-                    success: function() {
-                        window.location.href = dwData.home_url + 'dashboard-toko'; 
+                    success: function(wpResponse) {
+                        if ( wpResponse.success ) {
+                            // KEDUANYA SUKSES -> Redirect
+                            $alert.text('Login berhasil! Mengalihkan...').addClass('bg-green-500 block').removeClass('hidden');
+                            window.location.href = wpResponse.data.redirect_url || (dwData.home_url + 'dashboard-toko');
+                        } else {
+                            // API Sukses, tapi WP Gagal (Jarang terjadi, tapi perlu dihandle)
+                            handleError('Gagal membuat sesi WordPress. Silakan coba lagi.');
+                        }
                     },
-                    error: function() {
-                         window.location.href = dwData.home_url;
+                    error: function(xhr, status, error) {
+                        handleError('Terjadi kesalahan pada server saat login sesi.');
                     }
                 });
             },
             error: function(xhr) {
+                // Login API Gagal (Password salah / User tidak ada)
                 var msg = 'Login gagal. Periksa username dan password.';
                 if(xhr.responseJSON && xhr.responseJSON.message) {
                     msg = xhr.responseJSON.message;
                 }
-                $alert.text(msg).addClass('bg-red-500 block').removeClass('hidden');
-                
-                // Reset UI
-                $btn.prop('disabled', false);
-                $btnText.text('Masuk');
-                $loader.addClass('hidden');
+                handleError(msg);
             }
         });
+
+        // Helper untuk handle error UI
+        function handleError(message) {
+            $alert.text(message).addClass('bg-red-500 block').removeClass('hidden');
+            $btn.prop('disabled', false);
+            $btnText.text('Masuk');
+            $loader.addClass('hidden');
+        }
     });
 
     // 3. Simple Add to Cart Animation
