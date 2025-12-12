@@ -373,7 +373,7 @@ jQuery(document).ready(function($) {
     });
 
     /* =========================================
-       7. REGISTER HANDLER (Halaman Daftar)
+       7. REGISTER HANDLER (UPDATED)
        ========================================= */
     $('#dw-register-form').on('submit', function(e) {
         e.preventDefault();
@@ -383,6 +383,8 @@ jQuery(document).ready(function($) {
         var email    = $('#email').val();
         var no_hp    = $('#no_hp').val();
         var password = $('#reg_password').val();
+        var role     = $('#role-input').val(); // Ambil role (pembeli/pedagang)
+        var nama_toko = $('#nama_toko').val(); // Ambil nama toko (jika pedagang)
         
         var $btn = $('#btn-reg-submit');
         var $btnText = $('#btn-reg-text');
@@ -393,31 +395,38 @@ jQuery(document).ready(function($) {
         $btn.prop('disabled', true);
         $btnText.text('Mendaftarkan...');
         $loader.removeClass('hidden');
-        $alert.addClass('hidden').removeClass('bg-red-500 bg-green-500');
+        $alert.addClass('hidden').removeClass('bg-red-50 text-red-700 bg-green-50 text-green-700');
 
-        // Step 1: Register via API Plugin (/auth/register)
+        // Payload Data
+        var payload = {
+            username: username,
+            email: email,
+            password: password,
+            fullname: fullname,
+            no_hp: no_hp,
+            role: role
+        };
+
+        // Jika pedagang, tambahkan nama toko
+        if (role === 'pedagang') {
+            payload.nama_toko = nama_toko;
+        }
+
+        // Step 1: Register via API Plugin
         $.ajax({
             type: 'POST',
             url: dwData.api_url + 'auth/register',
             contentType: 'application/json',
-            data: JSON.stringify({
-                username: username,
-                email: email,
-                password: password,
-                fullname: fullname,
-                no_hp: no_hp
-            }),
+            data: JSON.stringify(payload),
             success: function(response) {
                 // Register Sukses
-                $alert.text('Registrasi berhasil! Sedang login otomatis...').addClass('bg-green-500 block').removeClass('hidden');
+                $alert.html('<i class="ph-bold ph-check-circle text-lg"></i> Pendaftaran berhasil! Mengalihkan...').addClass('bg-green-50 text-green-700 flex').removeClass('hidden');
                 
-                // Simpan Token JWT jika dikembalikan
                 if(response.token) {
                     localStorage.setItem('dw_jwt_token', response.token);
                 }
 
-                // Step 2: Auto Login ke WP Session (Cookie)
-                // Gunakan handler login yang sama seperti form login
+                // Step 2: Auto Login
                 $.ajax({
                     type: 'POST',
                     url: dwData.ajax_url,
@@ -428,11 +437,14 @@ jQuery(document).ready(function($) {
                         security: dwData.nonce
                     },
                     success: function(wpRes) {
-                        // Redirect ke Dashboard
-                        window.location.href = dwData.home_url + 'dashboard-toko'; 
+                        // Redirect Berdasarkan Role
+                        if (role === 'pedagang') {
+                            window.location.href = dwData.home_url + 'dashboard-toko';
+                        } else {
+                            window.location.href = dwData.home_url + 'akun-saya';
+                        }
                     },
                     error: function() {
-                        // Fallback jika auto login gagal
                         window.location.href = dwData.home_url + 'login?registered=true';
                     }
                 });
@@ -443,7 +455,7 @@ jQuery(document).ready(function($) {
                 if(xhr.responseJSON && xhr.responseJSON.message) {
                     msg = xhr.responseJSON.message;
                 }
-                $alert.text(msg).addClass('bg-red-500 block').removeClass('hidden');
+                $alert.html('<i class="ph-bold ph-warning-circle text-lg"></i> ' + msg).addClass('bg-red-50 text-red-700 flex').removeClass('hidden');
                 
                 $btn.prop('disabled', false);
                 $btnText.text('Daftar Sekarang');
@@ -451,5 +463,4 @@ jQuery(document).ready(function($) {
             }
         });
     });
-
 });
