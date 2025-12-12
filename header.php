@@ -2,72 +2,88 @@
 <html <?php language_attributes(); ?>>
 <head>
     <meta charset="<?php bloginfo( 'charset' ); ?>">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <?php wp_head(); ?>
 </head>
-<body <?php body_class('bg-gray-100 flex justify-center min-h-screen text-slate-800 font-sans'); ?>>
+<body <?php body_class('bg-gray-50 text-slate-800 font-sans antialiased'); ?>>
     
-    <!-- Mobile Frame (Max 480px) -->
-    <div id="app-frame" class="w-full max-w-[480px] bg-white min-h-screen relative shadow-2xl flex flex-col overflow-x-hidden">
+    <!-- Wrapper Utama: Full Width Responsive -->
+    <div id="page-wrapper" class="flex flex-col min-h-screen">
         
         <?php 
-        // Logic Header Dinamis
-        $is_home = is_front_page();
-        $page_title = is_archive() ? get_the_archive_title() : get_the_title();
-        if (is_post_type_archive('dw_produk')) $page_title = 'Pasar Desa';
-        if (is_page('wisata')) $page_title = 'Jelajah Wisata';
-
-        // Integrasi Data Branding dari Plugin
-        // Menggunakan helper dw_get_setting() jika tersedia
+        // Data Branding dari Plugin
         $brand_name = function_exists('dw_get_setting') ? dw_get_setting('nama_website', get_bloginfo('name')) : get_bloginfo('name');
         $brand_logo = function_exists('dw_get_setting') ? dw_get_setting('logo_frontend', '') : '';
         ?>
 
-        <!-- HEADER -->
-        <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-gray-100 px-5 py-3 flex items-center justify-between transition-all">
-            <?php if ($is_home) : ?>
-                <!-- Mode Home: Logo & Nama Website dari Plugin -->
-                <div class="flex items-center gap-3">
+        <!-- HEADER RESPONSIVE -->
+        <header class="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-200 shadow-sm transition-all">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+                
+                <!-- Logo Area -->
+                <a href="<?php echo home_url(); ?>" class="flex items-center gap-3 group">
                     <?php if ( ! empty( $brand_logo ) ) : ?>
-                        <!-- Tampilkan Logo jika diupload di plugin -->
-                        <img src="<?php echo esc_url( $brand_logo ); ?>" alt="<?php echo esc_attr( $brand_name ); ?>" class="h-10 w-auto object-contain">
+                        <img src="<?php echo esc_url( $brand_logo ); ?>" alt="<?php echo esc_attr( $brand_name ); ?>" class="h-10 w-auto object-contain transition-transform group-hover:scale-105">
                     <?php else : ?>
-                        <!-- Fallback Teks jika tidak ada logo -->
                         <div class="flex flex-col">
-                            <span class="text-[10px] text-gray-400 font-bold tracking-wide uppercase">Selamat Datang</span>
-                            <div class="flex items-center gap-1 text-primary font-extrabold text-lg leading-none tracking-tight">
+                            <span class="text-[10px] text-gray-500 font-bold tracking-wider uppercase leading-none mb-0.5">Desa Wisata</span>
+                            <span class="text-primary font-extrabold text-xl leading-none tracking-tight group-hover:text-secondary transition-colors">
                                 <?php echo esc_html( $brand_name ); ?>
-                            </div>
+                            </span>
                         </div>
                     <?php endif; ?>
-                </div>
+                </a>
 
-                <div class="flex gap-3">
-                    <a href="<?php echo site_url('/notifikasi'); ?>" class="relative text-gray-600 hover:text-primary"><i class="ph-bold ph-bell text-xl"></i></a>
-                    <a href="<?php echo site_url('/keranjang'); ?>" class="relative text-gray-600 hover:text-primary">
-                        <i class="ph-bold ph-shopping-cart text-xl"></i>
-                        <!-- Badge Cart Dinamis via JS -->
-                        <span id="header-cart-count" class="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center border border-white hidden">0</span>
+                <!-- Desktop Navigation (Hidden on Mobile) -->
+                <nav class="hidden md:flex items-center gap-8">
+                    <?php
+                    $menu_items = [
+                        'Beranda' => home_url(),
+                        'Jelajah Wisata' => site_url('/wisata'),
+                        'Pasar Desa' => function_exists('get_post_type_archive_link') ? get_post_type_archive_link('dw_produk') : site_url('/produk'),
+                        'Tentang' => site_url('/tentang'),
+                    ];
+                    foreach($menu_items as $label => $link):
+                        // Cek aktif sederhana
+                        $active_class = (get_permalink() == $link || (is_home() && $label == 'Beranda')) ? 'text-primary font-bold' : 'text-gray-600 hover:text-primary font-medium';
+                    ?>
+                        <a href="<?php echo esc_url($link); ?>" class="text-sm transition-colors <?php echo $active_class; ?>">
+                            <?php echo $label; ?>
+                        </a>
+                    <?php endforeach; ?>
+                </nav>
+
+                <!-- Header Actions -->
+                <div class="flex items-center gap-3 sm:gap-4">
+                    <!-- Cart Icon -->
+                    <a href="<?php echo site_url('/keranjang'); ?>" class="relative p-2 text-gray-600 hover:text-primary transition-colors group">
+                        <i class="ph-bold ph-shopping-cart text-2xl group-hover:scale-110 transition-transform"></i>
+                        <span id="header-cart-count" class="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center border border-white transform scale-0 transition-transform duration-200">0</span>
                     </a>
-                </div>
-            <?php else : ?>
-                <!-- Mode Halaman Lain: Tombol Back & Judul -->
-                <div class="flex items-center gap-3 w-full">
-                    <a href="javascript:history.back()" class="text-gray-600 hover:text-primary p-1 rounded-full active:bg-gray-100">
-                        <i class="ph-bold ph-arrow-left text-xl"></i>
-                    </a>
-                    <h1 class="text-lg font-bold text-gray-800 truncate flex-1"><?php echo esc_html($page_title); ?></h1>
-                    
-                    <!-- Khusus Halaman Produk/Detail: Tampilkan Cart -->
-                    <?php if (is_singular('dw_produk') || is_post_type_archive('dw_produk')) : ?>
-                        <a href="<?php echo site_url('/keranjang'); ?>" class="relative text-gray-600 hover:text-primary">
-                            <i class="ph-bold ph-shopping-cart text-xl"></i>
-                            <span id="header-cart-count-inner" class="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full h-4 w-4 flex items-center justify-center border border-white hidden">0</span>
+
+                    <!-- User Menu / Login Button -->
+                    <?php if (is_user_logged_in()): 
+                        $current_user = wp_get_current_user();
+                    ?>
+                        <a href="<?php echo site_url('/akun-saya'); ?>" class="flex items-center gap-2 pl-2 border-l border-gray-200 hover:opacity-80 transition-opacity">
+                            <img src="<?php echo get_avatar_url($current_user->ID); ?>" class="w-8 h-8 rounded-full border border-gray-200 object-cover">
+                            <span class="hidden sm:block text-sm font-bold text-gray-700 max-w-[100px] truncate">
+                                <?php echo esc_html($current_user->display_name); ?>
+                            </span>
+                        </a>
+                    <?php else: ?>
+                        <a href="<?php echo site_url('/login'); ?>" class="hidden md:inline-flex items-center justify-center bg-primary text-white px-5 py-2 rounded-full text-sm font-bold hover:bg-secondary transition-all shadow-md hover:shadow-lg transform active:scale-95">
+                            Masuk
+                        </a>
+                        <!-- Mobile Login Icon -->
+                        <a href="<?php echo site_url('/login'); ?>" class="md:hidden p-2 text-gray-600 hover:text-primary">
+                            <i class="ph-bold ph-sign-in text-2xl"></i>
                         </a>
                     <?php endif; ?>
                 </div>
-            <?php endif; ?>
+
+            </div>
         </header>
 
         <!-- CONTENT START -->
-        <main class="flex-1 overflow-y-auto no-scrollbar pb-24 relative">
+        <main class="flex-1 w-full">
