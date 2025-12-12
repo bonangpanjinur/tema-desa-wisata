@@ -1,0 +1,43 @@
+/*
+Theme Name: Tema Desa Wisata
+Author: Bonang Panji Nur
+Version: 1.0
+Description: Theme WordPress khusus aplikasi Desa Wisata dengan tampilan Mobile App Modern (Tailwind).
+*/
+
+/* Hide Default Scrollbar (Agar tampilan bersih di mobile) */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
+
+/* Glassmorphism Utilities */
+.glass {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255,255,255,0.3);
+}
+
+/* Navigation Active State Animation */
+.nav-item.active {
+    color: #0F766E; /* Primary Color */
+    transform: translateY(-2px);
+}
+.nav-item.active i {
+    font-weight: bold; /* Use bold/fill icon variant */
+}
+
+/* Ensure body doesn't behave weirdly on mobile touch */
+body {
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none; /* Prevent pull-to-refresh on body if annoying */
+}
+
+/* Specific for preventing horizontal scroll issues */
+#app-frame {
+    overscroll-behavior-y: auto;
+}
