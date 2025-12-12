@@ -40,7 +40,7 @@ function dw_theme_enqueue_scripts() {
     wp_enqueue_script('phosphor-icons', 'https://unpkg.com/@phosphor-icons/web', [], null, false);
 
     // Main Styles & JS
-    wp_enqueue_style('dw-style', get_stylesheet_uri(), [], '1.0.1');
+    wp_enqueue_style('dw-style', get_stylesheet_uri(), [], '1.0.2');
     wp_enqueue_script('dw-main-js', get_template_directory_uri() . '/assets/js/main.js', ['jquery'], '1.0.1', true);
     
     // AJAX Cart Logic
@@ -53,19 +53,26 @@ function dw_theme_enqueue_scripts() {
 }
 add_action('wp_enqueue_scripts', 'dw_theme_enqueue_scripts');
 
-// 3. Helper: Format Rupiah (Moved here to ensure visibility)
+// 3. Helper: Format Rupiah (Utama)
 if ( ! function_exists( 'dw_format_price' ) ) {
     function dw_format_price($price) {
         return 'Rp ' . number_format((float)$price, 0, ',', '.');
     }
 }
 
-// 4. Helper: Cek Apakah Halaman Auth (Login/Register)
+// 4. Helper Alias: dw_price (Untuk kompatibilitas kode front-page.php)
+if ( ! function_exists( 'dw_price' ) ) {
+    function dw_price($price) {
+        return dw_format_price($price);
+    }
+}
+
+// 5. Helper: Cek Apakah Halaman Auth (Login/Register)
 function dw_is_auth_page() {
     return is_page('login') || is_page('register') || is_page('lupa-password');
 }
 
-// 5. Redirect User yang sudah login dari halaman Login/Register
+// 6. Redirect User yang sudah login dari halaman Login/Register
 function dw_redirect_logged_in_user() {
     if (is_user_logged_in() && dw_is_auth_page()) {
         wp_redirect(home_url());
@@ -74,7 +81,7 @@ function dw_redirect_logged_in_user() {
 }
 add_action('template_redirect', 'dw_redirect_logged_in_user');
 
-// 6. Handle Login via AJAX (Untuk experience aplikasi yang mulus)
+// 7. Handle Login via AJAX
 function dw_ajax_login_handler() {
     check_ajax_referer('dw-cart-nonce', 'nonce');
     

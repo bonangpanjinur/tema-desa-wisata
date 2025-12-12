@@ -1,31 +1,26 @@
-name: Deploy Plugin to WordPress via SFTP
+name: Deploy Theme to WordPress via FTP
 
 on:
   push:
     branches: [ "main" ]
 
 jobs:
-  build-and-deploy:
+  web-deploy:
+    name: Deploy
     runs-on: ubuntu-latest
     
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '7.4'
-      
-      - name: Install PHP Dependencies
-        run: composer install --no-dev --optimize-autoloader
-
+      # Langkah Cleanup: Hapus file sistem git agar tidak ikut terupload
+      # Kita HAPUS langkah composer install karena tidak diperlukan di theme ini
       - name: Cleanup before deploy
         run: |
           rm -rf .git .github .gitignore
-          rm -rf composer.json composer.lock
+          rm -rf README.md
 
-      # PERBAIKAN DI SINI
+      # Proses Deploy FTP
       - name: FTP Deploy
         uses: SamKirkland/FTP-Deploy-Action@4.3.3
         with:
@@ -33,17 +28,20 @@ jobs:
           username: ${{ secrets.FTP_USER }}
           password: ${{ secrets.FTP_PASSWORD }}
           
-          # 1. Ganti ke 'ftp' biasa (lebih stabil untuk upload banyak file kecil)
+          # Menggunakan protokol FTP biasa (port 21) sesuai config Anda
           protocol: ftp 
           port: 21
           
-          # 2. Matikan validasi SSL ketat (mengatasi error FIN packet)
+          # Security loose untuk menghindari error handshake SSL/TLS pada beberapa hosting
           security: loose
           
+          # Folder lokal (root repository)
           local-dir: ./
+          
+          # Folder tujuan di server (Pastikan path ini benar)
           server-dir: /public_html/admin.bonang.my.id/wp-content/themes/tema-desa-wisata/
           
-          # 3. Exclude file sync agar tidak loop
+          # Exclude file/folder agar tidak di-upload/dihapus
           exclude: |
             **/.git*
             **/.git*/**
