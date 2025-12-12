@@ -1,3 +1,8 @@
+/**
+ * Main JS - Tema Desa Wisata
+ * Menangani Cart, Login, Register, dan UI Interaktif
+ */
+
 jQuery(document).ready(function($) {
     
     // Debugging: Cek koneksi API
@@ -28,11 +33,14 @@ jQuery(document).ready(function($) {
         const cart = getCart();
         const count = cart.reduce((acc, item) => acc + item.qty, 0);
         const $badge = $('#header-cart-count');
+        const $badgeInner = $('#header-cart-count-inner'); // Untuk header inner page
         
         if (count > 0) {
-            $badge.text(count).removeClass('hidden');
+            $badge.text(count).removeClass('hidden').addClass('flex');
+            $badgeInner.text(count).removeClass('hidden').addClass('flex');
         } else {
-            $badge.addClass('hidden');
+            $badge.addClass('hidden').removeClass('flex');
+            $badgeInner.addClass('hidden').removeClass('flex');
         }
     }
 
@@ -42,15 +50,20 @@ jQuery(document).ready(function($) {
     /* =========================================
        2. ADD TO CART HANDLER
        ========================================= */
-    $(document).on('click', '.add-to-cart-btn, #single-add-cart', function(e) {
+    $(document).on('click', '.add-to-cart-btn, #single-add-cart, #btn-add-to-cart', function(e) {
         e.preventDefault();
         const btn = $(this);
         
         // Ambil data produk dari atribut data-
-        const id = btn.data('id');
+        const id = parseInt(btn.data('id')) || 0;
         const title = btn.data('title');
         const price = parseInt(btn.data('price')) || 0;
         const thumb = btn.data('thumb');
+        
+        if (id === 0) {
+            console.error('Product ID not found');
+            return;
+        }
         
         // Cek input qty (untuk halaman detail), default 1
         let qty = 1;
@@ -72,20 +85,33 @@ jQuery(document).ready(function($) {
 
         // Efek Visual Tombol
         const originalHTML = btn.html();
+        
         // Ubah tampilan tombol sesaat
-        btn.html('<i class="fas fa-check"></i> Masuk Keranjang')
-           .removeClass('bg-primary bg-white text-primary border-primary') // Hapus kelas lama
-           .addClass('bg-green-700 text-white border-transparent'); // Tambah kelas sukses
+        btn.html('<i class="ph-bold ph-check"></i> Masuk')
+           .removeClass('bg-primary bg-gray-900 text-primary border-primary') // Hapus kelas lama
+           .addClass('bg-green-600 text-white border-transparent shadow-none'); // Tambah kelas sukses
+        
+        // Tampilkan notifikasi toast (jika ada elemennya)
+        const $toast = $('#cart-message');
+        if ($toast.length) {
+            $toast.text('Produk berhasil ditambahkan').fadeIn().delay(2000).fadeOut();
+        }
         
         setTimeout(() => {
             // Kembalikan tombol ke semula
             btn.html(originalHTML)
-               .removeClass('bg-green-700 text-white border-transparent')
-               .addClass('bg-primary text-white'); // Asumsi default style primary
-            
-            // Khusus tombol di halaman detail (style outline)
-            if(btn.attr('id') === 'single-add-cart') {
-                 btn.removeClass('bg-primary text-white').addClass('bg-white text-primary border-2 border-primary');
+               .removeClass('bg-green-600 text-white border-transparent shadow-none');
+
+            // Kembalikan class asli berdasarkan ID tombol (handling berbagai tombol di tema)
+            if (btn.attr('id') === 'single-add-cart') {
+                 // Tombol di single-dw_produk (versi lama)
+                 btn.addClass('bg-white text-primary border-2 border-primary');
+            } else if (btn.attr('id') === 'btn-add-to-cart') {
+                 // Tombol di single-dw_produk (versi app style)
+                 btn.addClass('bg-gray-900 text-white');
+            } else {
+                 // Tombol default di archive
+                 btn.addClass('text-primary'); 
             }
         }, 1500);
     });
@@ -109,33 +135,39 @@ jQuery(document).ready(function($) {
         renderCartPage();
     }
 
+    // Fungsi untuk mengubah qty di halaman cart (plus/minus)
+    window.updateCartItemQty = function(id, change) {
+        let cart = getCart();
+        const item = cart.find(i => i.id === id);
+        if (item) {
+            item.qty += change;
+            if (item.qty < 1) item.qty = 1;
+            saveCart(cart);
+            renderCartPage();
+        }
+    }
+
     function renderCartPage() {
         // Hanya jalankan jika elemen container keranjang ada
-        if (!$('#cart-container').length) return;
+        if (!$('#cart-items-container').length) return;
 
         const cart = getCart();
-        const $container = $('#cart-container');
-        const $emptyState = $('#cart-empty-state'); // Elemen kosong bawaan PHP
-        const $summaryCount = $('#summary-count');
-        const $summaryTotal = $('#summary-total');
-        const $btnCheckout = $('#btn-checkout');
+        const $container = $('#cart-items-container');
+        const $emptyState = $('#cart-empty');
+        const $checkoutBar = $('.fixed.bottom-0'); // Checkout bar di page-cart.php
 
         if (cart.length === 0) {
-            // Jika kosong, tampilkan empty state default
-            $container.html('').append(`
-                <div class="p-8 text-center text-gray-500">
-                    <i class="fas fa-shopping-basket text-4xl mb-4 text-gray-300"></i>
-                    <p>Keranjang belanja Anda kosong.</p>
-                    <a href="${dwData.home_url}produk" class="text-primary font-semibold hover:underline mt-2 inline-block">Mulai Belanja</a>
-                </div>
-            `);
-            $summaryCount.text('0 barang');
-            $summaryTotal.text('Rp 0');
-            $btnCheckout.addClass('opacity-50 cursor-not-allowed').prop('href', '#'); // Disable link
+            $container.html('').hide();
+            $emptyState.removeClass('hidden').addClass('flex');
+            $checkoutBar.hide(); // Sembunyikan checkout bar jika kosong
             return;
+        } else {
+            $container.show();
+            $emptyState.addClass('hidden').removeClass('flex');
+            $checkoutBar.show();
         }
 
-        let html = '<div class="divide-y divide-gray-100">';
+        let html = '';
         let total = 0;
         let count = 0;
 
@@ -144,34 +176,50 @@ jQuery(document).ready(function($) {
             total += subtotal;
             count += item.qty;
 
+            // Format Rupiah
+            const formattedPrice = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(item.price);
+
             html += `
-            <div class="p-4 flex gap-4 items-center">
-                <div class="w-20 h-20 bg-gray-100 rounded overflow-hidden flex-shrink-0 border border-gray-200">
+            <div class="bg-white p-3 rounded-2xl shadow-soft border border-gray-50 flex gap-3 relative overflow-hidden group">
+                <!-- Image -->
+                <div class="w-20 h-20 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
                     <img src="${item.thumb}" class="w-full h-full object-cover">
                 </div>
-                <div class="flex-1">
-                    <h4 class="font-semibold text-gray-800 text-sm md:text-base line-clamp-1">${item.title}</h4>
-                    <div class="text-primary font-bold">Rp ${item.price.toLocaleString('id-ID')}</div>
-                    <div class="text-sm text-gray-500 mt-1">Qty: ${item.qty}</div>
+                
+                <!-- Details -->
+                <div class="flex-1 flex flex-col justify-between">
+                    <div>
+                        <h3 class="text-sm font-bold text-gray-800 line-clamp-1">${item.title}</h3>
+                        <p class="text-[10px] text-gray-500">ID: ${item.id}</p>
+                    </div>
+                    <div class="flex justify-between items-end">
+                        <span class="text-sm font-bold text-secondary">${formattedPrice}</span>
+                        
+                        <!-- Qty Control -->
+                        <div class="flex items-center bg-gray-50 rounded-lg border border-gray-200">
+                            <button onclick="updateCartItemQty(${item.id}, -1)" class="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-primary">-</button>
+                            <input type="text" value="${item.qty}" class="w-8 h-6 text-center text-xs bg-transparent border-none p-0 focus:ring-0" readonly>
+                            <button onclick="updateCartItemQty(${item.id}, 1)" class="w-6 h-6 flex items-center justify-center text-gray-500 hover:text-primary">+</button>
+                        </div>
+                    </div>
                 </div>
-                <div class="text-right">
-                    <div class="font-bold text-gray-900 mb-2">Rp ${subtotal.toLocaleString('id-ID')}</div>
-                    <button onclick="removeCartItem(${item.id})" class="text-red-500 text-sm hover:underline flex items-center justify-end gap-1 ml-auto">
-                        <i class="fas fa-trash"></i> Hapus
-                    </button>
-                </div>
+
+                <!-- Delete Button (Top Right) -->
+                <button onclick="removeCartItem(${item.id})" class="absolute top-2 right-2 text-gray-300 hover:text-red-500 p-1">
+                    <i class="ph-bold ph-trash"></i>
+                </button>
             </div>`;
         });
-        html += '</div>';
 
         $container.html(html);
-        $summaryCount.text(count + ' barang');
-        $summaryTotal.text('Rp ' + total.toLocaleString('id-ID'));
-        $btnCheckout.removeClass('opacity-50 cursor-not-allowed').prop('href', dwData.home_url + 'checkout');
+        
+        // Update Total di Checkout Bar
+        $('.fixed.bottom-0 .text-lg.font-bold').text(new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(total));
+        $('.fixed.bottom-0 a').text(`Checkout (${count})`);
     }
 
     // Jalankan render saat load jika di halaman cart
-    if ($('#cart-container').length) {
+    if ($('#cart-items-container').length) {
         renderCartPage();
     }
 
@@ -187,8 +235,7 @@ jQuery(document).ready(function($) {
 
         // Redirect jika keranjang kosong
         if (cart.length === 0) {
-            window.location.href = dwData.home_url + 'cart';
-            return;
+            window.location.href = dwData.home_url + 'keranjang';
         }
 
         let total = 0;
@@ -197,6 +244,8 @@ jQuery(document).ready(function($) {
         // Render ringkasan item di halaman checkout
         cart.forEach(item => {
             total += (item.price * item.qty);
+            const formattedPrice = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(item.price * item.qty);
+            
             html += `
             <div class="flex justify-between items-center text-sm border-b border-gray-50 last:border-0 pb-2 last:pb-0">
                 <div class="flex items-center gap-3">
@@ -206,13 +255,13 @@ jQuery(document).ready(function($) {
                         <div class="text-gray-500 text-xs">x${item.qty}</div>
                     </div>
                 </div>
-                <div class="font-medium">Rp ${(item.price * item.qty).toLocaleString('id-ID')}</div>
+                <div class="font-medium">${formattedPrice}</div>
             </div>`;
         });
 
         $container.html(html);
-        $subtotal.text('Rp ' + total.toLocaleString('id-ID'));
-        $total.text('Rp ' + (total + SERVICE_FEE).toLocaleString('id-ID'));
+        if ($subtotal.length) $subtotal.text('Rp ' + total.toLocaleString('id-ID'));
+        if ($total.length) $total.text('Rp ' + (total + SERVICE_FEE).toLocaleString('id-ID'));
 
         // Handle Form Submit (Buat Pesanan)
         $('#checkout-form').on('submit', function(e) {
@@ -246,7 +295,7 @@ jQuery(document).ready(function($) {
                 contentType: 'application/json',
                 data: JSON.stringify({
                     cart_items: cartPayload,
-                    shipping_address_id: 0, // 0 jika pakai alamat manual (sesuai implementasi API Anda)
+                    shipping_address_id: 0, // 0 jika pakai alamat manual
                     manual_address: addressData, // Kirim data alamat manual
                     seller_shipping_choices: {}, // Jika ada fitur ongkir, ini harus diisi
                     payment_method: 'manual_transfer'
@@ -260,7 +309,6 @@ jQuery(document).ready(function($) {
                     console.error('Checkout Error:', xhr);
                     
                     // Fallback simulasi (Untuk demo jika API belum 100% siap menerima struktur ini)
-                    // Hapus blok ini jika API sudah fix
                     if (xhr.status === 404 || xhr.status === 500) {
                         alert('Mode Simulasi: Order berhasil dibuat! (Data API belum sinkron sepenuhnya)');
                         localStorage.removeItem(CART_KEY);
@@ -281,10 +329,20 @@ jQuery(document).ready(function($) {
     }
 
     /* =========================================
-       5. GENERAL UI (Mobile Menu)
+       5. GENERAL UI (Mobile Menu, Tabs, Carousel)
        ========================================= */
     $('#mobile-menu-btn').on('click', function() {
         $('#mobile-menu').slideToggle();
+    });
+
+    // Product Tabs
+    $('.product-tabs .tab-nav a').on('click', function(e) {
+        e.preventDefault();
+        $('.product-tabs .tab-nav a').removeClass('active');
+        $('.product-tabs .tab-pane').removeClass('active');
+        $(this).addClass('active');
+        var targetId = $(this).attr('href');
+        $(targetId).addClass('active');
     });
 
     /* =========================================
@@ -324,7 +382,6 @@ jQuery(document).ready(function($) {
                 localStorage.setItem('dw_jwt_token', response.token);
 
                 // LANGKAH 2: Login ke Sesi WordPress (Set Cookie Auth)
-                // Agar user bisa akses halaman yang diproteksi WP (seperti Dashboard Toko)
                 $.ajax({
                     type: 'POST',
                     url: dwData.ajax_url,
@@ -353,7 +410,7 @@ jQuery(document).ready(function($) {
                 
                 var msg = 'Login gagal.';
                 if (xhr.responseJSON && xhr.responseJSON.code === 'rest_no_route') {
-                    msg = '<strong>Error Rute API:</strong> Jalur API tidak ditemukan. Mohon masuk ke Admin > Settings > Permalinks dan klik "Save Changes" untuk memperbaiki ini.';
+                    msg = '<strong>Error Rute API:</strong> Jalur API tidak ditemukan. Mohon Admin masuk ke Settings > Permalinks dan klik "Save Changes".';
                 } else if (xhr.responseJSON && xhr.responseJSON.message) {
                     msg = xhr.responseJSON.message;
                 } else if (xhr.status === 404) {
