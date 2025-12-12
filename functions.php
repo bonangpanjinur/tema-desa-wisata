@@ -45,7 +45,9 @@ function tema_dw_scripts() {
 
     wp_enqueue_style( 'tema-dw-style', get_stylesheet_uri() );
     wp_enqueue_style('font-awesome', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
-    wp_enqueue_script( 'tema-dw-main-js', get_template_directory_uri() . '/assets/js/main.js', array('jquery'), '1.0.1', true );
+    
+    // Versi script di-bump ke 1.0.2 untuk refresh cache browser
+    wp_enqueue_script( 'tema-dw-main-js', get_template_directory_uri() . '/assets/js/main.js', array('jquery'), '1.0.2', true );
 
     wp_localize_script( 'tema-dw-main-js', 'dwData', array(
         'ajax_url' => admin_url( 'admin-ajax.php' ),
@@ -57,7 +59,7 @@ function tema_dw_scripts() {
 }
 add_action( 'wp_enqueue_scripts', 'tema_dw_scripts' );
 
-// 3. Helper: Cek Harga Produk (NAMA FUNGSI DIGANTI)
+// 3. Helper: Cek Harga Produk
 function tema_dw_get_product_price_html($post_id) {
     $harga = get_post_meta($post_id, '_price', true);
     if (!$harga) {
@@ -66,7 +68,7 @@ function tema_dw_get_product_price_html($post_id) {
     return '<span class="text-primary font-bold">Rp ' . number_format($harga, 0, ',', '.') . '</span>';
 }
 
-// 4. Helper: Redirect Pedagang (NAMA FUNGSI DIGANTI)
+// 4. Helper: Redirect Pedagang
 function tema_dw_login_redirect( $redirect_to, $request, $user ) {
     if ( isset( $user->roles ) && is_array( $user->roles ) ) {
         if ( in_array( 'pedagang', $user->roles ) ) {
@@ -77,7 +79,7 @@ function tema_dw_login_redirect( $redirect_to, $request, $user ) {
 }
 add_filter( 'login_redirect', 'tema_dw_login_redirect', 10, 3 );
 
-// 5. Hide Admin Bar (NAMA FUNGSI DIGANTI)
+// 5. Hide Admin Bar
 function tema_dw_disable_admin_bar() {
     if ( ! current_user_can( 'administrator' ) && ! is_admin() ) {
         show_admin_bar( false );
@@ -85,7 +87,7 @@ function tema_dw_disable_admin_bar() {
 }
 add_action( 'after_setup_theme', 'tema_dw_disable_admin_bar' );
 
-// 6. Handler AJAX Login (NAMA FUNGSI & ACTION DIGANTI)
+// 6. Handler AJAX Login
 function tema_dw_ajax_login_handler() {
     check_ajax_referer( 'wp_rest', 'security' );
 
@@ -106,6 +108,15 @@ function tema_dw_ajax_login_handler() {
         ) );
     }
 }
-// Menggunakan nama action baru 'tema_dw_ajax_login' agar tidak bentrok dengan plugin
 add_action( 'wp_ajax_tema_dw_ajax_login', 'tema_dw_ajax_login_handler' );
 add_action( 'wp_ajax_nopriv_tema_dw_ajax_login', 'tema_dw_ajax_login_handler' );
+
+// 7. AUTO FIX: Flush Rewrite Rules (Sekali Jalan)
+// Ini akan memperbaiki error "No Route" secara otomatis
+function tema_dw_auto_flush_rewrite() {
+    if ( ! get_option( 'tema_dw_rewrite_flushed' ) ) {
+        flush_rewrite_rules();
+        update_option( 'tema_dw_rewrite_flushed', true );
+    }
+}
+add_action( 'init', 'tema_dw_auto_flush_rewrite' );
