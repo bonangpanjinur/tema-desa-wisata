@@ -188,6 +188,7 @@ jQuery(document).ready(function($) {
         // Redirect jika keranjang kosong
         if (cart.length === 0) {
             window.location.href = dwData.home_url + 'cart';
+            return;
         }
 
         let total = 0;
@@ -463,4 +464,5 @@ jQuery(document).ready(function($) {
             }
         });
     });
+
 });
