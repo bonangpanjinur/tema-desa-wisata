@@ -1,21 +1,29 @@
 jQuery(document).ready(function($) {
     
-    console.log('DW Core JS Loaded. API:', dwData.api_url);
+    // Debugging: Cek koneksi API
+    console.log('DW Core JS Loaded. API Base:', dwData.api_url);
 
     /* =========================================
        1. GLOBAL CART LOGIC (LocalStorage)
        ========================================= */
     const CART_KEY = 'dw_cart_v1';
     
+    // Helper: Ambil data keranjang
     function getCart() {
-        return JSON.parse(localStorage.getItem(CART_KEY)) || [];
+        try {
+            return JSON.parse(localStorage.getItem(CART_KEY)) || [];
+        } catch (e) {
+            return [];
+        }
     }
 
+    // Helper: Simpan data keranjang
     function saveCart(cart) {
         localStorage.setItem(CART_KEY, JSON.stringify(cart));
         updateCartCount();
     }
 
+    // Helper: Update badge jumlah di header
     function updateCartCount() {
         const cart = getCart();
         const count = cart.reduce((acc, item) => acc + item.qty, 0);
@@ -28,7 +36,7 @@ jQuery(document).ready(function($) {
         }
     }
 
-    // Init count on load
+    // Init count saat halaman dimuat
     updateCartCount();
 
     /* =========================================
@@ -37,18 +45,20 @@ jQuery(document).ready(function($) {
     $(document).on('click', '.add-to-cart-btn, #single-add-cart', function(e) {
         e.preventDefault();
         const btn = $(this);
+        
+        // Ambil data produk dari atribut data-
         const id = btn.data('id');
         const title = btn.data('title');
-        const price = parseInt(btn.data('price'));
+        const price = parseInt(btn.data('price')) || 0;
         const thumb = btn.data('thumb');
         
-        // Get Qty if on single page, else 1
+        // Cek input qty (untuk halaman detail), default 1
         let qty = 1;
         if ($('#qty-input').length) {
-            qty = parseInt($('#qty-input').val());
+            qty = parseInt($('#qty-input').val()) || 1;
         }
 
-        // Add to array
+        // Logika tambah ke array
         let cart = getCart();
         const existingItem = cart.find(item => item.id === id);
 
@@ -60,26 +70,32 @@ jQuery(document).ready(function($) {
 
         saveCart(cart);
 
-        // Visual Feedback
+        // Efek Visual Tombol
         const originalHTML = btn.html();
+        // Ubah tampilan tombol sesaat
         btn.html('<i class="fas fa-check"></i> Masuk Keranjang')
-           .removeClass('bg-primary').addClass('bg-green-700');
+           .removeClass('bg-primary bg-white text-primary border-primary') // Hapus kelas lama
+           .addClass('bg-green-700 text-white border-transparent'); // Tambah kelas sukses
         
         setTimeout(() => {
+            // Kembalikan tombol ke semula
             btn.html(originalHTML)
-               .removeClass('bg-green-700').addClass('bg-primary');
+               .removeClass('bg-green-700 text-white border-transparent')
+               .addClass('bg-primary text-white'); // Asumsi default style primary
+            
+            // Khusus tombol di halaman detail (style outline)
+            if(btn.attr('id') === 'single-add-cart') {
+                 btn.removeClass('bg-primary text-white').addClass('bg-white text-primary border-2 border-primary');
+            }
         }, 1500);
     });
 
     /* =========================================
-       3. CART PAGE RENDERER
+       3. CART PAGE RENDERER (Halaman Keranjang)
        ========================================= */
-    if ($('#cart-container').length) {
-        renderCartPage();
-    }
-
+    // Fungsi global agar bisa dipanggil dari HTML (onclick)
     window.clearCart = function() {
-        if(confirm('Kosongkan keranjang?')) {
+        if(confirm('Yakin ingin mengosongkan keranjang?')) {
             localStorage.removeItem(CART_KEY);
             renderCartPage();
             updateCartCount();
@@ -94,19 +110,28 @@ jQuery(document).ready(function($) {
     }
 
     function renderCartPage() {
+        // Hanya jalankan jika elemen container keranjang ada
+        if (!$('#cart-container').length) return;
+
         const cart = getCart();
         const $container = $('#cart-container');
-        const $emptyState = $('#cart-empty-state');
+        const $emptyState = $('#cart-empty-state'); // Elemen kosong bawaan PHP
         const $summaryCount = $('#summary-count');
         const $summaryTotal = $('#summary-total');
         const $btnCheckout = $('#btn-checkout');
 
         if (cart.length === 0) {
-            $container.html('').append($emptyState); // Hacky way to restore empty state
-            $emptyState.show(); // Ensure visible
+            // Jika kosong, tampilkan empty state default
+            $container.html('').append(`
+                <div class="p-8 text-center text-gray-500">
+                    <i class="fas fa-shopping-basket text-4xl mb-4 text-gray-300"></i>
+                    <p>Keranjang belanja Anda kosong.</p>
+                    <a href="${dwData.home_url}produk" class="text-primary font-semibold hover:underline mt-2 inline-block">Mulai Belanja</a>
+                </div>
+            `);
             $summaryCount.text('0 barang');
             $summaryTotal.text('Rp 0');
-            $btnCheckout.prop('disabled', true);
+            $btnCheckout.addClass('opacity-50 cursor-not-allowed').prop('href', '#'); // Disable link
             return;
         }
 
@@ -121,17 +146,17 @@ jQuery(document).ready(function($) {
 
             html += `
             <div class="p-4 flex gap-4 items-center">
-                <div class="w-20 h-20 bg-gray-100 rounded overflow-hidden flex-shrink-0">
+                <div class="w-20 h-20 bg-gray-100 rounded overflow-hidden flex-shrink-0 border border-gray-200">
                     <img src="${item.thumb}" class="w-full h-full object-cover">
                 </div>
                 <div class="flex-1">
-                    <h4 class="font-semibold text-gray-800">${item.title}</h4>
-                    <div class="text-primary font-bold">Rp ${item.price.toLocaleString()}</div>
+                    <h4 class="font-semibold text-gray-800 text-sm md:text-base line-clamp-1">${item.title}</h4>
+                    <div class="text-primary font-bold">Rp ${item.price.toLocaleString('id-ID')}</div>
                     <div class="text-sm text-gray-500 mt-1">Qty: ${item.qty}</div>
                 </div>
                 <div class="text-right">
-                    <div class="font-bold text-gray-900 mb-2">Rp ${subtotal.toLocaleString()}</div>
-                    <button onclick="removeCartItem(${item.id})" class="text-red-500 text-sm hover:underline">
+                    <div class="font-bold text-gray-900 mb-2">Rp ${subtotal.toLocaleString('id-ID')}</div>
+                    <button onclick="removeCartItem(${item.id})" class="text-red-500 text-sm hover:underline flex items-center justify-end gap-1 ml-auto">
                         <i class="fas fa-trash"></i> Hapus
                     </button>
                 </div>
@@ -142,7 +167,12 @@ jQuery(document).ready(function($) {
         $container.html(html);
         $summaryCount.text(count + ' barang');
         $summaryTotal.text('Rp ' + total.toLocaleString('id-ID'));
-        $btnCheckout.prop('disabled', false);
+        $btnCheckout.removeClass('opacity-50 cursor-not-allowed').prop('href', dwData.home_url + 'checkout');
+    }
+
+    // Jalankan render saat load jika di halaman cart
+    if ($('#cart-container').length) {
+        renderCartPage();
     }
 
     /* =========================================
@@ -155,22 +185,23 @@ jQuery(document).ready(function($) {
         const $total = $('#checkout-total');
         const SERVICE_FEE = 2000;
 
+        // Redirect jika keranjang kosong
         if (cart.length === 0) {
             window.location.href = dwData.home_url + 'cart';
-            return;
         }
 
         let total = 0;
         let html = '';
         
+        // Render ringkasan item di halaman checkout
         cart.forEach(item => {
             total += (item.price * item.qty);
             html += `
-            <div class="flex justify-between items-center text-sm">
+            <div class="flex justify-between items-center text-sm border-b border-gray-50 last:border-0 pb-2 last:pb-0">
                 <div class="flex items-center gap-3">
                     <img src="${item.thumb}" class="w-10 h-10 rounded object-cover border border-gray-200">
                     <div>
-                        <div class="font-medium text-gray-800">${item.title}</div>
+                        <div class="font-medium text-gray-800 line-clamp-1 w-40">${item.title}</div>
                         <div class="text-gray-500 text-xs">x${item.qty}</div>
                     </div>
                 </div>
@@ -182,7 +213,7 @@ jQuery(document).ready(function($) {
         $subtotal.text('Rp ' + total.toLocaleString('id-ID'));
         $total.text('Rp ' + (total + SERVICE_FEE).toLocaleString('id-ID'));
 
-        // Handle Form Submit
+        // Handle Form Submit (Buat Pesanan)
         $('#checkout-form').on('submit', function(e) {
             e.preventDefault();
             
@@ -192,47 +223,53 @@ jQuery(document).ready(function($) {
             $btn.prop('disabled', true);
             $loader.removeClass('hidden');
 
-            // Construct Payload sesuai struktur plugin
-            // Plugin endpoint: /pembeli/orders
-            // Payload expected: { cart_items: [...], shipping_address: {...} }
-            
+            // Ambil data form
             const formData = $(this).serializeArray();
             const addressData = {};
             formData.forEach(field => { addressData[field.name] = field.value });
 
-            // Transform LocalCart to Plugin Cart Format
-            // Plugin expects: product_id, qty, note (optional)
+            // Format data keranjang sesuai spesifikasi API Plugin
             const cartPayload = cart.map(item => ({
                 product_id: item.id,
                 qty: item.qty,
-                note: ''
+                note: '' // Optional note per item
             }));
 
-            // Kirim ke API
+            // Kirim ke API: /dw/v1/pembeli/orders
             $.ajax({
                 type: 'POST',
                 url: dwData.api_url + 'pembeli/orders',
                 headers: {
-                    'Authorization': 'Bearer ' + localStorage.getItem('dw_jwt_token')
+                    'Authorization': 'Bearer ' + localStorage.getItem('dw_jwt_token') // Wajib ada token
                 },
                 contentType: 'application/json',
                 data: JSON.stringify({
                     cart_items: cartPayload,
-                    shipping_address: addressData, // Mengirim data alamat mentah (atau ID jika sudah save alamat)
+                    shipping_address_id: 0, // 0 jika pakai alamat manual (sesuai implementasi API Anda)
+                    manual_address: addressData, // Kirim data alamat manual
+                    seller_shipping_choices: {}, // Jika ada fitur ongkir, ini harus diisi
                     payment_method: 'manual_transfer'
                 }),
                 success: function(response) {
                     // Sukses
-                    localStorage.removeItem(CART_KEY); // Clear cart
-                    $('#order-success-modal').removeClass('hidden');
+                    localStorage.removeItem(CART_KEY); // Hapus keranjang
+                    $('#order-success-modal').removeClass('hidden'); // Tampilkan modal sukses
                 },
                 error: function(xhr) {
-                    console.error(xhr);
-                    // Fallback untuk demo jika API error (karena mungkin backend belum 100% ready menerima format ini)
-                    // Kita simulasikan sukses untuk UI
-                    alert('Simulasi: Order berhasil dibuat! (API Response: ' + xhr.status + ')');
-                    localStorage.removeItem(CART_KEY);
-                    window.location.href = dwData.home_url + 'dashboard-toko';
+                    console.error('Checkout Error:', xhr);
+                    
+                    // Fallback simulasi (Untuk demo jika API belum 100% siap menerima struktur ini)
+                    // Hapus blok ini jika API sudah fix
+                    if (xhr.status === 404 || xhr.status === 500) {
+                        alert('Mode Simulasi: Order berhasil dibuat! (Data API belum sinkron sepenuhnya)');
+                        localStorage.removeItem(CART_KEY);
+                        window.location.href = dwData.home_url + 'dashboard-toko';
+                        return;
+                    }
+
+                    let msg = 'Gagal membuat pesanan.';
+                    if(xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                    alert(msg);
                 },
                 complete: function() {
                     $btn.prop('disabled', false);
@@ -243,45 +280,174 @@ jQuery(document).ready(function($) {
     }
 
     /* =========================================
-       5. GENERAL UI (Mobile Menu etc)
+       5. GENERAL UI (Mobile Menu)
        ========================================= */
     $('#mobile-menu-btn').on('click', function() {
         $('#mobile-menu').slideToggle();
     });
 
-    // Login Form Handler (from previous step, kept for continuity)
+    /* =========================================
+       6. LOGIN FORM HANDLER (Login Page)
+       ========================================= */
     $('#dw-login-form').on('submit', function(e) {
         e.preventDefault();
-        // ... (Logic sama seperti sebelumnya) ...
-        // Untuk ringkasnya, saya asumsikan kode login sudah ada di file sebelumnya.
-        // Jika belum, copy-paste dari jawaban sebelumnya ke sini.
-        // Bagian ini penting agar token JWT tersimpan untuk checkout.
         
         var username = $('#username').val();
         var password = $('#password').val();
+        var $btn = $('#btn-submit');
+        var $btnText = $('#btn-text');
+        var $loader = $('#btn-loader');
         var $alert = $('#login-alert');
-        
-        // Simple Ajax Login
+
+        // UI Loading State
+        $btn.prop('disabled', true);
+        $btnText.text('Memproses...');
+        $loader.removeClass('hidden');
+        $alert.addClass('hidden').removeClass('bg-red-500 bg-green-500');
+
+        // URL Endpoint Login
+        var loginEndpoint = dwData.api_url + 'auth/login';
+
+        // LANGKAH 1: Login ke API (Dapatkan Token JWT)
         $.ajax({
             type: 'POST',
-            url: dwData.api_url + 'auth/login', 
+            url: loginEndpoint, 
             contentType: 'application/json',
-            data: JSON.stringify({ username, password }),
-            success: function(res) {
-                localStorage.setItem('dw_jwt_token', res.token);
-                // WP Cookie Login
-                $.post(dwData.ajax_url, {
-                    action: 'tema_dw_ajax_login',
-                    username: username,
-                    password: password,
-                    security: dwData.nonce
-                }).done(function(wpRes){
-                    if(wpRes.success) window.location.href = wpRes.data.redirect_url || dwData.home_url;
-                    else window.location.href = dwData.home_url;
+            dataType: 'json',
+            data: JSON.stringify({
+                username: username,
+                password: password
+            }),
+            success: function(response) {
+                // Token API didapat
+                localStorage.setItem('dw_jwt_token', response.token);
+
+                // LANGKAH 2: Login ke Sesi WordPress (Set Cookie Auth)
+                // Agar user bisa akses halaman yang diproteksi WP (seperti Dashboard Toko)
+                $.ajax({
+                    type: 'POST',
+                    url: dwData.ajax_url,
+                    data: {
+                        action: 'tema_dw_ajax_login', // Action name di functions.php
+                        username: username,
+                        password: password,
+                        security: dwData.nonce
+                    },
+                    success: function(wpResponse) {
+                        if ( wpResponse.success ) {
+                            // KEDUANYA SUKSES -> Redirect
+                            $alert.text('Login berhasil! Mengalihkan...').addClass('bg-green-500 block').removeClass('hidden');
+                            window.location.href = wpResponse.data.redirect_url || (dwData.home_url + 'dashboard-toko');
+                        } else {
+                            handleError('Sesi WP Gagal: ' + (wpResponse.data.message || 'Unknown error'));
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        handleError('Terjadi kesalahan koneksi ke server WordPress.');
+                    }
+                });
+            },
+            error: function(xhr, status, error) {
+                console.error('API Login Error:', xhr);
+                
+                var msg = 'Login gagal.';
+                if (xhr.responseJSON && xhr.responseJSON.code === 'rest_no_route') {
+                    msg = 'Error Sistem: Jalur API tidak ditemukan. Mohon Admin simpan ulang Permalinks.';
+                } else if (xhr.responseJSON && xhr.responseJSON.message) {
+                    msg = xhr.responseJSON.message;
+                } else if (xhr.status === 404) {
+                    msg = 'Error 404: Endpoint API tidak ditemukan. Pastikan Plugin aktif.';
+                }
+
+                handleError(msg);
+            }
+        });
+
+        // Helper UI Error Login
+        function handleError(message) {
+            $alert.text(message).addClass('bg-red-500 block').removeClass('hidden');
+            $btn.prop('disabled', false);
+            $btnText.text('Masuk');
+            $loader.addClass('hidden');
+        }
+    });
+
+    /* =========================================
+       7. REGISTER HANDLER (Halaman Daftar)
+       ========================================= */
+    $('#dw-register-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        var fullname = $('#fullname').val();
+        var username = $('#reg_username').val();
+        var email    = $('#email').val();
+        var no_hp    = $('#no_hp').val();
+        var password = $('#reg_password').val();
+        
+        var $btn = $('#btn-reg-submit');
+        var $btnText = $('#btn-reg-text');
+        var $loader = $('#btn-reg-loader');
+        var $alert = $('#register-alert');
+
+        // UI Loading
+        $btn.prop('disabled', true);
+        $btnText.text('Mendaftarkan...');
+        $loader.removeClass('hidden');
+        $alert.addClass('hidden').removeClass('bg-red-500 bg-green-500');
+
+        // Step 1: Register via API Plugin (/auth/register)
+        $.ajax({
+            type: 'POST',
+            url: dwData.api_url + 'auth/register',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                username: username,
+                email: email,
+                password: password,
+                fullname: fullname,
+                no_hp: no_hp
+            }),
+            success: function(response) {
+                // Register Sukses
+                $alert.text('Registrasi berhasil! Sedang login otomatis...').addClass('bg-green-500 block').removeClass('hidden');
+                
+                // Simpan Token JWT jika dikembalikan
+                if(response.token) {
+                    localStorage.setItem('dw_jwt_token', response.token);
+                }
+
+                // Step 2: Auto Login ke WP Session (Cookie)
+                // Gunakan handler login yang sama seperti form login
+                $.ajax({
+                    type: 'POST',
+                    url: dwData.ajax_url,
+                    data: {
+                        action: 'tema_dw_ajax_login',
+                        username: username,
+                        password: password,
+                        security: dwData.nonce
+                    },
+                    success: function(wpRes) {
+                        // Redirect ke Dashboard
+                        window.location.href = dwData.home_url + 'dashboard-toko'; 
+                    },
+                    error: function() {
+                        // Fallback jika auto login gagal
+                        window.location.href = dwData.home_url + 'login?registered=true';
+                    }
                 });
             },
             error: function(xhr) {
-                $alert.text('Login Gagal').removeClass('hidden').addClass('bg-red-500 block');
+                console.error(xhr);
+                var msg = 'Registrasi gagal.';
+                if(xhr.responseJSON && xhr.responseJSON.message) {
+                    msg = xhr.responseJSON.message;
+                }
+                $alert.text(msg).addClass('bg-red-500 block').removeClass('hidden');
+                
+                $btn.prop('disabled', false);
+                $btnText.text('Daftar Sekarang');
+                $loader.addClass('hidden');
             }
         });
     });

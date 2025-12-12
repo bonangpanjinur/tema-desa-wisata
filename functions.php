@@ -110,13 +110,19 @@ function tema_dw_ajax_login_handler() {
 }
 add_action( 'wp_ajax_tema_dw_ajax_login', 'tema_dw_ajax_login_handler' );
 add_action( 'wp_ajax_nopriv_tema_dw_ajax_login', 'tema_dw_ajax_login_handler' );
+// 7. Redirect Halaman Lost Password Bawaan WP
+function tema_dw_custom_lost_password_url( $lostpassword_url, $redirect ) {
+    return home_url( '/lupa-password/' ); // Pastikan slug halaman sesuai dengan yang Anda buat
+}
+add_filter( 'lostpassword_url', 'tema_dw_custom_lost_password_url', 10, 2 );
 
-// 7. AUTO FIX: Flush Rewrite Rules (Sekali Jalan)
-// Ini akan memperbaiki error "No Route" secara otomatis
-function tema_dw_auto_flush_rewrite() {
-    if ( ! get_option( 'tema_dw_rewrite_flushed' ) ) {
-        flush_rewrite_rules();
-        update_option( 'tema_dw_rewrite_flushed', true );
+// 8. Redirect setelah Reset Password (Optional)
+// Agar user tidak bingung setelah klik link di email
+function tema_dw_login_url_redirect() {
+    // Jika user mengakses wp-login.php?action=lostpassword secara manual
+    if ( isset( $_GET['action'] ) && $_GET['action'] == 'lostpassword' && ! is_user_logged_in() ) {
+        wp_redirect( home_url( '/lupa-password/' ) );
+        exit;
     }
 }
-add_action( 'init', 'tema_dw_auto_flush_rewrite' );
+add_action( 'init', 'tema_dw_login_url_redirect' );

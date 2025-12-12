@@ -1,92 +1,91 @@
 <?php
 /**
- * Template Name: Halaman Pendaftaran
- * Description: Form registrasi custom untuk Pedagang dan Pembeli
+ * Template Name: Halaman Register
  */
 
-// Jika sudah login, redirect ke dashboard
 if ( is_user_logged_in() ) {
-    $current_user = wp_get_current_user();
-    if ( in_array( 'pedagang', (array) $current_user->roles ) ) {
-        wp_redirect( home_url( '/dashboard-toko/' ) );
-    } else {
-        wp_redirect( home_url( '/akun-saya/' ) );
-    }
+    wp_redirect( home_url('/dashboard-toko') );
     exit;
 }
 
-get_header(); ?>
+get_header(); 
+?>
 
-<div class="dw-login-container" style="padding: 60px 20px; background: #f4f6f8; min-height: 80vh;">
-    <div class="dw-login-box" style="background: white; max-width: 500px; margin: 0 auto; padding: 40px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
-        <h2 style="text-align: center; margin-bottom: 30px; color: var(--primary-dark);">Buat Akun Baru</h2>
+<div class="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div class="sm:mx-auto sm:w-full sm:max-w-md">
+        <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+            Daftar Akun Baru
+        </h2>
+        <p class="mt-2 text-center text-sm text-gray-600">
+            Sudah punya akun?
+            <a href="<?php echo home_url('/login'); ?>" class="font-medium text-primary hover:text-green-500">
+                Masuk di sini
+            </a>
+        </p>
+    </div>
 
-        <?php
-        // Menampilkan pesan error/sukses
-        if ( isset( $_GET['register'] ) ) {
-            if ( $_GET['register'] == 'success' ) {
-                echo '<div class="dw-alert success" style="background: #e8f5e9; color: #2e7d32; padding: 15px; margin-bottom: 20px; border-radius: 4px;">Pendaftaran berhasil! Silakan cek email atau <a href="'.home_url('/login/').'">Login di sini</a>.</div>';
-            } elseif ( $_GET['register'] == 'failed' ) {
-                echo '<div class="dw-alert error" style="background: #ffebee; color: #c62828; padding: 15px; margin-bottom: 20px; border-radius: 4px;">Pendaftaran gagal. Username atau Email mungkin sudah terdaftar.</div>';
-            } elseif ( $_GET['register'] == 'empty' ) {
-                echo '<div class="dw-alert warning" style="background: #fff3e0; color: #ef6c00; padding: 15px; margin-bottom: 20px; border-radius: 4px;">Harap isi semua kolom wajib.</div>';
-            }
-        }
-        ?>
-
-        <form action="" method="post" id="dw-register-form">
+    <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+        <div class="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
             
-            <!-- Nama Lengkap -->
-            <div class="form-group" style="margin-bottom: 20px;">
-                <label for="dw_fullname" style="display: block; margin-bottom: 8px; font-weight: 500;">Nama Lengkap</label>
-                <input type="text" name="dw_fullname" id="dw_fullname" class="input" required placeholder="Nama sesuai KTP">
-            </div>
+            <!-- Alert Container -->
+            <div id="register-alert" class="hidden mb-4 p-4 rounded text-sm text-white"></div>
 
-            <!-- Username -->
-            <div class="form-group" style="margin-bottom: 20px;">
-                <label for="dw_username" style="display: block; margin-bottom: 8px; font-weight: 500;">Username</label>
-                <input type="text" name="dw_username" id="dw_username" class="input" required placeholder="Tanpa spasi, cth: tokobudi">
-            </div>
+            <form id="dw-register-form" class="space-y-6">
+                <!-- Nama Lengkap -->
+                <div>
+                    <label for="fullname" class="block text-sm font-medium text-gray-700"> Nama Lengkap </label>
+                    <div class="mt-1">
+                        <input id="fullname" name="fullname" type="text" required class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm">
+                    </div>
+                </div>
 
-            <!-- Email -->
-            <div class="form-group" style="margin-bottom: 20px;">
-                <label for="dw_email" style="display: block; margin-bottom: 8px; font-weight: 500;">Alamat Email</label>
-                <input type="email" name="dw_email" id="dw_email" class="input" required placeholder="email@contoh.com">
-            </div>
+                <!-- Username -->
+                <div>
+                    <label for="reg_username" class="block text-sm font-medium text-gray-700"> Username </label>
+                    <div class="mt-1">
+                        <input id="reg_username" name="username" type="text" required class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm">
+                    </div>
+                </div>
 
-            <!-- Password -->
-            <div class="form-group" style="margin-bottom: 20px;">
-                <label for="dw_password" style="display: block; margin-bottom: 8px; font-weight: 500;">Password</label>
-                <input type="password" name="dw_password" id="dw_password" class="input" required minlength="6">
-            </div>
+                <!-- Email & No HP Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="email" class="block text-sm font-medium text-gray-700"> Email </label>
+                        <div class="mt-1">
+                            <input id="email" name="email" type="email" required class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm">
+                        </div>
+                    </div>
+                    <div>
+                        <label for="no_hp" class="block text-sm font-medium text-gray-700"> No. WhatsApp </label>
+                        <div class="mt-1">
+                            <input id="no_hp" name="no_hp" type="text" required placeholder="0812..." class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm">
+                        </div>
+                    </div>
+                </div>
 
-            <!-- Pilihan Peran (Role) -->
-            <div class="form-group" style="margin-bottom: 25px;">
-                <label style="display: block; margin-bottom: 8px; font-weight: 500;">Saya ingin mendaftar sebagai:</label>
-                <div style="display: flex; gap: 20px;">
-                    <label style="cursor: pointer; display: flex; align-items: center; gap: 8px;">
-                        <input type="radio" name="dw_role" value="pembeli" checked> 
-                        <span>Pembeli / Wisatawan</span>
-                    </label>
-                    <label style="cursor: pointer; display: flex; align-items: center; gap: 8px;">
-                        <input type="radio" name="dw_role" value="pedagang"> 
-                        <span>Pedagang Desa</span>
+                <!-- Password -->
+                <div>
+                    <label for="reg_password" class="block text-sm font-medium text-gray-700"> Password </label>
+                    <div class="mt-1">
+                        <input id="reg_password" name="password" type="password" required class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm">
+                    </div>
+                </div>
+
+                <div class="flex items-center">
+                    <input id="terms" name="terms" type="checkbox" required class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded">
+                    <label for="terms" class="ml-2 block text-sm text-gray-900">
+                        Saya setuju dengan <a href="#" class="text-primary hover:underline">Syarat & Ketentuan</a>
                     </label>
                 </div>
-                <small style="display: block; margin-top: 5px; color: #666;">*Pedagang memerlukan verifikasi admin desa nanti.</small>
-            </div>
 
-            <!-- Tombol Daftar -->
-            <div class="form-actions">
-                <?php wp_nonce_field( 'dw_register_action', 'dw_register_nonce' ); ?>
-                <button type="submit" name="dw_register_submit" class="btn-primary" style="width: 100%; padding: 12px;">Daftar Sekarang</button>
-            </div>
-
-        </form>
-
-        <p style="text-align: center; margin-top: 20px; color: #666;">
-            Sudah punya akun? <a href="<?php echo home_url('/login/'); ?>" style="color: var(--primary-color); font-weight: 600;">Masuk di sini</a>
-        </p>
+                <div>
+                    <button type="submit" id="btn-reg-submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                        <span id="btn-reg-text">Daftar Sekarang</span>
+                        <i id="btn-reg-loader" class="fas fa-spinner fa-spin ml-2 hidden"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 
