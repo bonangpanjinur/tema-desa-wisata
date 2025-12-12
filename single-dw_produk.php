@@ -1,150 +1,238 @@
-<?php get_header(); ?>
+<?php
+/**
+ * Template Name: Single Produk Desa Wisata
+ * Description: Menampilkan detail lengkap produk, galeri, dan info penjual.
+ */
 
-<?php while (have_posts()) : the_post(); 
-    $product_id = get_the_ID();
-    
-    // Ambil Meta Data dari Plugin
-    $harga = get_post_meta($product_id, '_dw_harga_dasar', true); // Sesuaikan meta key dengan plugin
-    $stok = get_post_meta($product_id, '_dw_stok', true);
-    $gallery = get_post_meta($product_id, '_dw_galeri_foto', true);
-    
-    // Data Penjual (Pedagang)
+get_header(); ?>
+
+<?php while ( have_posts() ) : the_post(); 
+    // Mengambil Meta Data dari Plugin
+    $post_id = get_the_ID();
+    $harga = get_post_meta($post_id, '_dw_harga_dasar', true);
+    $stok = get_post_meta($post_id, '_dw_stok', true); // Bisa angka atau string kosong (unlimited)
+    $gallery_ids = get_post_meta($post_id, '_dw_galeri_foto', true); // String ID dipisah koma
     $author_id = get_the_author_meta('ID');
     
-    // Ambil data detail pedagang dari custom table plugin
-    global $wpdb;
-    $pedagang = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}dw_pedagang WHERE id_user = %d", $author_id));
+    // Data Toko / Penjual (Integrasi User Meta / Custom Table Plugin)
+    // Asumsi: Nama toko disimpan di user meta atau tabel pedagang. Kita pakai Display Name dulu untuk aman.
+    $store_name = get_the_author(); 
+    $store_avatar = get_avatar_url($author_id);
     
-    $nama_toko = $pedagang ? $pedagang->nama_toko : get_the_author_meta('display_name');
-    $foto_profil_toko = $pedagang && $pedagang->foto_profil ? $pedagang->foto_profil : 'https://via.placeholder.com/100?text=Toko';
-    $id_desa = $pedagang ? $pedagang->id_desa : 0;
-    
-    // Ambil Data Desa jika ada
-    $nama_desa = '';
-    if ($id_desa) {
-        $desa = $wpdb->get_row($wpdb->prepare("SELECT nama_desa FROM {$wpdb->prefix}dw_desa WHERE id = %d", $id_desa));
-        if ($desa) {
-            $nama_desa = $desa->nama_desa;
-        }
-    }
-
-    // Link Profile Toko (Mengarah ke Archive Produk difilter by Author)
-    $link_toko = get_author_posts_url($author_id); 
-    
-    // Link Profile Desa (Mengarah ke halaman Wisata difilter by Desa ID - asumsi implementasi filter di page-wisata.php)
-    // Atau bisa buat page khusus profile desa. Untuk sekarang kita arahkan ke pencarian wisata di desa tersebut.
-    $link_desa = site_url('/wisata/?desa_id=' . $id_desa); 
-
-    $main_image = get_the_post_thumbnail_url($product_id, 'full');
+    // Thumbnail Utama
+    $main_thumb_url = has_post_thumbnail() ? get_the_post_thumbnail_url(null, 'large') : 'https://via.placeholder.com/800x600?text=No+Image';
 ?>
 
-<!-- Full Image with Back Button Overlay -->
-<div class="relative w-full h-[320px] bg-gray-200">
-    <?php if($main_image): ?>
-        <img src="<?php echo esc_url($main_image); ?>" class="w-full h-full object-cover">
-    <?php else: ?>
-        <div class="w-full h-full flex items-center justify-center text-gray-400 bg-gray-100"><i class="ph-duotone ph-image text-4xl"></i></div>
-    <?php endif; ?>
-    
-    <div class="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-black/60 to-transparent p-5 flex justify-between items-start">
-        <a href="javascript:history.back()" class="w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-white/30 transition">
-            <i class="ph-bold ph-arrow-left text-xl"></i>
-        </a>
-        <a href="<?php echo site_url('/keranjang'); ?>" class="w-10 h-10 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center text-white hover:bg-white/30 transition relative">
-            <i class="ph-bold ph-shopping-cart text-xl"></i>
-            <!-- Badge count logic here if needed -->
-        </a>
-    </div>
-</div>
+<div class="bg-white py-8 min-h-screen">
+    <div class="container mx-auto px-4">
+        
+        <!-- Breadcrumb -->
+        <nav class="flex text-sm text-gray-500 mb-8 overflow-x-auto whitespace-nowrap pb-2">
+            <a href="<?php echo home_url(); ?>" class="hover:text-primary transition">Beranda</a>
+            <span class="mx-2 text-gray-300">/</span>
+            <a href="<?php echo get_post_type_archive_link('dw_produk'); ?>" class="hover:text-primary transition">Produk</a>
+            <span class="mx-2 text-gray-300">/</span>
+            <span class="text-gray-800 font-medium truncate"><?php the_title(); ?></span>
+        </nav>
 
-<!-- Content Container (Rounded Top) -->
-<div class="relative -mt-8 bg-white rounded-t-[2rem] px-6 py-8 min-h-[50vh] pb-32 shadow-[0_-10px_40px_rgba(0,0,0,0.1)]">
-    
-    <!-- Title & Price -->
-    <div class="flex justify-between items-start mb-2 gap-4">
-        <h1 class="text-xl font-bold text-gray-900 leading-snug flex-1"><?php the_title(); ?></h1>
-        <div class="text-right">
-            <?php if(function_exists('dw_format_price')): ?>
-                <span class="block text-xl font-bold text-primary"><?php echo dw_format_price($harga); ?></span>
-            <?php else: ?>
-                <span class="block text-xl font-bold text-primary">Rp <?php echo number_format((float)$harga, 0, ',', '.'); ?></span>
-            <?php endif; ?>
-        </div>
-    </div>
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-10">
+            
+            <!-- KOLOM KIRI: Galeri Foto (7 kolom) -->
+            <div class="lg:col-span-7">
+                <!-- Main Image -->
+                <div class="bg-gray-100 rounded-2xl overflow-hidden mb-4 border border-gray-200 relative group cursor-zoom-in">
+                    <img src="<?php echo esc_url($main_thumb_url); ?>" id="main-product-image" alt="<?php the_title(); ?>" class="w-full h-[400px] md:h-[500px] object-cover transition duration-300 group-hover:scale-105">
+                    <div class="absolute inset-0 bg-black/5 group-hover:bg-transparent transition"></div>
+                </div>
 
-    <!-- Meta Info (Stok & Rating) -->
-    <div class="flex items-center gap-4 text-xs text-gray-500 mb-6 border-b border-gray-50 pb-6">
-        <div class="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1 rounded-lg">
-            <i class="ph-fill ph-package text-gray-400"></i> 
-            <span>Stok: <strong><?php echo esc_html($stok); ?></strong></span>
-        </div>
-        <div class="flex items-center gap-1.5 bg-gray-50 px-2.5 py-1 rounded-lg">
-            <i class="ph-fill ph-star text-yellow-400"></i> 
-            <span class="font-bold text-gray-900">4.8</span> 
-            <span class="text-gray-400">(24 ulasan)</span>
-        </div>
-        <?php if($nama_desa): ?>
-        <a href="<?php echo esc_url($link_desa); ?>" class="flex items-center gap-1.5 bg-blue-50 text-blue-600 px-2.5 py-1 rounded-lg hover:bg-blue-100 transition">
-            <i class="ph-fill ph-map-pin"></i>
-            <span class="font-bold truncate max-w-[100px]"><?php echo esc_html($nama_desa); ?></span>
-        </a>
-        <?php endif; ?>
-    </div>
+                <!-- Thumbnail Gallery -->
+                <?php if ( ! empty( $gallery_ids ) ) : 
+                    $ids = explode(',', $gallery_ids);
+                    if(count($ids) > 0):
+                ?>
+                <div class="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+                    <!-- Thumb 1 (Featured) -->
+                    <button onclick="changeImage('<?php echo esc_url($main_thumb_url); ?>')" class="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden border-2 border-primary cursor-pointer hover:opacity-80 transition">
+                        <img src="<?php echo esc_url($main_thumb_url); ?>" class="w-full h-full object-cover">
+                    </button>
+                    <!-- Gallery Loop -->
+                    <?php foreach($ids as $img_id): 
+                        $img_url = wp_get_attachment_image_url($img_id, 'large');
+                        $thumb_url = wp_get_attachment_image_url($img_id, 'thumbnail');
+                        if($img_url):
+                    ?>
+                    <button onclick="changeImage('<?php echo esc_url($img_url); ?>')" class="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden border-2 border-transparent hover:border-primary cursor-pointer transition">
+                        <img src="<?php echo esc_url($thumb_url); ?>" class="w-full h-full object-cover">
+                    </button>
+                    <?php endif; endforeach; ?>
+                </div>
+                <?php endif; endif; ?>
+            </div>
 
-    <!-- Seller Card (Profile Pedagang) -->
-    <div class="flex items-center gap-4 bg-white border border-gray-100 p-4 rounded-2xl shadow-sm mb-8 hover:border-primary/30 transition-colors group">
-        <div class="w-12 h-12 rounded-full overflow-hidden border border-gray-200 flex-shrink-0">
-            <img src="<?php echo esc_url($foto_profil_toko); ?>" class="w-full h-full object-cover">
-        </div>
-        <div class="flex-1 min-w-0">
-            <h4 class="text-sm font-bold text-gray-900 truncate"><?php echo esc_html($nama_toko); ?></h4>
-            <div class="flex items-center gap-2 text-[10px] text-gray-500 mt-0.5">
-                <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> Online</span>
-                <span>•</span>
-                <span><?php echo $nama_desa ? esc_html($nama_desa) : 'Lokasi Penjual'; ?></span>
+            <!-- KOLOM KANAN: Info & Aksi (5 kolom) -->
+            <div class="lg:col-span-5">
+                <div class="sticky top-24">
+                    
+                    <!-- Judul & Rating -->
+                    <h1 class="text-3xl font-bold text-gray-900 mb-2 leading-tight"><?php the_title(); ?></h1>
+                    <div class="flex items-center gap-4 mb-6">
+                        <div class="flex text-yellow-400 text-sm">
+                            <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star-half-alt"></i>
+                        </div>
+                        <span class="text-sm text-gray-500 border-l border-gray-300 pl-4">4.8 (24 Ulasan)</span>
+                        <span class="text-sm text-gray-500 border-l border-gray-300 pl-4">Terjual 100+</span>
+                    </div>
+
+                    <!-- Harga -->
+                    <div class="mb-8">
+                        <span class="text-4xl font-bold text-primary">Rp <?php echo number_format((float)$harga, 0, ',', '.'); ?></span>
+                    </div>
+
+                    <!-- Deskripsi Singkat -->
+                    <div class="prose prose-sm text-gray-600 mb-8 line-clamp-4">
+                        <?php the_excerpt(); ?>
+                    </div>
+
+                    <!-- Pilihan Stok / Variasi (Placeholder UI) -->
+                    <div class="mb-8">
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="font-semibold text-gray-700">Kuantitas</label>
+                            <span class="text-sm text-gray-500">Stok: <span class="font-medium text-gray-800"><?php echo !empty($stok) ? $stok : 'Tersedia'; ?></span></span>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <div class="flex items-center border border-gray-300 rounded-lg w-max">
+                                <button onclick="updateQty(-1)" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-l-lg transition">-</button>
+                                <input type="number" id="qty-input" value="1" min="1" max="<?php echo is_numeric($stok) ? $stok : 999; ?>" class="w-14 text-center border-none focus:ring-0 p-0 text-gray-800 font-bold bg-transparent">
+                                <button onclick="updateQty(1)" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-r-lg transition">+</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tombol Aksi -->
+                    <div class="flex flex-col sm:flex-row gap-4 mb-8">
+                        <button id="single-add-cart" 
+                                class="flex-1 bg-white border-2 border-primary text-primary font-bold py-3.5 px-6 rounded-xl hover:bg-green-50 transition flex justify-center items-center gap-2"
+                                data-id="<?php echo $post_id; ?>" 
+                                data-title="<?php the_title(); ?>"
+                                data-price="<?php echo esc_attr($harga); ?>"
+                                data-thumb="<?php echo esc_url($main_thumb_url); ?>">
+                            <i class="fas fa-cart-plus"></i> Tambah Keranjang
+                        </button>
+                        <button class="flex-1 bg-primary text-white font-bold py-3.5 px-6 rounded-xl hover:bg-secondary transition shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 duration-200">
+                            Beli Sekarang
+                        </button>
+                    </div>
+
+                    <!-- Info Penjual -->
+                    <div class="border-t border-gray-100 pt-6">
+                        <div class="flex items-center gap-4 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                            <img src="<?php echo esc_url($store_avatar); ?>" class="w-12 h-12 rounded-full border border-gray-200">
+                            <div class="flex-1">
+                                <h4 class="font-bold text-gray-800 text-sm"><?php echo esc_html($store_name); ?></h4>
+                                <div class="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
+                                    <span class="flex items-center gap-1"><i class="fas fa-map-marker-alt text-red-400"></i> Jawa Tengah</span>
+                                    <span class="w-1 h-1 bg-gray-300 rounded-full"></span>
+                                    <span class="text-green-600 font-medium">Online</span>
+                                </div>
+                            </div>
+                            <a href="<?php echo get_author_posts_url($author_id); ?>" class="text-xs font-bold text-primary border border-primary px-3 py-1.5 rounded-lg hover:bg-primary hover:text-white transition">
+                                Kunjungi Toko
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Jaminan -->
+                    <div class="grid grid-cols-3 gap-4 mt-6 text-center">
+                        <div class="text-xs text-gray-500">
+                            <i class="fas fa-shield-alt text-2xl text-gray-300 mb-2 block"></i>
+                            Jaminan Aman
+                        </div>
+                        <div class="text-xs text-gray-500">
+                            <i class="fas fa-check-circle text-2xl text-gray-300 mb-2 block"></i>
+                            Produk Asli
+                        </div>
+                        <div class="text-xs text-gray-500">
+                            <i class="fas fa-shipping-fast text-2xl text-gray-300 mb-2 block"></i>
+                            Pengiriman Cepat
+                        </div>
+                    </div>
+
+                </div>
             </div>
         </div>
-        <a href="<?php echo esc_url($link_toko); ?>" class="text-xs font-bold text-primary bg-primary/5 border border-primary/20 px-4 py-2 rounded-xl hover:bg-primary hover:text-white transition-all group-hover:shadow-md">
-            Kunjungi
-        </a>
-    </div>
 
-    <!-- Deskripsi -->
-    <div>
-        <h3 class="font-bold text-gray-900 text-lg mb-3">Deskripsi Produk</h3>
-        <div class="text-sm text-gray-600 leading-relaxed space-y-3 product-content">
-            <?php the_content(); ?>
+        <!-- Deskripsi Lengkap & Ulasan (Tabs) -->
+        <div class="mt-16 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="flex border-b border-gray-100">
+                <button class="px-8 py-4 text-sm font-bold text-primary border-b-2 border-primary bg-green-50/50">Deskripsi Lengkap</button>
+                <button class="px-8 py-4 text-sm font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition">Ulasan Pembeli</button>
+                <button class="px-8 py-4 text-sm font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-50 transition">Info Pengiriman</button>
+            </div>
+            <div class="p-8">
+                <div class="prose max-w-none text-gray-600">
+                    <?php the_content(); ?>
+                </div>
+            </div>
         </div>
+
+        <!-- Produk Terkait -->
+        <div class="mt-16">
+            <h3 class="text-2xl font-bold text-gray-800 mb-6">Produk Lain dari Toko Ini</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <?php
+                // Query Produk Terkait (dari Author yang sama)
+                $related_args = array(
+                    'post_type' => 'dw_produk',
+                    'posts_per_page' => 4,
+                    'post__not_in' => array($post_id),
+                    'author' => $author_id,
+                );
+                $related_query = new WP_Query($related_args);
+                
+                if($related_query->have_posts()):
+                    while($related_query->have_posts()): $related_query->the_post();
+                    $rel_thumb = has_post_thumbnail() ? get_the_post_thumbnail_url(null, 'medium') : 'https://via.placeholder.com/300';
+                    $rel_price = get_post_meta(get_the_ID(), '_dw_harga_dasar', true);
+                ?>
+                <div class="bg-white border border-gray-100 rounded-lg hover:shadow-lg transition group">
+                    <div class="relative h-40 overflow-hidden rounded-t-lg bg-gray-100">
+                        <a href="<?php the_permalink(); ?>">
+                            <img src="<?php echo esc_url($rel_thumb); ?>" class="w-full h-full object-cover">
+                        </a>
+                    </div>
+                    <div class="p-3">
+                        <h4 class="font-semibold text-gray-800 mb-1 text-sm line-clamp-2">
+                            <a href="<?php the_permalink(); ?>"><?php the_title(); ?></a>
+                        </h4>
+                        <div class="text-primary font-bold text-sm">Rp <?php echo number_format((float)$rel_price, 0, ',', '.'); ?></div>
+                    </div>
+                </div>
+                <?php endwhile; wp_reset_postdata(); endif; ?>
+            </div>
+        </div>
+
     </div>
-
 </div>
 
-<!-- Sticky Bottom Action -->
-<div class="fixed bottom-0 w-full max-w-[480px] bg-white border-t border-gray-100 p-4 pb-8 z-50 flex items-center gap-3 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
-    <a href="https://wa.me/?text=Halo%20saya%20tertarik%20dengan%20produk%20<?php echo urlencode(get_the_title()); ?>" target="_blank" class="w-12 h-12 border border-gray-200 rounded-2xl flex items-center justify-center text-gray-500 hover:text-green-600 hover:border-green-600 hover:bg-green-50 transition-all">
-        <i class="ph-bold ph-whatsapp-logo text-2xl"></i>
-    </a>
-    
-    <!-- Tombol Add to Cart dengan ID dan Data Attributes yang benar untuk JS -->
-    <button id="btn-add-to-cart" class="flex-1 bg-gray-900 text-white font-bold h-12 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-transform hover:bg-gray-800 add-to-cart-btn" 
-            data-id="<?php echo get_the_ID(); ?>"
-            data-title="<?php echo esc_attr(get_the_title()); ?>"
-            data-price="<?php echo esc_attr($harga); ?>"
-            data-thumb="<?php echo esc_url($main_image); ?>">
-        <i class="ph-bold ph-plus"></i> Masuk Keranjang
-    </button>
-    
-    <!-- Tombol Beli Langsung (Bisa diarahkan ke Checkout langsung dengan parameter produk) -->
-    <a href="<?php echo site_url('/checkout/?product_id=' . get_the_ID()); ?>" class="flex-1 bg-primary text-white font-bold h-12 rounded-2xl shadow-lg shadow-primary/30 active:scale-95 transition-transform flex items-center justify-center hover:bg-teal-700">
-        Beli Langsung
-    </a>
-</div>
+<script>
+// Fungsi Ganti Gambar Utama
+function changeImage(src) {
+    document.getElementById('main-product-image').src = src;
+}
 
-<style>
-    /* Styling tambahan untuk konten deskripsi agar rapi */
-    .product-content p { margin-bottom: 1em; }
-    .product-content ul { list-style: disc; padding-left: 1.5em; margin-bottom: 1em; }
-</style>
+// Fungsi Update Qty
+function updateQty(delta) {
+    var input = document.getElementById('qty-input');
+    var currentVal = parseInt(input.value) || 1;
+    var maxVal = parseInt(input.getAttribute('max')) || 999;
+    var newVal = currentVal + delta;
+    
+    if (newVal >= 1 && newVal <= maxVal) {
+        input.value = newVal;
+    }
+}
+</script>
 
 <?php endwhile; ?>
+
 <?php get_footer(); ?>
