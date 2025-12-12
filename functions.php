@@ -94,12 +94,13 @@ function tema_dw_login_redirect( $redirect_to, $request, $user ) {
 add_filter( 'login_redirect', 'tema_dw_login_redirect', 10, 3 );
 
 // 5. Hide Admin Bar untuk User non-admin
-function dw_disable_admin_bar() {
+// FIX: Renamed function to avoid collision with plugin
+function tema_dw_disable_admin_bar() {
     if ( ! current_user_can( 'administrator' ) && ! is_admin() ) {
         show_admin_bar( false );
     }
 }
-add_action( 'after_setup_theme', 'dw_disable_admin_bar' );
+add_action( 'after_setup_theme', 'tema_dw_disable_admin_bar' );
 
 // 6. Handler AJAX Login (Required for main.js)
 function dw_ajax_login_handler() {
