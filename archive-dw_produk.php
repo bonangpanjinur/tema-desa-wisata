@@ -1,133 +1,107 @@
-<?php get_header(); ?>
+<?php
+/**
+ * Template Name: Archive Produk Desa Wisata
+ * Description: Menampilkan daftar produk dengan filter kategori dan lokasi.
+ */
 
-<!-- Sticky Header & Filters -->
-<!-- Menggunakan top-0 karena berada di dalam container scrollable 'main' -->
-<div class="glass sticky top-0 z-30 bg-white/90 backdrop-blur-md shadow-sm">
-    <div class="px-5 py-3 border-b border-gray-50 flex items-center justify-between">
-        <h2 class="text-lg font-bold text-gray-800 flex items-center gap-2">
-            <i class="ph-duotone ph-storefront text-primary text-xl"></i> Pasar Desa
-        </h2>
-        <!-- Keranjang dihapus sesuai permintaan (sudah ada di header utama) -->
-    </div>
-    
-    <!-- Filter Chips (Horizontal) -->
-    <div class="px-5 py-3 flex gap-2 overflow-x-auto no-scrollbar">
-        <?php 
-        $current_cat = get_query_var('kategori_produk'); 
-        $cats = get_terms(['taxonomy' => 'kategori_produk', 'hide_empty' => false]);
+get_header(); ?>
+
+<div class="bg-gray-50 py-10 min-h-screen">
+    <div class="container mx-auto px-4">
         
-        // FIX: Fallback aman untuk link arsip
-        $archive_link = '#';
-        if ( function_exists('get_post_type_archive_link') ) {
-            $link = get_post_type_archive_link('dw_produk');
-            $archive_link = $link ? $link : site_url('/produk');
-        } else {
-            $archive_link = site_url('/produk');
-        }
-        ?>
-        
-        <a href="<?php echo esc_url($archive_link); ?>" 
-           class="px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all border <?php echo empty($current_cat) ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-500 border-gray-200'; ?>">
-           Semua
-        </a>
+        <!-- Header Halaman -->
+        <div class="text-center mb-12">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-4">Jelajahi Produk Desa</h1>
+            <p class="text-gray-500 max-w-2xl mx-auto">Temukan aneka oleh-oleh otentik, kerajinan tangan unik, dan kuliner lezat langsung dari warga desa wisata di seluruh nusantara.</p>
+        </div>
 
-        <?php if (!is_wp_error($cats) && !empty($cats)) : foreach ($cats as $cat) : ?>
-            <a href="<?php echo get_term_link($cat); ?>" 
-               class="px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all border <?php echo ($current_cat == $cat->slug) ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-500 border-gray-200'; ?>">
-               <?php echo esc_html($cat->name); ?>
-            </a>
-        <?php endforeach; endif; ?>
-    </div>
-</div>
-
-<div class="p-4 bg-gray-50 min-h-screen pb-32">
-    <div class="grid grid-cols-2 gap-3">
-        <?php if ( have_posts() ) : ?>
-            <?php while ( have_posts() ) : the_post(); 
-                $harga = get_post_meta(get_the_ID(), '_dw_harga', true) ?: 0;
-                $stok = get_post_meta(get_the_ID(), '_dw_stok', true);
-                $is_sold_out = ($stok !== '' && (int)$stok <= 0);
-                
-                // Placeholder Nama Toko (Nanti ambil dari relasi pedagang)
-                $toko = "UMKM Lokal"; 
-                
-                // Format Price Helper Logic inside template for safety
-                $formatted_price = function_exists('dw_format_price') ? dw_format_price($harga) : 'Rp ' . number_format((float)$harga, 0, ',', '.');
-            ?>
-                <!-- Product Card Modern -->
-                <div class="bg-white rounded-2xl p-2 shadow-[0_2px_12px_rgba(0,0,0,0.04)] border border-gray-100 flex flex-col h-full relative overflow-hidden group">
-                    
-                    <!-- Image Area -->
-                    <div class="aspect-square bg-gray-100 rounded-xl overflow-hidden relative mb-2">
-                        <?php if (has_post_thumbnail()) : ?>
-                            <img src="<?php the_post_thumbnail_url('medium'); ?>" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 <?php echo $is_sold_out ? 'grayscale opacity-70' : ''; ?>">
-                        <?php else : ?>
-                            <div class="w-full h-full flex items-center justify-center text-gray-300"><i class="ph-duotone ph-image text-4xl"></i></div>
-                        <?php endif; ?>
-                        
-                        <!-- Overlay Badges -->
-                        <?php if ($is_sold_out) : ?>
-                            <div class="absolute inset-0 bg-black/40 flex items-center justify-center">
-                                <span class="bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-md">HABIS</span>
-                            </div>
-                        <?php else: ?>
-                            <!-- Wishlist Btn -->
-                            <button class="absolute top-2 right-2 w-7 h-7 bg-white/80 backdrop-blur rounded-full flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-white shadow-sm transition-all active:scale-90">
-                                <i class="ph-fill ph-heart"></i>
-                            </button>
-                        <?php endif; ?>
+        <div class="flex flex-col lg:flex-row gap-8">
+            
+            <!-- Sidebar Filter -->
+            <aside class="w-full lg:w-1/4">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 sticky top-24">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="font-bold text-lg text-gray-800">Filter Pencarian</h3>
+                        <a href="<?php echo get_post_type_archive_link('dw_produk'); ?>" class="text-xs text-primary hover:underline">Reset</a>
                     </div>
                     
-                    <!-- Content -->
-                    <div class="flex-1 flex flex-col px-1">
-                        <div class="flex items-center gap-1 mb-1 opacity-70">
-                            <i class="ph-fill ph-storefront text-primary text-[10px]"></i>
-                            <span class="text-[10px] text-gray-500 font-semibold truncate"><?php echo esc_html($toko); ?></span>
+                    <!-- Filter Kategori -->
+                    <div class="mb-8">
+                        <h4 class="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Kategori</h4>
+                        <ul class="space-y-2 text-sm text-gray-600">
+                            <?php
+                            $terms = get_terms( array(
+                                'taxonomy'   => 'kategori_produk',
+                                'hide_empty' => true,
+                            ) );
+                            if ( ! empty( $terms ) && ! is_wp_error( $terms ) ) {
+                                foreach ( $terms as $term ) {
+                                    $is_active = ( get_query_var( 'kategori_produk' ) == $term->slug );
+                                    echo '<li>';
+                                    echo '<a href="' . esc_url( get_term_link( $term ) ) . '" class="flex items-center group ' . ( $is_active ? 'text-primary font-bold' : 'hover:text-primary' ) . '">';
+                                    echo '<span class="w-2 h-2 rounded-full mr-2 ' . ( $is_active ? 'bg-primary' : 'bg-gray-300 group-hover:bg-primary' ) . '"></span>';
+                                    echo esc_html( $term->name ) . ' <span class="ml-auto text-xs text-gray-400">(' . $term->count . ')</span>';
+                                    echo '</a>';
+                                    echo '</li>';
+                                }
+                            } else {
+                                echo '<li class="text-gray-400 italic">Belum ada kategori.</li>';
+                            }
+                            ?>
+                        </ul>
+                    </div>
+
+                    <!-- Filter Harga (UI Only for now, implementation needs complex query) -->
+                    <div class="mb-6">
+                        <h4 class="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Rentang Harga</h4>
+                        <div class="flex items-center gap-2 mb-4">
+                            <input type="number" placeholder="Min" class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-primary">
+                            <span class="text-gray-400">-</span>
+                            <input type="number" placeholder="Max" class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-primary">
                         </div>
-                        
-                        <h3 class="text-sm font-bold text-gray-800 leading-snug mb-auto line-clamp-2">
-                            <a href="<?php the_permalink(); ?>" class="hover:text-primary transition-colors">
-                                <?php the_title(); ?>
-                            </a>
-                        </h3>
-                        
-                        <div class="mt-3 flex items-center justify-between">
-                            <div class="flex flex-col">
-                                <span class="text-sm font-extrabold text-gray-900"><?php echo esc_html($formatted_price); ?></span>
-                            </div>
+                    </div>
+
+                    <button class="w-full bg-primary text-white py-2.5 rounded-lg hover:bg-secondary transition text-sm font-bold shadow-md hover:shadow-lg transform hover:-translate-y-0.5 duration-200">
+                        Terapkan Filter
+                    </button>
+                </div>
+            </aside>
+
+            <!-- Grid Produk -->
+            <main class="w-full lg:w-3/4">
+                
+                <!-- Toolbar Atas -->
+                <div class="flex justify-between items-center mb-6 bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                    <div class="text-sm text-gray-500">
+                        Menampilkan <span class="font-bold text-gray-800"><?php echo $wp_query->post_count; ?></span> dari <span class="font-bold text-gray-800"><?php echo $wp_query->found_posts; ?></span> produk
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm text-gray-500 hidden sm:inline">Urutkan:</span>
+                        <select class="border-none text-sm font-medium text-gray-700 focus:ring-0 cursor-pointer bg-gray-50 rounded px-2 py-1 hover:bg-gray-100" onchange="location.href=this.value">
+                            <option value="?orderby=date&order=DESC">Terbaru</option>
+                            <option value="?orderby=meta_value_num&meta_key=_dw_harga_dasar&order=ASC">Harga Terendah</option>
+                            <option value="?orderby=meta_value_num&meta_key=_dw_harga_dasar&order=DESC">Harga Tertinggi</option>
+                        </select>
+                    </div>
+                </div>
+
+                <?php if ( have_posts() ) : ?>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-6">
+                        <?php while ( have_posts() ) : the_post(); 
+                            // Mengambil data dari Plugin Core
+                            $post_id = get_the_ID();
+                            $harga = get_post_meta($post_id, '_dw_harga_dasar', true);
+                            $stok = get_post_meta($post_id, '_dw_stok', true);
+                            $lokasi = get_post_meta($post_id, '_dw_kabupaten', true); // Asumsi meta key lokasi
+                            $rating = 0; // Default rating (bisa diintegrasikan dengan sistem review nanti)
                             
-                            <?php if (!$is_sold_out) : ?>
-                                <!-- Add Button -->
-                                <a href="<?php the_permalink(); ?>" class="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center shadow-lg shadow-gray-900/20 active:scale-90 transition-transform hover:bg-primary">
-                                    <i class="ph-bold ph-plus"></i>
-                                </a>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                </div>
-            <?php endwhile; ?>
-        <?php else : ?>
-            <div class="col-span-2 py-20 text-center flex flex-col items-center">
-                <div class="w-24 h-24 bg-white rounded-full shadow-sm border border-gray-100 flex items-center justify-center mb-4">
-                    <i class="ph-duotone ph-shopping-bag-open text-4xl text-gray-300"></i>
-                </div>
-                <h3 class="text-base font-bold text-gray-800">Produk Kosong</h3>
-                <p class="text-xs text-gray-500 mt-1 max-w-[200px]">Belum ada produk untuk kategori ini.</p>
-                <a href="<?php echo esc_url($archive_link); ?>" class="mt-4 text-primary text-xs font-bold hover:underline">Lihat Semua</a>
-            </div>
-        <?php endif; ?>
-    </div>
-    
-    <!-- Pagination -->
-    <div class="mt-8 flex justify-center">
-        <?php
-        the_posts_pagination(array(
-            'prev_text' => '<i class="ph-bold ph-caret-left"></i>',
-            'next_text' => '<i class="ph-bold ph-caret-right"></i>',
-            'class' => 'flex gap-2' 
-        ));
-        ?>
-    </div>
-</div>
-
-<?php get_footer(); ?>
+                            // Gambar Thumbnail
+                            $thumb_url = has_post_thumbnail() ? get_the_post_thumbnail_url(null, 'medium_large') : 'https://via.placeholder.com/400x400?text=No+Image';
+                        ?>
+                            <!-- Kartu Produk -->
+                            <div class="bg-white border border-gray-100 rounded-xl hover:shadow-xl transition duration-300 group flex flex-col h-full relative overflow-hidden">
+                                
+                                <!-- Badge Lokasi -->
+                                <?php if($lokasi): ?>
+                                <div class="absolute top-3 left-3 z-10">
+                                    <span class="bg-black/50 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-1

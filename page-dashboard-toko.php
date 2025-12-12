@@ -1,117 +1,160 @@
 <?php
 /**
- * Template Name: Single Produk App Style
+ * Template Name: Dashboard Toko
  */
-get_header();
 
-while ( have_posts() ) : the_post();
-    $product_id = get_the_ID();
-    
-    // Ambil Data dari Plugin
-    $price = get_post_meta( $product_id, '_dw_harga_dasar', true );
-    $stock = get_post_meta( $product_id, '_dw_stok', true );
-    $gallery = get_post_meta( $product_id, '_dw_galeri_foto', true ); // ID dipisah koma
-    
-    // Data Penjual
-    $author_id = get_the_author_meta('ID');
-    $author_name = get_the_author_meta('display_name');
-    
-    // Cek apakah ada galeri
-    $gallery_ids = !empty($gallery) ? explode(',', $gallery) : [];
-    $main_image = get_the_post_thumbnail_url($product_id, 'full');
+// Proteksi Halaman: Hanya user login & role pedagang
+if ( ! is_user_logged_in() ) {
+    wp_redirect( home_url('/login') );
+    exit;
+}
+
+$user = wp_get_current_user();
+// Cek Role (Sederhana)
+if ( ! in_array( 'pedagang', (array) $user->roles ) && ! in_array( 'administrator', (array) $user->roles ) ) {
+    // Jika user login tapi bukan pedagang, arahkan ke akun saya (pembeli)
+    // wp_redirect( home_url('/akun-saya') ); // Enable jika halaman akun saya sudah ada
+}
+
+get_header(); 
 ?>
 
-<div id="product-detail" class="h-full bg-white relative flex flex-col pb-24">
+<div class="bg-gray-100 min-h-screen">
     
-    <!-- Navbar Overlay Absolute -->
-    <div class="absolute top-0 left-0 right-0 p-5 flex justify-between items-center z-20">
-        <a href="javascript:history.back()" class="w-10 h-10 bg-white/70 backdrop-blur-md rounded-full flex items-center justify-center text-dark shadow-sm">
-            <i class="fa-solid fa-arrow-left"></i>
-        </a>
-        <a href="<?php echo home_url('/keranjang/'); ?>" class="w-10 h-10 bg-white/70 backdrop-blur-md rounded-full flex items-center justify-center text-dark shadow-sm relative">
-            <i class="fa-solid fa-bag-shopping"></i>
-            <?php 
-                $cart = get_user_meta(get_current_user_id(), '_dw_cart_items', true);
-                if(is_array($cart) && count($cart) > 0) echo '<span class="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>';
-            ?>
-        </a>
-    </div>
-
-    <!-- Image Area (Full Bleed Top) -->
-    <div class="h-[45vh] bg-gray-100 relative overflow-hidden">
-        <img src="<?php echo $main_image ? esc_url($main_image) : 'https://via.placeholder.com/600'; ?>" class="w-full h-full object-cover">
-    </div>
-
-    <!-- Details Sheet -->
-    <div class="flex-1 bg-white -mt-8 rounded-t-[2rem] relative z-10 flex flex-col shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
-        <div class="p-6">
-            <!-- Handle -->
-            <div class="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6"></div>
-
-            <!-- Title & Price -->
-            <div class="flex justify-between items-start mb-4">
-                <div class="flex-1 pr-4">
-                    <span class="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded-md uppercase tracking-wider mb-2 inline-block">Produk Desa</span>
-                    <h1 class="text-xl font-bold text-dark leading-snug"><?php the_title(); ?></h1>
-                </div>
-                <div class="text-right">
-                    <div class="text-2xl font-bold text-primary">Rp <?php echo number_format((float)$price, 0, ',', '.'); ?></div>
-                    <div class="text-[10px] text-gray-400">Stok: <?php echo esc_html($stock); ?></div>
-                </div>
+    <!-- Top Bar -->
+    <div class="bg-white shadow-sm border-b border-gray-200">
+        <div class="container mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="font-bold text-lg text-gray-700">
+                <i class="fas fa-store text-primary mr-2"></i> Dashboard Toko
             </div>
-
-            <!-- Rating Mockup -->
-            <div class="flex items-center gap-4 mb-6 border-b border-gray-50 pb-6">
-                <div class="flex items-center gap-1">
-                    <i class="fa-solid fa-star text-yellow-400 text-sm"></i>
-                    <span class="font-bold text-sm text-dark">4.8</span>
-                    <span class="text-xs text-subtle">(Ulasan)</span>
-                </div>
-            </div>
-
-            <!-- Penjual -->
-            <div class="flex items-center gap-3 p-3 rounded-2xl bg-surface border border-gray-100 mb-6">
-                <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                    <?php echo substr($author_name, 0, 1); ?>
-                </div>
-                <div class="flex-1">
-                    <h4 class="font-bold text-sm text-dark"><?php echo esc_html($author_name); ?></h4>
-                    <p class="text-xs text-subtle">Penjual Terverifikasi</p>
-                </div>
-                <button class="text-xs font-bold text-primary border border-primary/20 px-3 py-1.5 rounded-full hover:bg-primary hover:text-white transition">Lihat Toko</button>
-            </div>
-
-            <!-- Deskripsi -->
-            <div class="mb-6">
-                <h3 class="text-sm font-bold text-dark mb-2">Deskripsi</h3>
-                <div class="text-sm text-gray-500 leading-relaxed">
-                    <?php the_content(); ?>
-                </div>
+            <div class="text-sm text-gray-500">
+                Halo, <span class="font-semibold text-gray-800"><?php echo esc_html($user->display_name); ?></span>
             </div>
         </div>
     </div>
 
-    <!-- Bottom Action Bar (Sticky) -->
-    <div class="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-50 flex gap-3 pb-6 z-50 max-w-[480px] mx-auto">
-        <a href="#" class="w-12 h-12 flex items-center justify-center rounded-2xl border border-gray-200 text-subtle hover:text-primary hover:border-primary transition">
-            <i class="fa-regular fa-comment-dots text-lg"></i>
-        </a>
-        
-        <!-- Form Add to Cart (AJAX) -->
-        <div class="flex-1 flex gap-3">
-            <input type="hidden" id="qty" value="1">
-            <button id="btn-add-to-cart" data-product-id="<?php echo $product_id; ?>" class="flex-1 bg-primaryLight text-primary font-bold rounded-2xl text-sm hover:bg-emerald-200 transition py-3">
-                + Keranjang
-            </button>
-            <a href="#" class="flex-1 bg-primary text-white font-bold rounded-2xl text-sm shadow-glow hover:bg-emerald-700 transition flex items-center justify-center">
-                Beli Langsung
-            </a>
+    <div class="container mx-auto px-4 py-8">
+        <div class="flex flex-col md:flex-row gap-6">
+            
+            <!-- Sidebar Navigation -->
+            <aside class="w-full md:w-64 flex-shrink-0">
+                <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                    <nav class="flex flex-col">
+                        <a href="#ringkasan" class="dash-link px-4 py-3 border-l-4 border-primary bg-green-50 text-primary font-medium hover:bg-gray-50 transition">
+                            <i class="fas fa-home w-6"></i> Ringkasan
+                        </a>
+                        <a href="#produk" class="dash-link px-4 py-3 border-l-4 border-transparent text-gray-600 hover:text-primary hover:bg-gray-50 transition">
+                            <i class="fas fa-box w-6"></i> Produk Saya
+                        </a>
+                        <a href="#pesanan" class="dash-link px-4 py-3 border-l-4 border-transparent text-gray-600 hover:text-primary hover:bg-gray-50 transition flex justify-between items-center">
+                            <span><i class="fas fa-shopping-bag w-6"></i> Pesanan Masuk</span>
+                            <span class="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">2</span>
+                        </a>
+                        <a href="#pengaturan" class="dash-link px-4 py-3 border-l-4 border-transparent text-gray-600 hover:text-primary hover:bg-gray-50 transition">
+                            <i class="fas fa-cog w-6"></i> Pengaturan Toko
+                        </a>
+                        <a href="<?php echo wp_logout_url(home_url()); ?>" class="px-4 py-3 border-t border-gray-100 text-red-600 hover:bg-red-50 transition">
+                            <i class="fas fa-sign-out-alt w-6"></i> Keluar
+                        </a>
+                    </nav>
+                </div>
+            </aside>
+
+            <!-- Main Content Area -->
+            <main class="flex-1">
+                
+                <!-- CONTENT: RINGKASAN -->
+                <div id="view-ringkasan" class="dash-view">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        <!-- Stat Card -->
+                        <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-blue-500">
+                            <div class="text-gray-500 text-sm mb-1">Total Penjualan</div>
+                            <div class="text-2xl font-bold text-gray-800">Rp 1.500.000</div>
+                        </div>
+                        <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-green-500">
+                            <div class="text-gray-500 text-sm mb-1">Pesanan Selesai</div>
+                            <div class="text-2xl font-bold text-gray-800">12</div>
+                        </div>
+                        <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-yellow-500">
+                            <div class="text-gray-500 text-sm mb-1">Perlu Dikirim</div>
+                            <div class="text-2xl font-bold text-gray-800">2</div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow-sm p-6">
+                        <h3 class="font-bold text-lg text-gray-800 mb-4">Pesanan Terbaru</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm text-gray-600">
+                                <thead class="bg-gray-50 text-gray-800 font-semibold uppercase text-xs">
+                                    <tr>
+                                        <th class="px-4 py-3">ID Pesanan</th>
+                                        <th class="px-4 py-3">Tanggal</th>
+                                        <th class="px-4 py-3">Pelanggan</th>
+                                        <th class="px-4 py-3">Status</th>
+                                        <th class="px-4 py-3 text-right">Total</th>
+                                        <th class="px-4 py-3">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    <!-- Dummy Data -->
+                                    <tr class="hover:bg-gray-50">
+                                        <td class="px-4 py-3">#ORD-001</td>
+                                        <td class="px-4 py-3">12 Des 2024</td>
+                                        <td class="px-4 py-3">Budi Santoso</td>
+                                        <td class="px-4 py-3"><span class="bg-yellow-100 text-yellow-700 px-2 py-1 rounded text-xs">Perlu Dikirim</span></td>
+                                        <td class="px-4 py-3 text-right">Rp 150.000</td>
+                                        <td class="px-4 py-3"><button class="text-primary hover:underline">Detail</button></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CONTENT: PRODUK (Placeholder) -->
+                <div id="view-produk" class="dash-view hidden">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">Produk Saya</h2>
+                        <button class="bg-primary text-white px-4 py-2 rounded shadow hover:bg-secondary">
+                            <i class="fas fa-plus mr-1"></i> Tambah Produk
+                        </button>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-sm p-10 text-center text-gray-500">
+                        <p>Fitur manajemen produk akan muncul di sini (load via AJAX).</p>
+                    </div>
+                </div>
+                 
+                 <!-- CONTENT: PESANAN (Placeholder) -->
+                <div id="view-pesanan" class="dash-view hidden">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6">Semua Pesanan</h2>
+                    <div class="bg-white rounded-lg shadow-sm p-10 text-center text-gray-500">
+                         <p>List pesanan lengkap akan muncul di sini.</p>
+                    </div>
+                </div>
+
+            </main>
         </div>
     </div>
-    
-    <!-- Toast Notification Container -->
-    <div id="cart-message" style="display:none; position: fixed; top: 100px; left: 50%; transform: translateX(-50%); z-index: 100; background: rgba(0,0,0,0.8); color: white; padding: 10px 20px; border-radius: 20px; font-size: 12px;"></div>
-
 </div>
 
-<?php endwhile; get_footer(); ?>
+<script>
+// Simple Tab Switcher Logic
+jQuery(document).ready(function($){
+    $('.dash-link').click(function(e){
+        e.preventDefault();
+        
+        // UI Tabs
+        $('.dash-link').removeClass('border-primary bg-green-50 text-primary font-medium')
+                       .addClass('border-transparent text-gray-600 hover:bg-gray-50');
+        $(this).removeClass('border-transparent text-gray-600 hover:bg-gray-50')
+               .addClass('border-primary bg-green-50 text-primary font-medium');
+
+        // View Switching
+        var target = $(this).attr('href').replace('#', 'view-');
+        $('.dash-view').addClass('hidden');
+        $('#' + target).removeClass('hidden');
+    });
+});
+</script>
+
+<?php get_footer(); ?>
