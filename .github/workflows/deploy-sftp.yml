@@ -1,0 +1,50 @@
+name: Deploy Plugin to WordPress via SFTP
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.4'
+      
+      - name: Install PHP Dependencies
+        run: composer install --no-dev --optimize-autoloader
+
+      - name: Cleanup before deploy
+        run: |
+          rm -rf .git .github .gitignore
+          rm -rf composer.json composer.lock
+
+      # PERBAIKAN DI SINI
+      - name: FTP Deploy
+        uses: SamKirkland/FTP-Deploy-Action@4.3.3
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USER }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          
+          # 1. Ganti ke 'ftp' biasa (lebih stabil untuk upload banyak file kecil)
+          protocol: ftp 
+          port: 21
+          
+          # 2. Matikan validasi SSL ketat (mengatasi error FIN packet)
+          security: loose
+          
+          local-dir: ./
+          server-dir: /public_html/admin.bonang.my.id/wp-content/themes/tema-desa-wisata/
+          
+          # 3. Exclude file sync agar tidak loop
+          exclude: |
+            **/.git*
+            **/.git*/**
+            .ftp-deploy-sync-state.json
