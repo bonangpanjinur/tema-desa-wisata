@@ -1,34 +1,328 @@
 /**
  * Main JS - Tema Desa Wisata
- * Menangani Cart, Login, Register, dan UI Interaktif secara lengkap.
+ * Menangani Cart, Auth, dan Dashboard Toko (Merchant).
  */
 
 jQuery(document).ready(function($) {
     
-    // Debugging: Cek koneksi API saat load
-    console.log('DW Core JS Loaded. API Base:', dwData.api_url);
+    const API_BASE = dwData.api_url;
+    const JWT_TOKEN = localStorage.getItem('dw_jwt_token');
+
+    // Headers untuk AJAX yang butuh Auth
+    const authHeaders = {};
+    if(JWT_TOKEN) {
+        authHeaders['Authorization'] = 'Bearer ' + JWT_TOKEN;
+    }
 
     /* =========================================
-       1. LOGIKA KERANJANG GLOBAL (LocalStorage)
+       1. DASHBOARD MERCHANT FUNCTIONS
        ========================================= */
-    const CART_KEY = 'dw_cart_v1';
-    
-    // Helper: Ambil data keranjang dari penyimpanan lokal
-    function getCart() {
-        try {
-            return JSON.parse(localStorage.getItem(CART_KEY)) || [];
-        } catch (e) {
-            return [];
+
+    // A. LOAD RINGKASAN (STATS)
+    window.loadMerchantSummary = function() {
+        if(!$('#view-ringkasan').length) return;
+
+        $.ajax({
+            url: API_BASE + 'pedagang/dashboard/summary',
+            type: 'GET',
+            headers: authHeaders,
+            success: function(res) {
+                $('#stat-sales').text(new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(res.penjualan_bulan_ini || 0));
+                $('#stat-orders').text(res.pesanan_baru || 0);
+                $('#stat-products').text(res.produk_habis || 0); // Atau total produk active
+                
+                // Update badge di sidebar jika ada pesanan baru
+                if(res.pesanan_baru > 0) {
+                    $('#sidebar-order-badge').text(res.pesanan_baru).removeClass('hidden');
+                }
+                
+                // Load tabel ringkasan pesanan juga
+                loadMerchantOrders('', 5, true); 
+            }
+        });
+    }
+
+    // B. LOAD PRODUK
+    window.loadMerchantProducts = function() {
+        const $container = $('#merchant-product-list');
+        $container.html('<div class="col-span-full py-12 text-center text-gray-400"><i class="ph-duotone ph-spinner animate-spin text-2xl"></i><p>Memuat produk...</p></div>');
+
+        $.ajax({
+            url: API_BASE + 'pedagang/produk',
+            type: 'GET',
+            headers: authHeaders,
+            success: function(products) {
+                if(!products || products.length === 0) {
+                    $container.html('<div class="col-span-full py-12 text-center bg-white rounded-xl border border-dashed border-gray-300"><p class="text-gray-500 mb-2">Belum ada produk.</p><button onclick="openProductModal()" class="text-primary font-bold text-sm hover:underline">Tambah Produk Pertama</button></div>');
+                    return;
+                }
+
+                let html = '';
+                products.forEach(p => {
+                    const img = (p.gambar_unggulan && p.gambar_unggulan.thumbnail) ? p.gambar_unggulan.thumbnail : 'https://via.placeholder.com/150';
+                    const price = new Intl.NumberFormat('id-ID').format(p.harga_dasar);
+                    
+                    // Kita simpan data produk dalam attribut data-json untuk keperluan edit
+                    const jsonString = JSON.stringify(p).replace(/"/g, '&quot;');
+
+                    html += `
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col group">
+                        <div class="relative h-40 bg-gray-100 overflow-hidden">
+                            <img src="${img}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
+                            <div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition">
+                                <button onclick='editProduct(${jsonString})' class="w-8 h-8 bg-white rounded-full text-blue-600 shadow flex items-center justify-center hover:bg-blue-50"><i class="ph-bold ph-pencil-simple"></i></button>
+                                <button onclick="deleteProduct(${p.id})" class="w-8 h-8 bg-white rounded-full text-red-600 shadow flex items-center justify-center hover:bg-red-50"><i class="ph-bold ph-trash"></i></button>
+                            </div>
+                        </div>
+                        <div class="p-4 flex-1 flex flex-col">
+                            <h4 class="font-bold text-gray-800 line-clamp-2 mb-1">${p.nama_produk}</h4>
+                            <div class="mt-auto">
+                                <p class="text-primary font-bold">Rp ${price}</p>
+                                <p class="text-xs text-gray-400 mt-1">Stok: ${p.stok}</p>
+                            </div>
+                        </div>
+                    </div>`;
+                });
+                $container.html(html);
+            },
+            error: function() {
+                $container.html('<div class="col-span-full text-red-500 text-center">Gagal memuat produk.</div>');
+            }
+        });
+    }
+
+    // Helper Global untuk Edit (dipanggil dari onclick HTML)
+    window.editProduct = function(data) {
+        openProductModal(data);
+    }
+
+    // C. SUBMIT PRODUK (ADD/EDIT)
+    $('#form-product').on('submit', function(e) {
+        e.preventDefault();
+        
+        const $form = $(this);
+        const $btnText = $('#btn-save-text');
+        const $loader = $('#btn-save-loader');
+        const id = $('#prod_id').val();
+        
+        // Buat FormData untuk handle file upload
+        let formData = new FormData(this);
+        
+        // Endpoint dinamis (Create or Update)
+        let url = API_BASE + 'pedagang/produk';
+        if(id) {
+            url += '/' + id; // Append ID for update
+            // Untuk update via FormData di beberapa server setup, method kadang harus POST tapi dengan _method=PUT atau logic khusus.
+            // Di sini kita asumsikan Endpoint menerima POST untuk update jika ID ada di URL.
+        }
+
+        $btnText.text('Menyimpan...');
+        $loader.removeClass('hidden');
+
+        $.ajax({
+            url: url,
+            type: 'POST',
+            headers: authHeaders,
+            data: formData,
+            contentType: false,
+            processData: false,
+            success: function(res) {
+                alert('Produk berhasil disimpan!');
+                closeProductModal();
+                loadMerchantProducts();
+                loadMerchantSummary(); // Refresh stats
+            },
+            error: function(xhr) {
+                alert('Gagal: ' + (xhr.responseJSON?.message || 'Terjadi kesalahan'));
+            },
+            complete: function() {
+                $btnText.text('Simpan Produk');
+                $loader.addClass('hidden');
+            }
+        });
+    });
+
+    // D. HAPUS PRODUK
+    window.deleteProduct = function(id) {
+        if(!confirm('Yakin ingin menghapus produk ini?')) return;
+
+        $.ajax({
+            url: API_BASE + 'pedagang/produk/' + id,
+            type: 'DELETE',
+            headers: authHeaders,
+            success: function() {
+                loadMerchantProducts();
+            },
+            error: function() {
+                alert('Gagal menghapus produk.');
+            }
+        });
+    }
+
+    // E. LOAD PESANAN
+    window.loadMerchantOrders = function(status = '', limit = 20, isSummary = false) {
+        const $container = isSummary ? $('#recent-orders-body') : $('#merchant-order-list');
+        const loadingHtml = '<tr><td colspan="5" class="px-6 py-8 text-center text-gray-400"><i class="ph-duotone ph-spinner animate-spin text-2xl"></i></td></tr>';
+        $container.html(loadingHtml);
+
+        let url = API_BASE + 'pedagang/orders?per_page=' + limit;
+        if(status) url += '&status=' + status;
+
+        $.ajax({
+            url: url,
+            type: 'GET',
+            headers: authHeaders,
+            success: function(orders) {
+                if(!orders || orders.length === 0) {
+                    $container.html('<tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">Tidak ada pesanan.</td></tr>');
+                    return;
+                }
+
+                let html = '';
+                orders.forEach(o => {
+                    const total = new Intl.NumberFormat('id-ID').format(o.total_pesanan_toko);
+                    const date = new Date(o.tanggal_transaksi).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+                    
+                    // Badge Warna Status
+                    let badgeClass = 'bg-gray-100 text-gray-600';
+                    if(o.status_pesanan === 'menunggu_konfirmasi') badgeClass = 'bg-yellow-100 text-yellow-700';
+                    if(o.status_pesanan === 'diproses') badgeClass = 'bg-blue-100 text-blue-700';
+                    if(o.status_pesanan === 'dikirim_ekspedisi') badgeClass = 'bg-purple-100 text-purple-700';
+                    if(o.status_pesanan === 'selesai') badgeClass = 'bg-green-100 text-green-700';
+                    if(o.status_pesanan === 'dibatalkan') badgeClass = 'bg-red-100 text-red-700';
+
+                    // Tombol Aksi (Hanya muncul di Tab Pesanan utama, bukan ringkasan)
+                    let actions = '';
+                    if(!isSummary) {
+                        if(o.status_pesanan === 'menunggu_konfirmasi') {
+                            actions = `
+                                <button onclick="updateOrderStatus(${o.sub_order_id}, 'diproses')" class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700">Terima</button>
+                                <button onclick="updateOrderStatus(${o.sub_order_id}, 'dibatalkan')" class="text-xs bg-white border border-red-200 text-red-600 px-3 py-1.5 rounded hover:bg-red-50 ml-1">Tolak</button>
+                            `;
+                        } else if (o.status_pesanan === 'diproses') {
+                            actions = `
+                                <button onclick="promptResi(${o.sub_order_id})" class="text-xs bg-purple-600 text-white px-3 py-1.5 rounded hover:bg-purple-700">Kirim Resi</button>
+                            `;
+                        } else {
+                            actions = `<a href="#" class="text-xs text-gray-500 underline">Lihat Detail</a>`;
+                        }
+                    }
+
+                    // Kolom berbeda untuk ringkasan vs full list
+                    if(isSummary) {
+                        html += `
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-3 font-medium text-gray-900">#${o.sub_order_id}</td>
+                            <td class="px-6 py-3">${date}</td>
+                            <td class="px-6 py-3"><span class="px-2 py-1 rounded text-xs font-bold ${badgeClass}">${o.status_label}</span></td>
+                            <td class="px-6 py-3 text-right font-bold text-gray-800">Rp ${total}</td>
+                        </tr>`;
+                    } else {
+                        html += `
+                        <tr class="hover:bg-gray-50 border-b border-gray-50 last:border-0">
+                            <td class="px-6 py-4">
+                                <div class="font-bold text-gray-900">#${o.sub_order_id}</div>
+                                <div class="text-xs text-gray-500 mt-0.5">Kode Utama: ${o.kode_unik}</div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="text-sm text-gray-900">${o.nama_pembeli}</div>
+                            </td>
+                            <td class="px-6 py-4"><span class="px-2.5 py-1 rounded-full text-xs font-bold ${badgeClass}">${o.status_label}</span></td>
+                            <td class="px-6 py-4 font-bold text-gray-800">Rp ${total}</td>
+                            <td class="px-6 py-4 text-center">
+                                <div class="flex items-center justify-center gap-2">${actions}</div>
+                            </td>
+                        </tr>`;
+                    }
+                });
+                $container.html(html);
+            }
+        });
+    }
+
+    // F. UPDATE STATUS PESANAN
+    window.updateOrderStatus = function(id, status, resi = '') {
+        if(status === 'dibatalkan' && !confirm('Yakin ingin menolak pesanan ini?')) return;
+
+        const payload = { status: status };
+        if(resi) payload.nomor_resi = resi;
+
+        $.ajax({
+            url: API_BASE + 'pedagang/orders/sub/' + id,
+            type: 'POST',
+            headers: authHeaders,
+            contentType: 'application/json',
+            data: JSON.stringify(payload),
+            success: function() {
+                alert('Status pesanan berhasil diperbarui.');
+                loadMerchantOrders();
+                loadMerchantSummary();
+            },
+            error: function(xhr) {
+                alert('Gagal update: ' + (xhr.responseJSON?.message || 'Error'));
+            }
+        });
+    }
+
+    window.promptResi = function(id) {
+        const resi = prompt("Masukkan Nomor Resi Pengiriman:");
+        if(resi) {
+            updateOrderStatus(id, 'dikirim_ekspedisi', resi);
         }
     }
 
-    // Helper: Simpan data keranjang ke penyimpanan lokal
-    function saveCart(cart) {
-        localStorage.setItem(CART_KEY, JSON.stringify(cart));
-        updateCartCount(); // Update badge setiap kali simpan
+    // G. LOAD PROFIL TOKO
+    window.loadMerchantProfile = function() {
+        $.ajax({
+            url: API_BASE + 'pedagang/profile/me',
+            type: 'GET',
+            headers: authHeaders,
+            success: function(data) {
+                $('#set_nama_toko').val(data.nama_toko);
+                $('#set_deskripsi_toko').val(data.deskripsi_toko);
+                $('#set_no_rekening').val(data.no_rekening);
+                $('#set_nama_bank').val(data.nama_bank);
+                $('#set_atas_nama').val(data.atas_nama_rekening);
+            }
+        });
     }
 
-    // Helper: Update angka badge di header
+    // H. SAVE PROFIL TOKO
+    $('#form-settings-toko').on('submit', function(e) {
+        e.preventDefault();
+        
+        const payload = {
+            nama_toko: $('#set_nama_toko').val(),
+            deskripsi_toko: $('#set_deskripsi_toko').val(),
+            no_rekening: $('#set_no_rekening').val(),
+            nama_bank: $('#set_nama_bank').val(),
+            atas_nama_rekening: $('#set_atas_nama').val()
+        };
+
+        $.ajax({
+            url: API_BASE + 'pedagang/profile/me',
+            type: 'POST',
+            headers: authHeaders,
+            contentType: 'application/json',
+            data: JSON.stringify(payload),
+            success: function() {
+                alert('Pengaturan toko disimpan!');
+            },
+            error: function() {
+                alert('Gagal menyimpan pengaturan.');
+            }
+        });
+    });
+
+    /* =========================================
+       2. LOGIKA KERANJANG (CART)
+       (Kode Cart yang sudah ada tetap dipertahankan di sini)
+       ========================================= */
+    const CART_KEY = 'dw_cart_v1';
+    
+    function getCart() { try { return JSON.parse(localStorage.getItem(CART_KEY)) || []; } catch (e) { return []; } }
+    function saveCart(cart) { localStorage.setItem(CART_KEY, JSON.stringify(cart)); updateCartCount(); }
+    
     function updateCartCount() {
         const cart = getCart();
         const count = cart.reduce((acc, item) => acc + item.qty, 0);
@@ -43,48 +337,39 @@ jQuery(document).ready(function($) {
             $badgeInner.addClass('hidden scale-0').removeClass('flex scale-100');
         }
     }
-
-    // Inisialisasi hitungan saat halaman dimuat
     updateCartCount();
 
-
-    /* =========================================
-       2. HANDLER TOMBOL "TAMBAH KE KERANJANG"
-       ========================================= */
+    // ADD TO CART HANDLER
     $(document).on('click', '.add-to-cart-btn, #single-add-cart, #btn-add-to-cart', function(e) {
         e.preventDefault();
         const btn = $(this);
-        
-        // Ambil data produk dari atribut data- HTML
         const id = parseInt(btn.data('id')) || 0;
-        const title = btn.data('title');
-        const price = parseInt(btn.data('price')) || 0;
-        const thumb = btn.data('thumb');
         
-        if (id === 0) {
-            console.error('Product ID not found on button');
-            return;
-        }
-        
+        if(id === 0) return;
+
         // Cek input qty (khusus halaman detail produk), default 1
         let qty = 1;
         if ($('#qty-input').length) {
             qty = parseInt($('#qty-input').val()) || 1;
         }
 
-        // Logika penambahan ke array cart
         let cart = getCart();
         const existingItem = cart.find(item => item.id === id);
 
         if (existingItem) {
             existingItem.qty += qty;
         } else {
-            cart.push({ id, title, price, thumb, qty });
+            cart.push({
+                id: id,
+                title: btn.data('title'),
+                price: parseInt(btn.data('price')) || 0,
+                thumb: btn.data('thumb'),
+                qty: qty
+            });
         }
-
         saveCart(cart);
-
-        // Efek Visual Tombol (Feedback ke User)
+        
+        // Visual Feedback
         const originalHTML = btn.html();
         
         // Ubah tampilan tombol sesaat menjadi hijau/sukses
@@ -98,11 +383,9 @@ jQuery(document).ready(function($) {
             $toast.text('Produk berhasil ditambahkan ke keranjang').fadeIn().delay(2000).fadeOut();
         }
         
-        // Kembalikan tombol ke semula setelah 1.5 detik
         setTimeout(() => {
-            btn.html(originalHTML)
-               .removeClass('bg-green-600 text-white border-transparent shadow-none');
-
+            btn.html(originalHTML).removeClass('bg-green-600 text-white border-transparent shadow-none');
+            
             // Kembalikan class asli berdasarkan ID tombol agar style tidak rusak
             if (btn.attr('id') === 'single-add-cart') {
                  // Tombol di single produk (versi lama/desktop)
@@ -117,10 +400,7 @@ jQuery(document).ready(function($) {
         }, 1500);
     });
 
-
-    /* =========================================
-       3. RENDER HALAMAN KERANJANG (page-cart.php)
-       ========================================= */
+    // FUNGSI CART TAMBAHAN (CLEAR, REMOVE, UPDATE QTY, RENDER)
     
     // Fungsi Global: Kosongkan keranjang
     window.clearCart = function() {
@@ -163,12 +443,21 @@ jQuery(document).ready(function($) {
 
         if (cart.length === 0) {
             $container.html('').hide();
-            $emptyState.removeClass('hidden').addClass('flex');
+            // Jika ada elemen empty state khusus
+            if ($emptyState.length) {
+                $emptyState.removeClass('hidden').addClass('flex');
+            } else {
+                // Fallback jika tidak ada elemen empty state terpisah
+                $container.html('<div class="p-8 text-center text-gray-500"><i class="fas fa-shopping-basket text-4xl mb-4 text-gray-300"></i><p>Keranjang belanja Anda kosong.</p><a href="' + dwData.home_url + '/produk" class="text-primary font-semibold hover:underline mt-2 inline-block">Mulai Belanja</a></div>').show();
+            }
             $checkoutBar.hide(); // Sembunyikan tombol checkout jika kosong
+            // Update summary di sidebar jika ada (versi desktop)
+            if ($('#summary-count').length) $('#summary-count').text('0 barang');
+            if ($('#summary-total').length) $('#summary-total').text('Rp 0');
             return;
         } else {
             $container.show();
-            $emptyState.addClass('hidden').removeClass('flex');
+            if ($emptyState.length) $emptyState.addClass('hidden').removeClass('flex');
             $checkoutBar.show();
         }
 
@@ -218,343 +507,28 @@ jQuery(document).ready(function($) {
 
         $container.html(html);
         
-        // Update Total di Checkout Bar Bawah
-        $('.fixed.bottom-0 .text-lg.font-bold').text(new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(total));
+        // Update Total di Checkout Bar Bawah (Mobile App Style)
+        const formattedTotal = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(total);
+        $('.fixed.bottom-0 .text-lg.font-bold').text(formattedTotal);
         $('.fixed.bottom-0 a').text(`Checkout (${count})`);
+
+        // Update Summary di Sidebar (Desktop Style)
+        if ($('#summary-count').length) $('#summary-count').text(count + ' barang');
+        if ($('#summary-total').length) $('#summary-total').text(formattedTotal);
     }
 
     // Jalankan render saat load jika kita berada di halaman cart
-    if ($('#cart-items-container').length) {
+    if ($('#cart-items-container').length || $('#cart-container').length) {
+        // Fallback selector jika ID berbeda di template page-cart.php
+        if (!$('#cart-items-container').length && $('#cart-container').length) {
+             // Jika menggunakan template page-cart.php yang lama, tambahkan container ID yang sesuai
+             // atau sesuaikan renderCartPage untuk menargetkan #cart-container
+             // Di sini kita asumsikan #cart-container adalah wrapper utama
+             if (!$('#cart-items-container').length) {
+                 $('#cart-container').append('<div id="cart-items-container"></div>');
+             }
+        }
         renderCartPage();
     }
-
-
-    /* =========================================
-       4. LOGIKA HALAMAN CHECKOUT (page-checkout.php)
-       ========================================= */
-    if ($('#checkout-items-container').length) {
-        const cart = getCart();
-        const $container = $('#checkout-items-container');
-        const $subtotal = $('#checkout-subtotal');
-        const $total = $('#checkout-total');
-        const SERVICE_FEE = 2000; // Biaya layanan statis
-
-        // Redirect jika keranjang kosong saat masuk checkout
-        if (cart.length === 0) {
-            window.location.href = dwData.home_url + 'keranjang';
-        }
-
-        let total = 0;
-        let html = '';
-        
-        // Render ringkasan item di halaman checkout
-        cart.forEach(item => {
-            total += (item.price * item.qty);
-            const formattedPrice = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(item.price * item.qty);
-            
-            html += `
-            <div class="flex justify-between items-center text-sm border-b border-gray-50 last:border-0 pb-3 mb-3 last:pb-0 last:mb-0">
-                <div class="flex items-center gap-3">
-                    <img src="${item.thumb}" class="w-10 h-10 rounded object-cover border border-gray-200 bg-gray-100">
-                    <div>
-                        <div class="font-medium text-gray-800 line-clamp-1 w-40">${item.title}</div>
-                        <div class="text-gray-500 text-xs">Qty: ${item.qty}</div>
-                    </div>
-                </div>
-                <div class="font-bold text-gray-700">${formattedPrice}</div>
-            </div>`;
-        });
-
-        $container.html(html);
-        if ($subtotal.length) $subtotal.text('Rp ' + total.toLocaleString('id-ID'));
-        if ($total.length) $total.text('Rp ' + (total + SERVICE_FEE).toLocaleString('id-ID'));
-
-        // HANDLER TOMBOL "BAYAR SEKARANG"
-        $('#checkout-form').on('submit', function(e) {
-            e.preventDefault();
-            
-            const $btn = $('#btn-place-order');
-            const $loader = $('#checkout-loader');
-            
-            // State Loading
-            $btn.prop('disabled', true).addClass('opacity-75 cursor-not-allowed');
-            $loader.removeClass('hidden');
-
-            // Ambil data form
-            const formData = $(this).serializeArray();
-            const addressData = {};
-            formData.forEach(field => { addressData[field.name] = field.value });
-
-            // Format data keranjang sesuai spesifikasi API Plugin Desa Wisata Core
-            const cartPayload = cart.map(item => ({
-                product_id: item.id,
-                qty: item.qty,
-                note: '' // Bisa ditambahkan input catatan per item nanti
-            }));
-
-            // Kirim ke API: /dw/v1/pembeli/orders
-            $.ajax({
-                type: 'POST',
-                url: dwData.api_url + 'pembeli/orders',
-                headers: {
-                    'Authorization': 'Bearer ' + localStorage.getItem('dw_jwt_token') // Wajib ada token JWT
-                },
-                contentType: 'application/json',
-                data: JSON.stringify({
-                    cart_items: cartPayload,
-                    shipping_address_id: 0, // 0 jika pakai alamat manual (belum disimpan di DB)
-                    manual_address: addressData, // Kirim data alamat manual dari form
-                    seller_shipping_choices: {}, // Jika ada fitur ongkir, ini harus diisi logic ongkir
-                    payment_method: 'manual_transfer'
-                }),
-                success: function(response) {
-                    // Sukses
-                    localStorage.removeItem(CART_KEY); // Hapus keranjang lokal
-                    $('#order-success-modal').removeClass('hidden').addClass('flex'); // Tampilkan modal sukses
-                },
-                error: function(xhr) {
-                    console.error('Checkout Error:', xhr);
-                    
-                    let msg = 'Gagal membuat pesanan.';
-                    
-                    // Fallback simulasi jika API error (Misal: masalah struktur data)
-                    // Hapus blok 'if' ini jika API sudah stabil 100%
-                    if (xhr.status === 404 || xhr.status === 500) {
-                        alert('Mode Simulasi (API Error): Order berhasil dibuat secara lokal! Redirecting...');
-                        localStorage.removeItem(CART_KEY);
-                        window.location.href = dwData.home_url + 'dashboard-toko';
-                        return;
-                    }
-
-                    if(xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
-                    alert(msg);
-                },
-                complete: function() {
-                    $btn.prop('disabled', false).removeClass('opacity-75 cursor-not-allowed');
-                    $loader.addClass('hidden');
-                }
-            });
-        });
-    }
-
-
-    /* =========================================
-       5. GENERAL UI INTERACTION
-       ========================================= */
-    // Toggle Mobile Menu (Jika ada)
-    $('#mobile-menu-btn').on('click', function() {
-        $('#mobile-menu').slideToggle();
-    });
-
-    // Product Tabs (Detail Produk)
-    $('.product-tabs .tab-nav a').on('click', function(e) {
-        e.preventDefault();
-        $('.product-tabs .tab-nav a').removeClass('active border-primary text-primary').addClass('border-transparent text-gray-500');
-        $('.product-tabs .tab-pane').removeClass('active hidden').addClass('hidden');
-        
-        $(this).addClass('active border-primary text-primary').removeClass('border-transparent text-gray-500');
-        var targetId = $(this).attr('href');
-        $(targetId).removeClass('hidden').addClass('active');
-    });
-
-
-    /* =========================================
-       6. HANDLER LOGIN FORM (page-login.php)
-       ========================================= */
-    $('#dw-login-form').on('submit', function(e) {
-        e.preventDefault();
-        
-        var username = $('#username').val();
-        var password = $('#password').val();
-        var $btn = $('#btn-submit');
-        var $btnText = $('#btn-text');
-        var $loader = $('#btn-loader');
-        var $alert = $('#login-alert');
-
-        // UI Loading State
-        $btn.prop('disabled', true);
-        $btnText.text('Memproses...');
-        $loader.removeClass('hidden');
-        $alert.addClass('hidden').removeClass('bg-red-50 text-red-700 bg-green-50 text-green-700 flex');
-
-        // URL Endpoint Login API
-        var loginEndpoint = dwData.api_url + 'auth/login';
-
-        // LANGKAH 1: Login ke API (Dapatkan Token JWT)
-        $.ajax({
-            type: 'POST',
-            url: loginEndpoint, 
-            contentType: 'application/json',
-            dataType: 'json',
-            data: JSON.stringify({
-                username: username,
-                password: password
-            }),
-            success: function(response) {
-                // Token API didapat
-                localStorage.setItem('dw_jwt_token', response.token);
-
-                // LANGKAH 2: Login ke Sesi WordPress (Set Cookie Auth)
-                // Ini penting agar user bisa mengakses halaman wp-admin atau halaman proteksi lainnya
-                $.ajax({
-                    type: 'POST',
-                    url: dwData.ajax_url,
-                    data: {
-                        action: 'tema_dw_ajax_login', // Action name di functions.php
-                        username: username,
-                        password: password,
-                        security: dwData.nonce
-                    },
-                    success: function(wpResponse) {
-                        if ( wpResponse.success ) {
-                            // KEDUANYA SUKSES -> Redirect
-                            $alert.html('<i class="ph-bold ph-check-circle text-lg"></i> Login berhasil! Mengalihkan...').addClass('bg-green-50 text-green-700 flex').removeClass('hidden');
-                            
-                            // Redirect ke URL yang diberikan server atau default
-                            window.location.href = wpResponse.data.redirect_url || (dwData.home_url + 'dashboard-toko');
-                        } else {
-                            handleError('Sesi WP Gagal: ' + (wpResponse.data.message || 'Unknown error'));
-                        }
-                    },
-                    error: function(xhr, status, error) {
-                        handleError('Terjadi kesalahan koneksi ke server WordPress.');
-                    }
-                });
-            },
-            error: function(xhr, status, error) {
-                console.error('API Login Error:', xhr);
-                
-                var msg = 'Login gagal.';
-                
-                // Handling pesan error spesifik "No Route"
-                if (xhr.responseJSON && xhr.responseJSON.code === 'rest_no_route') {
-                    msg = '<strong>Error Sistem:</strong> Jalur API tidak ditemukan. Mohon Admin masuk ke <em>Settings > Permalinks</em> di dashboard WP dan klik "Save Changes".';
-                } else if (xhr.responseJSON && xhr.responseJSON.message) {
-                    msg = xhr.responseJSON.message;
-                } else if (xhr.status === 404) {
-                    msg = 'Error 404: Endpoint API tidak ditemukan (' + loginEndpoint + '). Pastikan Plugin Desa Wisata Core aktif.';
-                }
-
-                handleError('<i class="ph-bold ph-warning-circle text-lg"></i> ' + msg);
-            }
-        });
-
-        // Helper UI Error Login
-        function handleError(message) {
-            $alert.html(message).addClass('bg-red-50 text-red-700 flex').removeClass('hidden');
-            $btn.prop('disabled', false);
-            $btnText.text('Masuk Sekarang');
-            $loader.addClass('hidden');
-        }
-    });
-
-
-    /* =========================================
-       7. HANDLER REGISTER FORM (page-register.php)
-       ========================================= */
-    $('#dw-register-form').on('submit', function(e) {
-        e.preventDefault();
-        
-        // Ambil value dari input
-        var fullname = $('#fullname').val();
-        var username = $('#reg_username').val();
-        var email    = $('#email').val();
-        var no_hp    = $('#no_hp').val();
-        var password = $('#reg_password').val();
-        
-        // Ambil role dan nama toko (jika ada) dari input hidden/visible
-        var role     = $('#role-input').val(); // 'pembeli' atau 'pedagang'
-        var nama_toko = $('#nama_toko').val(); 
-        
-        var $btn = $('#btn-reg-submit');
-        var $btnText = $('#btn-reg-text');
-        var $loader = $('#btn-reg-loader');
-        var $alert = $('#register-alert');
-
-        // UI Loading
-        $btn.prop('disabled', true);
-        $btnText.text('Mendaftarkan...');
-        $loader.removeClass('hidden');
-        $alert.addClass('hidden').removeClass('bg-red-50 text-red-700 bg-green-50 text-green-700 flex');
-
-        // Siapkan data payload
-        var payload = {
-            username: username,
-            email: email,
-            password: password,
-            fullname: fullname,
-            no_hp: no_hp,
-            role: role
-        };
-
-        // Jika pedagang, tambahkan nama toko ke payload
-        if (role === 'pedagang') {
-            if(!nama_toko) {
-                 $alert.html('<i class="ph-bold ph-warning-circle text-lg"></i> Nama Toko wajib diisi untuk pedagang.').addClass('bg-red-50 text-red-700 flex').removeClass('hidden');
-                 $btn.prop('disabled', false);
-                 $btnText.text('Daftar Sekarang');
-                 $loader.addClass('hidden');
-                 return;
-            }
-            payload.nama_toko = nama_toko;
-        }
-
-        // Step 1: Register via API Plugin (/auth/register)
-        $.ajax({
-            type: 'POST',
-            url: dwData.api_url + 'auth/register',
-            contentType: 'application/json',
-            data: JSON.stringify(payload),
-            success: function(response) {
-                // Register Sukses
-                $alert.html('<i class="ph-bold ph-check-circle text-lg"></i> Pendaftaran berhasil! Mengalihkan...').addClass('bg-green-50 text-green-700 flex').removeClass('hidden');
-                
-                // Simpan Token JWT jika dikembalikan langsung
-                if(response.token) {
-                    localStorage.setItem('dw_jwt_token', response.token);
-                }
-
-                // Step 2: Auto Login ke WP Session (Cookie)
-                // Agar user tidak perlu login ulang manual
-                $.ajax({
-                    type: 'POST',
-                    url: dwData.ajax_url,
-                    data: {
-                        action: 'tema_dw_ajax_login',
-                        username: username,
-                        password: password,
-                        security: dwData.nonce
-                    },
-                    success: function(wpRes) {
-                        // Redirect Berdasarkan Role
-                        if (role === 'pedagang') {
-                            window.location.href = dwData.home_url + 'dashboard-toko';
-                        } else {
-                            window.location.href = dwData.home_url + 'akun-saya';
-                        }
-                    },
-                    error: function() {
-                        // Fallback jika auto login gagal
-                        window.location.href = dwData.home_url + 'login?registered=true';
-                    }
-                });
-            },
-            error: function(xhr) {
-                console.error(xhr);
-                var msg = 'Registrasi gagal.';
-                
-                // Parsing pesan error dari API
-                if(xhr.responseJSON && xhr.responseJSON.message) {
-                    msg = xhr.responseJSON.message;
-                }
-                
-                $alert.html('<i class="ph-bold ph-warning-circle text-lg"></i> ' + msg).addClass('bg-red-50 text-red-700 flex').removeClass('hidden');
-                
-                $btn.prop('disabled', false);
-                $btnText.text('Daftar Sekarang');
-                $loader.addClass('hidden');
-            }
-        });
-    });
 
 });
