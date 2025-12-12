@@ -1,49 +1,59 @@
-</main>
-        <!-- CONTENT END -->
-
-        <!-- BOTTOM NAVIGATION (Hanya muncul jika bukan halaman login/checkout/single) -->
-        <?php if (!is_page(['login', 'register', 'checkout']) && !is_singular(['dw_produk', 'dw_wisata'])) : ?>
-        <div class="fixed bottom-0 w-full max-w-[480px] z-50 px-6 pb-6 pt-2 pointer-events-none">
-            <nav class="bg-white/95 backdrop-blur-xl border border-white/50 shadow-[0_8px_30px_rgb(0,0,0,0.12)] rounded-2xl px-2 py-2 flex justify-between items-center pointer-events-auto">
-                
-                <a href="<?php echo home_url(); ?>" class="nav-item flex-1 flex flex-col items-center gap-1 py-2 text-gray-400 hover:text-primary transition-all <?php echo is_front_page() ? 'text-primary font-bold' : ''; ?>">
-                    <i class="<?php echo is_front_page() ? 'ph-fill' : 'ph-bold'; ?> ph-house text-2xl"></i>
-                    <span class="text-[10px]">Beranda</span>
-                </a>
-
-                <a href="<?php echo site_url('/wisata'); ?>" class="nav-item flex-1 flex flex-col items-center gap-1 py-2 text-gray-400 hover:text-primary transition-all <?php echo is_page('wisata') ? 'text-primary font-bold' : ''; ?>">
-                    <i class="<?php echo is_page('wisata') ? 'ph-fill' : 'ph-bold'; ?> ph-map-trifold text-2xl"></i>
-                    <span class="text-[10px]">Jelajah</span>
-                </a>
-
-                <!-- Main Action Button (Center) -->
-                <?php
-                // Fix: Gunakan get_post_type_archive_link dengan fallback
-                $produk_link = function_exists('get_post_type_archive_link') ? get_post_type_archive_link('dw_produk') : site_url('/produk');
-                if (!$produk_link) $produk_link = site_url('/produk');
-                ?>
-                <div class="relative w-16 flex justify-center group">
-                    <a href="<?php echo esc_url($produk_link); ?>" class="absolute -top-8 w-14 h-14 bg-gray-900 text-white rounded-full shadow-lg shadow-gray-900/40 flex items-center justify-center border-4 border-[#F8FAFC] transform transition-transform group-hover:scale-105 active:scale-95">
-                        <i class="ph-fill ph-storefront text-2xl"></i>
-                    </a>
-                    <span class="text-[10px] text-gray-500 font-medium mt-7 group-hover:text-primary">Pasar</span>
+<footer class="bg-dark text-white pt-16 pb-8">
+    <div class="container mx-auto px-4">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
+            <!-- Brand Info -->
+            <div class="col-span-1 md:col-span-1">
+                <h3 class="text-2xl font-bold mb-4 text-white">Desa<span class="text-accent">Wisata</span></h3>
+                <p class="text-gray-400 text-sm leading-relaxed mb-4">
+                    Platform marketplace terintegrasi yang menghubungkan potensi desa wisata dan produk UMKM lokal langsung ke wisatawan.
+                </p>
+                <div class="flex space-x-4">
+                    <a href="#" class="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center hover:bg-primary transition"><i class="fab fa-facebook-f text-sm"></i></a>
+                    <a href="#" class="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center hover:bg-primary transition"><i class="fab fa-instagram text-sm"></i></a>
+                    <a href="#" class="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center hover:bg-primary transition"><i class="fab fa-youtube text-sm"></i></a>
                 </div>
+            </div>
 
-                <a href="<?php echo site_url('/transaksi'); ?>" class="nav-item flex-1 flex flex-col items-center gap-1 py-2 text-gray-400 hover:text-primary transition-all <?php echo is_page('transaksi') ? 'text-primary font-bold' : ''; ?>">
-                    <i class="<?php echo is_page('transaksi') ? 'ph-fill' : 'ph-bold'; ?> ph-receipt text-2xl"></i>
-                    <span class="text-[10px]">Pesanan</span>
-                </a>
+            <!-- Links -->
+            <div>
+                <h4 class="text-lg font-semibold mb-4 text-white">Jelajahi</h4>
+                <ul class="space-y-2 text-sm text-gray-400">
+                    <li><a href="<?php echo home_url('/wisata'); ?>" class="hover:text-primary transition">Destinasi Wisata</a></li>
+                    <li><a href="<?php echo home_url('/produk'); ?>" class="hover:text-primary transition">Belanja Ole-Oleh</a></li>
+                    <li><a href="<?php echo home_url('/paket-wisata'); ?>" class="hover:text-primary transition">Paket Wisata</a></li>
+                    <li><a href="<?php echo home_url('/blog'); ?>" class="hover:text-primary transition">Berita Desa</a></li>
+                </ul>
+            </div>
 
-                <a href="<?php echo site_url('/akun-saya'); ?>" class="nav-item flex-1 flex flex-col items-center gap-1 py-2 text-gray-400 hover:text-primary transition-all <?php echo is_page('akun-saya') ? 'text-primary font-bold' : ''; ?>">
-                    <i class="<?php echo is_page('akun-saya') ? 'ph-fill' : 'ph-bold'; ?> ph-user text-2xl"></i>
-                    <span class="text-[10px]">Akun</span>
-                </a>
+            <!-- Links -->
+            <div>
+                <h4 class="text-lg font-semibold mb-4 text-white">Dukungan</h4>
+                <ul class="space-y-2 text-sm text-gray-400">
+                    <li><a href="#" class="hover:text-primary transition">Cara Pesan</a></li>
+                    <li><a href="#" class="hover:text-primary transition">Metode Pembayaran</a></li>
+                    <li><a href="#" class="hover:text-primary transition">Daftar Sebagai Mitra</a></li>
+                    <li><a href="#" class="hover:text-primary transition">Syarat & Ketentuan</a></li>
+                </ul>
+            </div>
 
-            </nav>
+            <!-- Newsletter -->
+            <div>
+                <h4 class="text-lg font-semibold mb-4 text-white">Hubungi Kami</h4>
+                <ul class="space-y-2 text-sm text-gray-400 mb-4">
+                    <li class="flex items-start gap-3"><i class="fas fa-map-marker-alt mt-1 text-primary"></i> <span>Jl. Desa Wisata No. 1, Indonesia</span></li>
+                    <li class="flex items-center gap-3"><i class="fas fa-envelope text-primary"></i> <span>info@desawisata.com</span></li>
+                    <li class="flex items-center gap-3"><i class="fas fa-phone text-primary"></i> <span>+62 812 3456 7890</span></li>
+                </ul>
+            </div>
         </div>
-        <?php endif; ?>
 
-    </div> <!-- End App Frame -->
-    <?php wp_footer(); ?>
+        <div class="border-t border-gray-700 pt-8 flex flex-col md:flex-row justify-between items-center text-sm text-gray-500">
+            <p>&copy; <?php echo date('Y'); ?> Desa Wisata Core. All rights reserved.</p>
+            <p>Built with <i class="fas fa-heart text-red-500"></i> by BonangPanjiNur</p>
+        </div>
+    </div>
+</footer>
+
+<?php wp_footer(); ?>
 </body>
 </html>

@@ -1,86 +1,86 @@
 <?php
 /**
- * Template Name: Halaman Login Custom
- * Description: Template khusus untuk halaman /login
+ * Template Name: Login Page
  */
 
-// 1. Jika user sudah login, tendang ke dashboard masing-masing
+// Redirect jika sudah login
 if ( is_user_logged_in() ) {
-    $current_user = wp_get_current_user();
-    if ( in_array( 'pedagang', (array) $current_user->roles ) ) {
-        wp_redirect( home_url( '/dashboard-toko/' ) );
-    } elseif ( in_array( 'pembeli', (array) $current_user->roles ) ) {
-        wp_redirect( home_url( '/akun-saya/' ) );
-    } else {
-        wp_redirect( admin_url() );
-    }
+    wp_redirect( home_url('/dashboard-toko') ); // Atau halaman akun
     exit;
 }
 
 get_header(); 
 ?>
 
-<div class="dw-login-container">
-    <div class="dw-login-box">
-        <h2>Masuk ke Desa Wisata</h2>
-        
-        <?php
-        // Menampilkan pesan error atau sukses dari URL parameter
-        if ( isset( $_GET['login'] ) && $_GET['login'] == 'failed' ) {
-            echo '<div class="dw-alert error">Username atau Password salah.</div>';
-        }
-        if ( isset( $_GET['login'] ) && $_GET['login'] == 'empty' ) {
-            echo '<div class="dw-alert warning">Silakan isi username dan password.</div>';
-        }
-        ?>
-
-        <!-- Form Login yang mengarah ke pemroses di functions.php -->
-        <form name="dw_login_form" id="dw_login_form" action="<?php echo esc_url( home_url( '/login/' ) ); ?>" method="post">
-            
-            <div class="form-group">
-                <label for="dw_user_login">Username atau Email</label>
-                <input type="text" name="dw_user_login" id="dw_user_login" class="input" required />
-            </div>
-
-            <div class="form-group">
-                <label for="dw_user_pass">Password</label>
-                <input type="password" name="dw_user_pass" id="dw_user_pass" class="input" required />
-            </div>
-
-            <div class="form-group checkbox">
-                <label>
-                    <input name="rememberme" type="checkbox" id="rememberme" value="forever" /> Ingat Saya
-                </label>
-            </div>
-
-            <div class="form-actions">
-                <!-- Nonce Security -->
-                <?php wp_nonce_field( 'dw_login_action', 'dw_login_nonce' ); ?>
-                <input type="submit" name="dw_login_submit" id="dw_login_submit" class="button button-primary" value="Masuk Sekarang" />
-            </div>
-            
-        </form>
-        
-        <p class="dw-register-link">
-            Belum punya akun? <a href="<?php echo home_url('/daftar/'); ?>">Daftar di sini</a>
+<div class="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div class="sm:mx-auto sm:w-full sm:max-w-md">
+        <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+            Masuk ke Akun Anda
+        </h2>
+        <p class="mt-2 text-center text-sm text-gray-600">
+            Atau
+            <a href="<?php echo home_url('/register'); ?>" class="font-medium text-primary hover:text-green-500">
+                daftar akun baru
+            </a>
         </p>
     </div>
-</div>
 
-<style>
-    /* Style Sederhana untuk Login */
-    .dw-login-container { display: flex; justify-content: center; align-items: center; min-height: 80vh; background: #f0f2f5; }
-    .dw-login-box { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
-    .dw-login-box h2 { text-align: center; margin-bottom: 20px; color: #333; }
-    .form-group { margin-bottom: 15px; }
-    .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
-    .form-group input[type="text"], .form-group input[type="password"] { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-    .button-primary { width: 100%; padding: 12px; background: #0073aa; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
-    .button-primary:hover { background: #005177; }
-    .dw-alert { padding: 10px; margin-bottom: 15px; border-radius: 4px; font-size: 14px; text-align: center; }
-    .dw-alert.error { background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
-    .dw-alert.warning { background: #fff3e0; color: #ef6c00; border: 1px solid #ffe0b2; }
-    .dw-register-link { text-align: center; margin-top: 15px; font-size: 14px; }
-</style>
+    <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+        <div class="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+            
+            <!-- Alert Container (JS will populate this) -->
+            <div id="login-alert" class="hidden mb-4 p-4 rounded text-sm text-white"></div>
+
+            <form id="dw-login-form" class="space-y-6">
+                <div>
+                    <label for="username" class="block text-sm font-medium text-gray-700"> Username / Email </label>
+                    <div class="mt-1">
+                        <input id="username" name="username" type="text" autocomplete="username" required class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700"> Password </label>
+                    <div class="mt-1">
+                        <input id="password" name="password" type="password" autocomplete="current-password" required class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm">
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <input id="remember-me" name="remember-me" type="checkbox" class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded">
+                        <label for="remember-me" class="ml-2 block text-sm text-gray-900"> Ingat saya </label>
+                    </div>
+
+                    <div class="text-sm">
+                        <a href="<?php echo wp_lostpassword_url(); ?>" class="font-medium text-primary hover:text-green-500">
+                            Lupa password?
+                        </a>
+                    </div>
+                </div>
+
+                <div>
+                    <button type="submit" id="btn-submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                        <span id="btn-text">Masuk</span>
+                        <i id="btn-loader" class="fas fa-spinner fa-spin ml-2 hidden"></i>
+                    </button>
+                </div>
+            </form>
+
+            <div class="mt-6">
+                <div class="relative">
+                    <div class="absolute inset-0 flex items-center">
+                        <div class="w-full border-t border-gray-300"></div>
+                    </div>
+                    <div class="relative flex justify-center text-sm">
+                        <span class="px-2 bg-white text-gray-500">
+                            Desa Wisata Core System
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <?php get_footer(); ?>

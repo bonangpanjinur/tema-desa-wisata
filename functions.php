@@ -1,102 +1,106 @@
 <?php
 /**
- * Functions and definitions
- * @package TemaDesaWisata
+ * Functions and definitions for Tema Desa Wisata
  */
 
-// 1. Setup Theme
-function dw_theme_setup() {
-    add_theme_support('title-tag');
-    add_theme_support('post-thumbnails');
+if ( ! defined( 'ABSPATH' ) ) {
+	exit; // Exit if accessed directly.
 }
-add_action('after_setup_theme', 'dw_theme_setup');
+
+// 1. Setup Dasar Theme
+function tema_dw_setup() {
+    // Menambahkan dukungan Title Tag
+    add_theme_support( 'title-tag' );
+
+    // Menambahkan dukungan Featured Image (Thumbnail)
+    add_theme_support( 'post-thumbnails' );
+
+    // Mendaftarkan Menu Navigasi
+    register_nav_menus( array(
+        'primary' => __( 'Primary Menu', 'tema-dw' ),
+        'footer'  => __( 'Footer Menu', 'tema-dw' ),
+    ) );
+
+    // Menambahkan dukungan Logo
+    add_theme_support( 'custom-logo', array(
+        'height'      => 50,
+        'width'       => 150,
+        'flex-height' => true,
+        'flex-width'  => true,
+    ) );
+}
+add_action( 'after_setup_theme', 'tema_dw_setup' );
 
 // 2. Enqueue Scripts & Styles
-function dw_theme_enqueue_scripts() {
-    // Tailwind CSS (CDN)
-    wp_enqueue_script('tailwind', 'https://cdn.tailwindcss.com', [], null, false);
+function tema_dw_scripts() {
+    // Load Tailwind CSS via CDN (Untuk kemudahan development & hasil instan)
+    // Di production sebaiknya di-compile, tapi untuk fase ini CDN sangat efisien.
+    wp_enqueue_script('tailwindcss', 'https://cdn.tailwindcss.com', array(), '3.4.0', false);
     
-    // Config Tailwind
-    wp_add_inline_script('tailwind', "
+    // Konfigurasi Tailwind Custom Config (agar warna sesuai brand Desa Wisata)
+    wp_add_inline_script('tailwindcss', "
         tailwind.config = {
             theme: {
                 extend: {
-                    fontFamily: { sans: ['\"Plus Jakarta Sans\"', 'sans-serif'] },
                     colors: {
-                        primary: '#0F766E', 
-                        secondary: '#F59E0B', 
-                        surface: '#F8FAFC',
-                    },
-                    boxShadow: {
-                        'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
+                        primary: '#16a34a', // Green 600
+                        secondary: '#15803d', // Green 700
+                        accent: '#ca8a04', // Yellow 600
+                        dark: '#1e293b',
                     }
                 }
             }
         }
     ");
 
-    // Fonts & Icons
-    wp_enqueue_style('google-fonts', 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap', [], null);
-    wp_enqueue_script('phosphor-icons', 'https://unpkg.com/@phosphor-icons/web', [], null, false);
+    // Main Style (style.css bawaan)
+    wp_enqueue_style( 'tema-dw-style', get_stylesheet_uri() );
 
-    // Main Styles & JS
-    wp_enqueue_style('dw-style', get_stylesheet_uri(), [], '1.0.2');
-    wp_enqueue_script('dw-main-js', get_template_directory_uri() . '/assets/js/main.js', ['jquery'], '1.0.1', true);
-    
-    // AJAX Cart Logic
-    wp_enqueue_script('dw-ajax-cart', get_template_directory_uri() . '/assets/js/ajax-cart.js', ['jquery'], '1.0.1', true);
-    wp_localize_script('dw-ajax-cart', 'dw_ajax', [
-        'ajax_url' => admin_url('admin-ajax.php'),
-        'nonce'    => wp_create_nonce('dw-cart-nonce'),
-        'home_url' => home_url()
-    ]);
+    // Font Awesome untuk Icon
+    wp_enqueue_style('font-awesome', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+    // Main JS
+    wp_enqueue_script( 'tema-dw-main-js', get_template_directory_uri() . '/assets/js/main.js', array('jquery'), '1.0.0', true );
+
+    // Localize Script untuk mengirim data PHP ke JS (Penting untuk AJAX/API)
+    wp_localize_script( 'tema-dw-main-js', 'dwData', array(
+        'ajax_url' => admin_url( 'admin-ajax.php' ),
+        'api_url'  => get_rest_url( null, 'dw/v1/' ),
+        'nonce'    => wp_create_nonce( 'wp_rest' ), // Nonce untuk keamanan WP REST API
+        'is_logged_in' => is_user_logged_in(),
+        'home_url' => home_url('/'),
+    ));
 }
-add_action('wp_enqueue_scripts', 'dw_theme_enqueue_scripts');
+add_action( 'wp_enqueue_scripts', 'tema_dw_scripts' );
 
-// 3. Helper: Format Rupiah (Utama)
-if ( ! function_exists( 'dw_format_price' ) ) {
-    function dw_format_price($price) {
-        return 'Rp ' . number_format((float)$price, 0, ',', '.');
+// 3. Helper: Cek Harga Produk (Integrasi dengan Plugin)
+function dw_get_product_price_html($post_id) {
+    // Coba ambil dari meta data plugin
+    $harga = get_post_meta($post_id, '_price', true);
+    if (!$harga) {
+        // Fallback jika menggunakan sistem variasi
+        // Logika ini harus disesuaikan dengan cara plugin menyimpan harga
+        return '<span class="text-sm text-gray-500">Cek Detail</span>';
+    }
+    return '<span class="text-primary font-bold">Rp ' . number_format($harga, 0, ',', '.') . '</span>';
+}
+
+// 4. Helper: Redirect Pedagang ke Dashboard setelah Login
+function dw_login_redirect( $redirect_to, $request, $user ) {
+    if ( isset( $user->roles ) && is_array( $user->roles ) ) {
+        if ( in_array( 'pedagang', $user->roles ) ) {
+            // Asumsi slug page dashboard toko adalah 'dashboard-toko'
+            return home_url( '/dashboard-toko/' );
+        }
+    }
+    return $redirect_to;
+}
+add_filter( 'login_redirect', 'dw_login_redirect', 10, 3 );
+
+// 5. Hide Admin Bar untuk User non-admin
+function dw_disable_admin_bar() {
+    if ( ! current_user_can( 'administrator' ) && ! is_admin() ) {
+        show_admin_bar( false );
     }
 }
-
-// 4. Helper Alias: dw_price (Untuk kompatibilitas kode front-page.php)
-if ( ! function_exists( 'dw_price' ) ) {
-    function dw_price($price) {
-        return dw_format_price($price);
-    }
-}
-
-// 5. Helper: Cek Apakah Halaman Auth (Login/Register)
-function dw_is_auth_page() {
-    return is_page('login') || is_page('register') || is_page('lupa-password');
-}
-
-// 6. Redirect User yang sudah login dari halaman Login/Register
-function dw_redirect_logged_in_user() {
-    if (is_user_logged_in() && dw_is_auth_page()) {
-        wp_redirect(home_url());
-        exit;
-    }
-}
-add_action('template_redirect', 'dw_redirect_logged_in_user');
-
-// 7. Handle Login via AJAX
-function dw_ajax_login_handler() {
-    check_ajax_referer('dw-cart-nonce', 'nonce');
-    
-    $info = array();
-    $info['user_login'] = sanitize_user($_POST['username']);
-    $info['user_password'] = $_POST['password'];
-    $info['remember'] = true;
-
-    $user_signon = wp_signon($info, false);
-
-    if (is_wp_error($user_signon)) {
-        wp_send_json_error(['message' => 'Username atau password salah.']);
-    } else {
-        wp_send_json_success(['redirect' => home_url()]);
-    }
-}
-add_action('wp_ajax_nopriv_dw_ajax_login', 'dw_ajax_login_handler');
-?>
+add_action( 'after_setup_theme', 'dw_disable_admin_bar' );
