@@ -101,6 +101,65 @@ get_header();
                     </div>
                 </div>
 
+                <!-- VIEW: PROFIL DESA -->
+                <div id="view-profil" class="dash-view hidden">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                        <div class="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
+                            <h2 class="text-lg font-bold text-gray-800">Profil Desa</h2>
+                            <button onclick="enableEditProfil()" id="btn-edit-profil" class="text-primary text-sm font-bold hover:underline">Edit Profil</button>
+                        </div>
+                        
+                        <form id="form-profil-desa" class="space-y-6">
+                            <!-- Foto Profil Desa -->
+                            <div class="flex flex-col items-center sm:flex-row gap-6">
+                                <div class="relative group">
+                                    <div class="w-24 h-24 rounded-full overflow-hidden bg-gray-100 border-2 border-white shadow-md">
+                                        <img id="preview-foto-desa" src="https://via.placeholder.com/150" class="w-full h-full object-cover">
+                                    </div>
+                                    <label for="foto_desa" class="absolute bottom-0 right-0 bg-white p-1.5 rounded-full shadow-sm cursor-pointer border border-gray-200 hover:bg-gray-50 hidden group-hover:block" title="Ganti Foto">
+                                        <i class="ph-bold ph-camera text-gray-600"></i>
+                                    </label>
+                                    <input type="file" id="foto_desa" name="foto" accept="image/*" class="hidden" disabled onchange="previewImage(this, 'preview-foto-desa')">
+                                </div>
+                                <div class="flex-1 text-center sm:text-left">
+                                    <h3 class="font-bold text-lg text-gray-900" id="display-nama-desa">Nama Desa</h3>
+                                    <p class="text-sm text-gray-500">Ubah foto dan informasi dasar desa Anda.</p>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 gap-6">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Deskripsi Desa</label>
+                                    <textarea name="deskripsi" id="deskripsi_desa" rows="4" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary disabled:bg-gray-50 disabled:text-gray-500" disabled></textarea>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Nomor Rekening Desa</label>
+                                        <input type="text" name="no_rekening_desa" id="no_rekening_desa" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary disabled:bg-gray-50 disabled:text-gray-500" disabled>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Nama Bank</label>
+                                        <input type="text" name="nama_bank_desa" id="nama_bank_desa" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary disabled:bg-gray-50 disabled:text-gray-500" disabled>
+                                    </div>
+                                    <div class="md:col-span-2">
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Atas Nama Rekening</label>
+                                        <input type="text" name="atas_nama_rekening_desa" id="atas_nama_rekening_desa" class="w-full border-gray-300 rounded-lg shadow-sm focus:border-primary focus:ring-primary disabled:bg-gray-50 disabled:text-gray-500" disabled>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="action-buttons" class="hidden justify-end gap-3 pt-4 border-t border-gray-100">
+                                <button type="button" onclick="cancelEditProfil()" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-bold text-gray-700 hover:bg-gray-50">Batal</button>
+                                <button type="submit" class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-secondary shadow-md flex items-center gap-2">
+                                    <span id="btn-save-text">Simpan Perubahan</span>
+                                    <i id="btn-save-loader" class="ph-bold ph-spinner animate-spin hidden"></i>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>
@@ -124,8 +183,111 @@ jQuery(document).ready(function($) {
             $('#' + target).removeClass('hidden');
 
             if(target === 'view-pedagang') loadPendingPedagang();
+            if(target === 'view-profil') loadProfilDesa();
         }
     });
+
+    // --- PROFIL DESA FUNCTIONS ---
+
+    // Load Profil Desa
+    window.loadProfilDesa = function() {
+        $.ajax({
+            url: API_BASE + 'admin-desa/profile/me',
+            type: 'GET',
+            headers: authHeaders,
+            success: function(res) {
+                // Populate Form
+                $('#display-nama-desa').text(res.nama_desa || 'Nama Desa');
+                $('#deskripsi_desa').val(res.deskripsi || '');
+                $('#no_rekening_desa').val(res.no_rekening_desa || '');
+                $('#nama_bank_desa').val(res.nama_bank_desa || '');
+                $('#atas_nama_rekening_desa').val(res.atas_nama_rekening_desa || '');
+                
+                if(res.foto) {
+                    $('#preview-foto-desa').attr('src', res.foto);
+                }
+            },
+            error: function() {
+                alert('Gagal memuat profil desa.');
+            }
+        });
+    }
+
+    // Enable Edit Mode
+    window.enableEditProfil = function() {
+        $('#form-profil-desa input, #form-profil-desa textarea').prop('disabled', false);
+        $('#btn-edit-profil').addClass('hidden');
+        $('#action-buttons').removeClass('hidden').addClass('flex');
+        $('#foto_desa').prop('disabled', false); // Enable file input
+    }
+
+    // Cancel Edit Mode
+    window.cancelEditProfil = function() {
+        $('#form-profil-desa input, #form-profil-desa textarea').prop('disabled', true);
+        $('#btn-edit-profil').removeClass('hidden');
+        $('#action-buttons').addClass('hidden').removeClass('flex');
+        loadProfilDesa(); // Reset values
+    }
+
+    // Preview Image Helper
+    window.previewImage = function(input, previewId) {
+        if (input.files && input.files[0]) {
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                $('#' + previewId).attr('src', e.target.result);
+            }
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    // Submit Profil Desa
+    $('#form-profil-desa').on('submit', function(e) {
+        e.preventDefault();
+        
+        const $btnText = $('#btn-save-text');
+        const $loader = $('#btn-save-loader');
+        
+        // Prepare FormData (termasuk file upload jika ada)
+        // Catatan: Jika API belum support file upload via endpoint profile update, 
+        // Anda mungkin perlu upload file terpisah dulu ke endpoint media.
+        // Di sini kita asumsikan endpoint support JSON update dulu.
+        // Untuk upload gambar, logika idealnya sama seperti produk (upload -> dapat URL -> kirim URL).
+        
+        // Sederhana: Kirim data teks dulu
+        const payload = {
+            deskripsi: $('#deskripsi_desa').val(),
+            no_rekening_desa: $('#no_rekening_desa').val(),
+            nama_bank_desa: $('#nama_bank_desa').val(),
+            atas_nama_rekening_desa: $('#atas_nama_rekening_desa').val()
+        };
+        
+        // TODO: Handle Foto Upload Logic Here (jika ada file baru)
+        
+        $btnText.text('Menyimpan...');
+        $loader.removeClass('hidden');
+
+        $.ajax({
+            url: API_BASE + 'admin-desa/profile/me',
+            type: 'POST',
+            headers: authHeaders,
+            contentType: 'application/json',
+            data: JSON.stringify(payload),
+            success: function() {
+                alert('Profil berhasil diperbarui!');
+                cancelEditProfil();
+            },
+            error: function() {
+                alert('Gagal menyimpan profil.');
+            },
+            complete: function() {
+                $btnText.text('Simpan Perubahan');
+                $loader.addClass('hidden');
+            }
+        });
+    });
+
+
+    // --- PEDAGANG & LAINNYA ---
 
     // Load Pending Pedagang
     function loadPendingPedagang() {
@@ -179,6 +341,21 @@ jQuery(document).ready(function($) {
             headers: authHeaders,
             success: function() {
                 alert('Pedagang disetujui!');
+                loadPendingPedagang();
+            }
+        });
+    }
+    
+    // Aksi Reject (Placeholder)
+    window.rejectPedagang = function(id) {
+        if(!confirm('Tolak pedagang ini?')) return;
+         $.ajax({
+            url: API_BASE + 'admin-desa/pedagang/' + id + '/reject',
+            type: 'POST',
+            headers: authHeaders,
+             data: { reason: 'Ditolak oleh admin desa' }, // Simplifikasi
+            success: function() {
+                alert('Pedagang ditolak.');
                 loadPendingPedagang();
             }
         });
