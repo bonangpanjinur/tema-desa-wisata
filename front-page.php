@@ -12,46 +12,45 @@ get_header();
 // =================================================================================
 
 // --- A. GET BANNERS (VIA DATABASE LANGSUNG) ---
-// Menggunakan $wpdb lebih cepat & stabil daripada menembak API sendiri (wp_remote_get)
-// yang sering gagal karena masalah Loopback/Timeout di server lokal/hosting.
-
 global $wpdb;
 $banners = [];
-$table_banner = $wpdb->prefix . 'dw_banners';
 
-// 1. Cek apakah tabel plugin 'dw_banners' benar-benar ada di database
+// PERBAIKAN: Nama tabel sesuai plugin adalah 'dw_banner' (bukan jamak)
+$table_banner = $wpdb->prefix . 'dw_banner';
+
+// 1. Cek apakah tabel plugin 'dw_banner' ada
 if ($wpdb->get_var("SHOW TABLES LIKE '$table_banner'") === $table_banner) {
     
-    // 2. Query data: Ambil banner yang Aktif (is_active = 1), urutkan terbaru
-    // Hasil dikembalikan sebagai Array Asosiatif (ARRAY_A) agar kompatibel dengan kode tampilan
-    $results = $wpdb->get_results("SELECT * FROM $table_banner WHERE is_active = 1 ORDER BY id DESC", ARRAY_A);
+    // 2. Query data: 
+    // - status = 'aktif' (sesuai struktur tabel plugin)
+    // - Urutkan berdasarkan 'prioritas' ASC (banner prioritas kecil muncul duluan)
+    $results = $wpdb->get_results("SELECT * FROM $table_banner WHERE status = 'aktif' ORDER BY prioritas ASC", ARRAY_A);
     
     if (!empty($results)) {
         $banners = $results;
     }
 }
 
-// Fallback: Jika Database Kosong (Belum upload banner), gunakan data dummy
+// Fallback: Jika Database Kosong, gunakan data dummy
 if (empty($banners)) {
     $banners = [
         [
-            'image_url' => 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80',
-            'title'     => 'Jelajah Alam Desa',
-            'description' => 'Data belum diisi. Silakan upload Banner di Menu Desa Wisata > Banner.',
-            'link'      => '#',
-            'label'     => 'Contoh Data'
+            // Struktur Dummy disamakan dengan DB agar loop di bawah konsisten
+            'gambar'      => 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80',
+            'judul'       => 'Jelajah Alam Desa',
+            'link'        => '#',
+            'description' => 'Data belum diisi. Silakan upload Banner di Menu Desa Wisata > Banner.' // Dummy field tambahan
         ],
         [
-            'image_url' => 'https://images.unsplash.com/photo-1596423736798-75b43694f540?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80',
-            'title'     => 'Kerajinan Bambu',
-            'description' => 'Ini adalah tampilan contoh jika belum ada banner aktif.',
-            'link'      => '#',
-            'label'     => 'Contoh Data'
+            'gambar'      => 'https://images.unsplash.com/photo-1596423736798-75b43694f540?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80',
+            'judul'       => 'Kerajinan Bambu',
+            'link'        => '#',
+            'description' => 'Ini adalah tampilan contoh jika belum ada banner aktif.'
         ]
     ];
 }
 
-// Variasi warna gradient background agar banner terlihat bervariasi
+// Variasi warna gradient background
 $gradients = [
     'from-blue-600 to-cyan-500',
     'from-emerald-600 to-green-500',
@@ -72,16 +71,19 @@ $gradients = [
     <div class="flex md:grid md:grid-cols-2 overflow-x-auto gap-4 no-scrollbar snap-x md:snap-none pb-4 md:pb-0">
         
         <?php foreach ($banners as $index => $banner) : 
-            // Sanitasi & Persiapan Variabel
-            $img   = !empty($banner['image_url']) ? $banner['image_url'] : 'https://via.placeholder.com/800x400?text=No+Image';
-            $title = !empty($banner['title']) ? $banner['title'] : 'Info Desa Wisata';
-            $desc  = !empty($banner['description']) ? $banner['description'] : '';
+            // PERBAIKAN: Mapping variabel sesuai kolom database plugin (dw_banner)
+            // Kolom DB: id, judul, gambar, link, status, prioritas
+            
+            $img   = !empty($banner['gambar']) ? $banner['gambar'] : 'https://via.placeholder.com/800x400?text=No+Image';
+            $title = !empty($banner['judul']) ? $banner['judul'] : 'Info Desa Wisata';
             $link  = !empty($banner['link']) ? $banner['link'] : '#';
+            
+            // Kolom deskripsi tidak ada di DB plugin, kita kosongkan atau isi default
+            $desc  = isset($banner['description']) ? $banner['description'] : ''; 
             
             // Logika Tampilan
             $gradient_class = $gradients[$index % count($gradients)];
-            // Jika tidak ada label dari API, buat otomatis berdasarkan urutan
-            $label = isset($banner['label']) ? $banner['label'] : ($index == 0 ? 'Terbaru' : 'Info Desa');
+            $label = ($index == 0) ? 'Terbaru' : 'Info Desa';
             $label_bg = ($index % 2 == 0) ? 'bg-orange-500' : 'bg-blue-500';
         ?>
         
