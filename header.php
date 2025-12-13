@@ -1,57 +1,44 @@
 <!DOCTYPE html>
 <html <?php language_attributes(); ?>>
 <head>
-    <meta charset="<?php bloginfo( 'charset' ); ?>">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <link rel="profile" href="https://gmpg.org/xfn/11">
+    <meta charset="<?php bloginfo('charset'); ?>">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <?php wp_head(); ?>
 </head>
+<body <?php body_class('bg-gray-200 min-h-screen flex justify-center items-start pt-0 sm:pt-10 pb-0 sm:pb-10'); ?>>
 
-<body <?php body_class(); ?>>
-<?php wp_body_open(); ?>
+    <!-- Mobile Container Wrapper -->
+    <!-- Ini membuat tampilan seperti HP meskipun di Desktop -->
+    <div id="app-wrapper" class="w-full sm:max-w-md bg-gray-50 min-h-screen sm:min-h-[800px] sm:h-[850px] sm:rounded-[2rem] shadow-2xl relative overflow-hidden flex flex-col">
+        
+        <!-- TOP HEADER & SEARCH (Sticky) -->
+        <header class="bg-emerald-600 text-white p-4 sticky top-0 z-40 rounded-b-xl shadow-md">
+            <div class="flex justify-between items-center mb-3">
+                <a href="<?php echo home_url(); ?>" class="flex items-center gap-2 hover:opacity-90 transition">
+                    <i class="fas fa-leaf text-yellow-300 text-xl"></i>
+                    <h1 class="font-bold text-lg tracking-wide"><?php bloginfo('name'); ?></h1>
+                </a>
+                <div class="flex gap-3">
+                    <a href="<?php echo home_url('/cart'); ?>" class="relative">
+                        <i class="fas fa-shopping-cart text-lg"></i>
+                        <?php 
+                        // Cek jumlah cart (Logic sederhana, nanti diganti dengan fungsi cart plugin)
+                        $cart_count = 0; 
+                        if ($cart_count > 0): 
+                        ?>
+                            <span class="absolute -top-2 -right-2 bg-red-500 text-xs rounded-full w-4 h-4 flex items-center justify-center"><?php echo $cart_count; ?></span>
+                        <?php endif; ?>
+                    </a>
+                    <button><i class="fas fa-bell text-lg"></i></button>
+                </div>
+            </div>
+            
+            <!-- Search Bar -->
+            <form action="<?php echo home_url('/'); ?>" method="get" class="relative">
+                <input type="text" name="s" placeholder="Cari wisata, produk, atau desa..." class="w-full py-2.5 pl-10 pr-4 rounded-lg text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 shadow-sm">
+                <i class="fas fa-search absolute left-3 top-3 text-gray-400 text-sm"></i>
+            </form>
+        </header>
 
-<!-- Pembungkus Utama Aplikasi -->
-<div class="app-container">
-
-    <header class="site-header">
-        <div class="header-content">
-            <?php if ( is_front_page() ) : ?>
-                <!-- Tampilan Header Beranda (Search Box) -->
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <form role="search" method="get" action="<?php echo esc_url( home_url( '/' ) ); ?>">
-                        <input type="search" placeholder="Cari wisata, kuliner..." value="<?php echo get_search_query(); ?>" name="s" />
-                        <input type="hidden" name="post_type" value="dw_produk" /> 
-                    </form>
-                </div>
-                <div class="header-icons">
-                    <a href="<?php echo site_url('/notifikasi'); ?>"><i class="fas fa-bell"></i></a>
-                    <a href="<?php echo site_url('/pesan'); ?>"><i class="fas fa-comment-dots"></i></a>
-                </div>
-            <?php else : ?>
-                <!-- Tampilan Header Halaman Lain (Judul Halaman) -->
-                <?php 
-                    // Tombol Back (Opsional, pakai JS history back)
-                    if( !is_home() ) {
-                        echo '<i class="fas fa-arrow-left" style="color:white; margin-right:15px; cursor:pointer;" onclick="history.back()"></i>';
-                    }
-                ?>
-                <div class="page-title">
-                    <?php 
-                    if ( is_archive() ) {
-                        post_type_archive_title();
-                    } elseif ( is_search() ) {
-                        echo 'Cari: ' . get_search_query();
-                    } else {
-                        the_title(); 
-                    }
-                    ?>
-                </div>
-                <div class="header-icons">
-                    <a href="<?php echo site_url('/cart'); ?>"><i class="fas fa-shopping-cart"></i></a>
-                </div>
-            <?php endif; ?>
-        </div>
-    </header>
-
-    <main id="main-content">
+        <!-- MAIN SCROLLABLE CONTENT START -->
+        <main class="flex-1 overflow-y-auto overflow-x-hidden pb-24 scroll-smooth">
