@@ -1,122 +1,238 @@
-/* --- Variables --- */
+/* --- 1. VARIABLES & RESET --- */
 :root {
-    --primary-color: #2E7D32; /* Hijau Desa */
-    --secondary-color: #81C784;
-    --accent-color: #FFC107;
-    --text-color: #333;
-    --bg-light: #f4f6f8;
-    --white: #ffffff;
-    --shadow: 0 2px 8px rgba(0,0,0,0.1);
-    --radius: 12px;
-    --header-height-mobile: 60px;
-    --header-height-desktop: 80px;
-    --bottom-nav-height: 60px;
+    --primary: #2E7D32;        /* Hijau Utama */
+    --primary-light: #E8F5E9;  /* Hijau Pucat Background */
+    --accent: #FFC107;         /* Kuning Aksen */
+    --accent-orange: #FF7043;  /* Oranye Aksen */
+    --bg-body: #F7F9FC;        /* Abu-abu Background */
+    --white: #FFFFFF;
+    --text-dark: #1A1A1A;
+    --text-grey: #757575;
+    
+    /* Layout Variables */
+    --radius-l: 24px;
+    --radius-m: 16px;
+    --radius-s: 12px;
+    --shadow: 0 4px 20px rgba(0,0,0,0.06);
+    --header-h: 70px;
+    --nav-h: 65px;
 }
 
-/* --- Reset & Base --- */
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg-light); color: var(--text-color); line-height: 1.6; padding-bottom: var(--bottom-nav-height); /* Space for bottom nav on mobile */ }
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background-color: var(--bg-body);
+    color: var(--text-dark);
+    margin: 0 auto;
+    min-height: 100vh;
+    overflow-x: hidden;
+    padding-bottom: 0;
+}
+
+/* --- 2. LAYOUT CONTAINER (Mobile App Simulation) --- */
+.app-container {
+    max-width: 480px; 
+    margin: 0 auto;
+    background-color: #fafafa;
+    min-height: 100vh;
+    border-left: 1px solid #eee;
+    border-right: 1px solid #eee;
+    position: relative;
+    padding-bottom: 100px; /* Ruang untuk Bottom Nav */
+    box-shadow: 0 0 30px rgba(0,0,0,0.05);
+}
+
+/* Tampilan Desktop (Optional: Agar tetap di tengah seperti app) */
+@media (min-width: 768px) {
+    body { background-color: #eef2f5; }
+}
+
 a { text-decoration: none; color: inherit; }
+ul { list-style: none; }
 img { max-width: 100%; height: auto; display: block; }
-.container { width: 100%; max-width: 1200px; margin: 0 auto; padding: 0 15px; }
 
-/* --- Header --- */
-.site-header { background: var(--primary-color); color: var(--white); position: sticky; top: 0; z-index: 100; box-shadow: var(--shadow); }
-.header-inner { display: flex; align-items: center; justify-content: space-between; height: var(--header-height-desktop); }
-.site-logo { font-size: 1.5rem; font-weight: bold; color: var(--white); }
-.search-bar { flex: 1; margin: 0 2rem; position: relative; }
-.search-bar input { width: 100%; padding: 10px 15px; border-radius: 20px; border: none; outline: none; }
-.desktop-nav ul { display: flex; gap: 20px; list-style: none; }
-.desktop-nav a { color: var(--white); font-weight: 500; }
-
-/* --- Mobile Header Specific --- */
-@media (max-width: 768px) {
-    .header-inner { height: var(--header-height-mobile); }
-    .desktop-nav { display: none; } /* Hide standard menu on mobile */
-    .site-logo { font-size: 1.2rem; }
-    .search-bar { margin: 0 10px; }
+/* --- 3. HEADER --- */
+.site-header {
+    position: sticky;
+    top: 0;
+    background: var(--primary);
+    height: var(--header-h);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    z-index: 100;
+    border-bottom-left-radius: var(--radius-l);
+    border-bottom-right-radius: var(--radius-l);
+    box-shadow: var(--shadow);
+    margin-bottom: 10px;
 }
 
-/* --- Carousel Banner --- */
-.hero-carousel { position: relative; overflow: hidden; border-radius: var(--radius); margin-top: 20px; box-shadow: var(--shadow); }
-.carousel-track { display: flex; transition: transform 0.5s ease-in-out; }
-.carousel-slide { min-width: 100%; }
-.carousel-slide img { width: 100%; height: 300px; object-fit: cover; border-radius: var(--radius); }
-/* Mobile Banner Height */
-@media (max-width: 768px) {
-    .carousel-slide img { height: 180px; }
-    .hero-carousel { margin-top: 10px; border-radius: 0; }
+.header-content { width: 100%; display: flex; align-items: center; gap: 15px; }
+
+/* Search Box */
+.search-box {
+    flex: 1;
+    background: rgba(255,255,255,0.2);
+    border-radius: 50px;
+    padding: 8px 15px;
+    display: flex;
+    align-items: center;
+    color: white;
+    backdrop-filter: blur(5px);
 }
+.search-box form { width: 100%; display: flex; }
+.search-box input { background: transparent; border: none; color: white; width: 100%; margin-left: 10px; outline: none; font-size: 0.9rem; }
+.search-box input::placeholder { color: rgba(255,255,255,0.8); }
 
-/* --- Grid Layouts (Produk & Wisata) --- */
-.section-title { font-size: 1.5rem; margin: 30px 0 15px; font-weight: 700; padding-left: 10px; border-left: 4px solid var(--primary-color); }
-.grid-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
-.card { background: var(--white); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); transition: transform 0.2s; border: 1px solid #eee; }
-.card:hover { transform: translateY(-5px); }
-.card-img { height: 180px; width: 100%; object-fit: cover; }
-.card-body { padding: 12px; }
-.card-title { font-size: 1rem; margin-bottom: 5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.card-price { color: var(--primary-color); font-weight: bold; font-size: 1.1rem; }
-.card-location { font-size: 0.8rem; color: #888; display: flex; align-items: center; gap: 5px; margin-top: 5px; }
+/* Icons & Title */
+.header-icons { display: flex; gap: 15px; }
+.header-icons i { color: white; font-size: 1.2rem; cursor: pointer; }
+.header-icons a { color: white; }
+.page-title { color: white; font-weight: 700; font-size: 1.2rem; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* Mobile Grid Adjustments */
-@media (max-width: 768px) {
-    .grid-container { grid-template-columns: repeat(2, 1fr); gap: 10px; } /* 2 kolom di mobile */
-    .card-img { height: 140px; }
-    .card-body { padding: 8px; }
-    .section-title { font-size: 1.2rem; margin: 20px 0 10px; }
-}
+/* --- 4. HERO BANNER (Carousel) --- */
+.hero-section { margin: 20px; margin-top: -30px; position: relative; z-index: 10; padding: 0 10px; }
+.banner-card { background: var(--white); border-radius: var(--radius-m); overflow: hidden; box-shadow: var(--shadow); position: relative; height: 180px; }
+.banner-card img { width: 100%; height: 100%; object-fit: cover; }
+.banner-text { position: absolute; bottom: 0; left: 0; right: 0; padding: 15px; background: linear-gradient(to top, rgba(0,0,0,0.7), transparent); color: white; }
+.hero-carousel { position: relative; height: 100%; }
+.carousel-track { display: flex; transition: transform 0.5s ease-in-out; height: 100%; }
+.carousel-slide { min-width: 100%; height: 100%; position: relative; }
 
-/* --- Bottom Navigation (Mobile Only) --- */
-.bottom-nav { 
-    display: none; 
-    position: fixed; 
-    bottom: 0; left: 0; right: 0; 
-    background: var(--white); 
-    box-shadow: 0 -2px 10px rgba(0,0,0,0.1); 
-    height: var(--bottom-nav-height); 
+/* --- 5. CATEGORIES & FILTERS --- */
+.categories { display: flex; justify-content: space-between; padding: 0 20px; margin-bottom: 30px; margin-top: 10px; }
+.cat-item { display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 0.75rem; color: var(--text-dark); cursor: pointer; text-align: center; width: 22%; }
+.cat-icon { width: 50px; height: 50px; background: var(--white); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.05); font-size: 1.2rem; color: var(--primary); transition: transform 0.2s; margin-bottom: 5px; }
+.cat-item:hover .cat-icon { transform: scale(1.05); }
+
+/* Horizontal Scroll Filter Pills */
+.explore-filters { display: flex; gap: 10px; overflow-x: auto; padding: 5px 20px 15px; scrollbar-width: none; }
+.explore-filters::-webkit-scrollbar { display: none; }
+.filter-pill { padding: 8px 16px; background: var(--white); border-radius: 20px; border: 1px solid #eee; font-size: 0.85rem; color: var(--text-grey); white-space: nowrap; cursor: pointer; transition: 0.2s; display: inline-block; }
+.filter-pill.active, .filter-pill:hover { background: var(--primary); color: white; border-color: var(--primary); }
+
+/* --- 6. GLOBAL COMPONENTS --- */
+.section-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px 15px 20px; }
+.section-title h3 { font-size: 1.1rem; font-weight: 700; margin: 0; }
+.section-title span { color: var(--primary); }
+.see-all { font-size: 0.8rem; color: var(--text-grey); font-weight: 600; }
+
+/* --- 7. PRODUCT & WISATA CARDS --- */
+.grid-product { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; padding: 0 20px; }
+.card-product { background: var(--white); border-radius: var(--radius-m); padding: 10px; box-shadow: var(--shadow); display: flex; flex-direction: column; transition: transform 0.2s; border: 1px solid #f0f0f0; position: relative; }
+.card-product:hover { transform: translateY(-3px); }
+.prod-img-wrap { position: relative; width: 100%; padding-top: 100%; border-radius: var(--radius-s); overflow: hidden; margin-bottom: 10px; background-color: #eee; }
+.prod-img-wrap img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+.badge-halal { position: absolute; top: 5px; right: 5px; background: rgba(255,255,255,0.95); padding: 2px 8px; border-radius: 4px; font-size: 0.6rem; color: var(--primary); font-weight: bold; z-index: 2; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+
+.prod-title { font-size: 0.95rem; font-weight: 600; margin-bottom: 4px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--text-dark); height: 2.6em; }
+.prod-shop { font-size: 0.75rem; color: var(--text-grey); display: flex; align-items: center; gap: 4px; margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prod-footer { margin-top: auto; display: flex; justify-content: space-between; align-items: center; }
+.prod-price { font-weight: 700; color: var(--text-dark); font-size: 1rem; }
+.btn-add { background: var(--primary); color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; cursor: pointer; transition: background 0.2s; flex-shrink: 0; box-shadow: 0 2px 5px rgba(0,0,0,0.15); }
+.btn-add:hover { background: var(--accent-orange); }
+
+/* Wisata Card (Full Width) */
+.card-wisata-full { background: var(--white); border-radius: var(--radius-m); overflow: hidden; box-shadow: var(--shadow); margin-bottom: 20px; transition: transform 0.2s; border: 1px solid #eee; }
+.card-wisata-full img { width: 100%; height: 180px; object-fit: cover; }
+.card-wisata-content { padding: 15px; }
+.card-wisata-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 5px; color: var(--text-dark); }
+.card-wisata-meta { font-size: 0.85rem; color: var(--text-grey); display: flex; gap: 15px; margin-bottom: 10px; }
+.card-wisata-meta i { color: var(--primary); margin-right: 5px; }
+
+/* Scroll Container (Home) */
+.scroll-container { display: flex; overflow-x: auto; gap: 15px; padding: 0 20px 20px 20px; scrollbar-width: none; }
+.scroll-container::-webkit-scrollbar { display: none; }
+.card-wisata-scroll { min-width: 260px; background: var(--white); border-radius: var(--radius-m); overflow: hidden; box-shadow: var(--shadow); border: 1px solid #f0f0f0; }
+.card-wisata-scroll img { width: 100%; height: 150px; object-fit: cover; }
+.card-wisata-scroll .content { padding: 12px; }
+
+/* --- 8. PAGE: AKUN SAYA --- */
+.profile-header { background: var(--white); padding: 30px 20px; display: flex; align-items: center; gap: 15px; margin-bottom: 15px; border-bottom: 1px solid #f0f0f0; }
+.profile-pic { width: 70px; height: 70px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary); padding: 2px; }
+.profile-info h3 { font-size: 1.2rem; margin-bottom: 4px; font-weight: 700; }
+.profile-info p { font-size: 0.9rem; color: var(--text-grey); }
+.menu-list { background: var(--white); border-radius: var(--radius-m); overflow: hidden; margin: 0 20px; box-shadow: var(--shadow); border: 1px solid #f5f5f5; }
+.menu-item { display: flex; align-items: center; padding: 15px 20px; border-bottom: 1px solid #f5f5f5; cursor: pointer; transition: background 0.2s; }
+.menu-item:last-child { border-bottom: none; }
+.menu-item:hover { background: #f9f9f9; }
+.menu-icon { width: 35px; color: var(--primary); font-size: 1.1rem; }
+.menu-text { flex: 1; font-size: 0.95rem; color: var(--text-dark); font-weight: 500; }
+.menu-section-title { padding: 20px 20px 8px 25px; font-size: 0.8rem; font-weight: 700; color: var(--text-grey); text-transform: uppercase; letter-spacing: 0.5px; }
+.btn-logout { margin: 30px 20px 50px 20px; width: calc(100% - 40px); padding: 12px; background: #FFEBEE; color: #D32F2F; border: none; border-radius: var(--radius-s); font-weight: 600; cursor: pointer; font-size: 1rem; display: block; text-align: center; }
+
+/* --- 9. PAGE: TRANSAKSI (TABS) --- */
+.tabs { display: flex; background: var(--white); padding: 0 20px; border-bottom: 1px solid #eee; position: sticky; top: var(--header-h); z-index: 90; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
+.tab { flex: 1; text-align: center; padding: 15px 0; font-size: 0.9rem; color: var(--text-grey); cursor: pointer; position: relative; font-weight: 500; }
+.tab.active { color: var(--primary); font-weight: 700; }
+.tab.active::after { content: ''; position: absolute; bottom: 0; left: 15%; right: 15%; height: 3px; background: var(--primary); border-radius: 3px 3px 0 0; }
+
+.order-list { padding: 20px; display: flex; flex-direction: column; gap: 15px; }
+.card-order { background: var(--white); border-radius: var(--radius-m); padding: 15px; box-shadow: var(--shadow); border: 1px solid #f0f0f0; }
+.order-header { display: flex; justify-content: space-between; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px dashed #eee; font-size: 0.8rem; }
+.order-status { font-weight: 600; padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; }
+.status-dikirim { background: #E3F2FD; color: #2196F3; }
+.status-selesai { background: #E8F5E9; color: #4CAF50; }
+.status-batal { background: #FFEBEE; color: #F44336; }
+.order-item { display: flex; gap: 12px; margin-bottom: 10px; align-items: flex-start; }
+.order-img { width: 60px; height: 60px; border-radius: 8px; object-fit: cover; border: 1px solid #eee; }
+.order-info { flex: 1; }
+.order-name { font-size: 0.9rem; font-weight: 600; margin-bottom: 4px; color: var(--text-dark); }
+.order-meta { font-size: 0.8rem; color: var(--text-grey); display: block; }
+.btn-track { border: 1px solid var(--primary); color: var(--primary); padding: 6px 16px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; background: transparent; cursor: pointer; display: inline-block; transition: 0.2s; }
+.btn-track:hover { background: var(--primary); color: white; }
+
+/* --- 10. BOTTOM NAV (Floating) --- */
+.bottom-nav {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 40px);
+    max-width: 440px;
+    height: var(--nav-h);
+    background: var(--white);
+    border-radius: 35px;
+    display: flex;
+    justify-content: center; /* Center content */
+    align-items: center;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
     z-index: 999;
+    padding: 0 5px;
+    border: 1px solid rgba(0,0,0,0.03);
 }
-.bottom-nav-inner { display: flex; justify-content: space-around; align-items: center; height: 100%; }
-.nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; color: #888; font-size: 0.75rem; width: 25%; }
-.nav-item i { font-size: 1.2rem; margin-bottom: 2px; }
-.nav-item.active { color: var(--primary-color); font-weight: bold; }
+.bottom-nav-inner { display: flex; width: 100%; justify-content: space-between; align-items: center; padding: 0 10px; }
+.nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; color: #ccc; font-size: 0.65rem; gap: 4px; width: 60px; height: 100%; cursor: pointer; text-decoration: none; transition: 0.3s; }
+.nav-item i { font-size: 1.3rem; transition: 0.3s; margin-bottom: 2px; }
+.nav-item.active { color: var(--primary); }
+.nav-item.active i { transform: translateY(-3px); }
 
-/* Styles untuk Tombol Tengah (Floating Button) */
+/* Tombol Tengah Mengambang */
 .nav-btn-center {
-    background: var(--accent-color);
+    background: var(--accent);
     width: 55px;
     height: 55px;
     border-radius: 50%;
-    margin-top: -30px; /* Membuat efek mengambang ke atas */
+    margin-top: -35px;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-color);
-    box-shadow: 0 4px 10px rgba(255, 193, 7, 0.4);
-    border: 4px solid var(--bg-light); /* Border warna background agar terlihat terpisah */
+    color: var(--text-dark);
+    box-shadow: 0 5px 15px rgba(255, 193, 7, 0.4);
+    border: 5px solid var(--bg-body);
+    cursor: pointer;
+    transition: transform 0.2s;
     position: relative;
     z-index: 1000;
 }
-.nav-btn-center i {
-    font-size: 1.4rem;
-    color: #fff;
-}
+/* Fix border agar nyatu dengan app container */
+.app-container .nav-btn-center { border-color: #fafafa; }
+.nav-btn-center:hover { transform: scale(1.05); }
+.nav-btn-center i { font-size: 1.4rem; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.1); }
 
-@media (max-width: 768px) {
-    .bottom-nav { display: block; }
-    body { padding-bottom: 70px; } /* Prevent content hidden behind nav */
-}
-
-/* --- Registration Page --- */
-.register-container { max-width: 500px; margin: 40px auto; padding: 30px; background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow); }
-.role-selector { display: flex; gap: 10px; margin-bottom: 20px; }
-.role-option { flex: 1; text-align: center; padding: 10px; border: 1px solid #ddd; border-radius: 8px; cursor: pointer; }
-.role-option.active { border-color: var(--primary-color); background: #e8f5e9; color: var(--primary-color); font-weight: bold; }
-.form-group { margin-bottom: 15px; }
-.form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
-.form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
-.btn-primary { width: 100%; padding: 12px; background: var(--primary-color); color: var(--white); border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-.btn-contact-admin { display: block; text-align: center; background: #25D366; color: white; padding: 15px; border-radius: 8px; font-weight: bold; margin-top: 10px; }
-.btn-contact-admin:hover { background: #128C7E; color: white; }
-.hidden { display: none; }
+/* --- 11. FOOTER & PAGINATION --- */
+.site-footer { padding: 20px; text-align: center; color: #bbb; font-size: 0.75rem; margin-top: 30px; padding-bottom: 20px; }
+ul.page-numbers { display: flex; justify-content: center; gap: 8px; padding: 0; margin-top: 20px; }
+.page-numbers { display: flex; align-items: center; justify-content: center; width: 35px; height: 35px; border-radius: 50%; background: var(--white); color: var(--text-dark); font-size: 0.9rem; font-weight: 600; box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: 0.2s; }
+.page-numbers.current, .page-numbers:hover { background: var(--primary); color: var(--white); transform: translateY(-2px); }
