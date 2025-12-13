@@ -1,15 +1,14 @@
 <?php
 /**
- * Template Name: Halaman Depan API
+ * Template Name: Halaman Depan API (Desain Fixed)
  */
 get_header();
 
 // =================================================================================
-// 1. LOGIKA PENGAMBILAN DATA (VIA API, BUKAN DATABASE LOKAL)
+// 1. LOGIKA PENGAMBILAN DATA (VIA API)
 // =================================================================================
 
 // --- A. GET BANNERS ---
-// Mengambil data dari endpoint /wp-json/dw/v1/banner
 $endpoint_banner = '/wp-json/dw/v1/banner';
 $data_banner = dw_fetch_api_data( $endpoint_banner );
 $banners = [];
@@ -20,26 +19,25 @@ if ( isset( $data_banner['data'] ) && is_array( $data_banner['data'] ) ) {
     $banners = $data_banner;
 }
 
-// Fallback: Jika API Kosong/Gagal, gunakan data dummy untuk demo tampilan
+// Fallback jika kosong (Dummy Data agar tampilan tidak rusak saat pertama install)
 if (empty($banners)) {
     $banners = [
         [
             'gambar'      => 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80',
             'judul'       => 'Jelajah Alam Desa',
             'link'        => '#',
-            'deskripsi'   => 'Banner dari API kosong, ini adalah dummy content.'
+            'deskripsi'   => 'Nikmati keindahan alam yang asri dan menenangkan.'
         ],
         [
             'gambar'      => 'https://images.unsplash.com/photo-1596423736798-75b43694f540?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80',
             'judul'       => 'Kerajinan Bambu',
             'link'        => '#',
-            'deskripsi'   => 'Silakan isi data banner di admin plugin core.'
+            'deskripsi'   => 'Produk lokal berkualitas dari pengrajin desa.'
         ]
     ];
 }
 
 // --- B. GET WISATA (POPULER) ---
-// Mengambil data dari endpoint /wp-json/dw/v1/wisata
 $endpoint_wisata = '/wp-json/dw/v1/wisata'; 
 $data_wisata = dw_fetch_api_data( $endpoint_wisata );
 $list_wisata = [];
@@ -49,12 +47,10 @@ if ( isset( $data_wisata['data'] ) && is_array( $data_wisata['data'] ) ) {
 } elseif ( is_array( $data_wisata ) && !isset( $data_wisata['error'] ) ) {
     $list_wisata = $data_wisata;
 }
-// Ambil 4 item pertama untuk bagian "Populer"
+// Ambil 4 item saja
 $list_wisata = array_slice($list_wisata, 0, 4);
 
 // --- C. GET PRODUK (UMKM) ---
-// Mengambil data dari endpoint /wp-json/dw/v1/produk
-// Kita tambahkan parameter ?per_page=10
 $endpoint_produk = '/wp-json/dw/v1/produk?per_page=10';
 $data_produk = dw_fetch_api_data( $endpoint_produk );
 $list_produk = [];
@@ -64,30 +60,28 @@ if ( isset( $data_produk['data'] ) && is_array( $data_produk['data'] ) ) {
 } elseif ( is_array( $data_produk ) && !isset( $data_produk['error'] ) ) {
     $list_produk = $data_produk;
 }
-
 ?>
+
+<!-- =================================================================================
+     2. TAMPILAN (VIEW) - DESAIN ORIGINAL
+     ================================================================================= -->
 
 <div id="primary" class="content-area">
     <main id="main" class="site-main container mx-auto px-4">
 
-        <!-- =================================================================================
-             2. TAMPILAN (VIEW) - Menggunakan Desain Tailwind Pilihan Anda
-             ================================================================================= -->
-
-        <!-- HERO SECTION -->
-        <div class="mt-6 md:px-0">
-            <!-- Banner Slider (Horizontal Scroll on Mobile, Grid on Desktop) -->
+        <!-- HERO SECTION: Banner Slider -->
+        <div class="mt-4 px-0 md:px-0">
             <div class="flex md:grid md:grid-cols-2 overflow-x-auto gap-4 no-scrollbar snap-x md:snap-none pb-4 md:pb-0">
                 
                 <?php foreach ($banners as $index => $banner) : 
-                    // Mapping Variabel API ke Tampilan
-                    // API key mungkin berbeda, kita pakai coalescing operator (??)
+                    // Mapping Variabel API
+                    // Prioritas: Key API -> Key Dummy -> Default
                     $img   = $banner['gambar'] ?? $banner['image_url'] ?? 'https://via.placeholder.com/800x400?text=No+Image';
                     $title = $banner['judul'] ?? $banner['title'] ?? 'Info Desa Wisata';
                     $link  = $banner['link'] ?? $banner['url'] ?? '#';
                     $desc  = $banner['deskripsi'] ?? $banner['description'] ?? ''; 
                     
-                    // Logika Tampilan Label
+                    // Style Labels
                     $label = ($index == 0) ? 'Terbaru' : 'Info Desa';
                     $label_bg = ($index % 2 == 0) ? 'bg-orange-500' : 'bg-blue-500';
                 ?>
@@ -132,6 +126,7 @@ if ( isset( $data_produk['data'] ) && is_array( $data_produk['data'] ) ) {
         <!-- Categories Menu -->
         <div class="mt-8 mb-8">
             <div class="grid grid-cols-4 md:flex md:justify-center md:gap-12 gap-4 text-center">
+                <!-- Link Kategori disesuaikan dengan parameter query string untuk tema client -->
                 <a href="<?php echo home_url('/?view=wisata'); ?>" class="flex flex-col items-center gap-2 group">
                     <div class="w-14 h-14 md:w-16 md:h-16 bg-green-100 rounded-2xl flex items-center justify-center text-emerald-600 shadow-sm group-hover:bg-emerald-600 group-hover:text-white transition duration-300 group-hover:-translate-y-1">
                         <i class="fas fa-map-marked-alt text-2xl md:text-3xl"></i>
@@ -169,12 +164,11 @@ if ( isset( $data_produk['data'] ) && is_array( $data_produk['data'] ) ) {
                 <a href="<?php echo home_url('/?view=wisata'); ?>" class="text-emerald-600 text-sm font-bold hover:underline">Lihat Semua <i class="fas fa-arrow-right ml-1"></i></a>
             </div>
             
-            <!-- Responsive Grid: Scroll on Mobile, Grid on Desktop -->
             <div class="flex md:grid md:grid-cols-4 gap-4 overflow-x-auto md:overflow-visible no-scrollbar pb-4 md:pb-0 -mx-4 md:mx-0 px-4 md:px-0">
                 <?php
                 if (!empty($list_wisata)) :
                     foreach ($list_wisata as $wisata) :
-                        // Mapping Data API Wisata
+                        // Mapping Data API -> Variable
                         $id         = $wisata['id'] ?? 0;
                         $judul      = $wisata['nama_wisata'] ?? $wisata['title'] ?? 'Wisata Tanpa Nama';
                         $lokasi     = $wisata['lokasi'] ?? $wisata['alamat'] ?? 'Desa Wisata';
@@ -182,7 +176,6 @@ if ( isset( $data_produk['data'] ) && is_array( $data_produk['data'] ) ) {
                         $rating     = $wisata['rating'] ?? 4.8;
                         $image_url  = $wisata['thumbnail'] ?? $wisata['featured_image_url'] ?? 'https://via.placeholder.com/500x300?text=No+Image';
                         
-                        // Link ke detail (menggunakan parameter URL karena ini client theme)
                         $link_detail = home_url('/?wisata_id=' . $id);
                 ?>
                     <!-- Wisata Card -->
@@ -210,8 +203,7 @@ if ( isset( $data_produk['data'] ) && is_array( $data_produk['data'] ) ) {
                 else:
                 ?>
                     <div class="col-span-full text-center py-10 bg-gray-50 rounded-xl w-full">
-                        <p class="text-gray-500">Belum ada data wisata dari API.</p>
-                        <?php if(isset($data_wisata['error'])) echo '<small class="text-red-400">Error: '.$data_wisata['message'].'</small>'; ?>
+                        <p class="text-gray-500">Belum ada data wisata.</p>
                     </div>
                 <?php endif; ?>
             </div>
@@ -227,7 +219,6 @@ if ( isset( $data_produk['data'] ) && is_array( $data_produk['data'] ) ) {
                 <a href="<?php echo home_url('/?view=produk'); ?>" class="text-emerald-600 text-sm font-bold hover:underline">Lihat Semua <i class="fas fa-arrow-right ml-1"></i></a>
             </div>
 
-            <!-- Responsive Grid: 2 Cols Mobile, 5 Cols Desktop -->
             <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-6">
                 <?php
                 if (!empty($list_produk)) :
@@ -240,7 +231,6 @@ if ( isset( $data_produk['data'] ) && is_array( $data_produk['data'] ) ) {
                         $terjual    = $produk['terjual'] ?? 0;
                         $image_url  = $produk['thumbnail'] ?? $produk['featured_image_url'] ?? 'https://via.placeholder.com/500x500?text=No+Image';
                         
-                        // Link Detail
                         $link_detail = home_url('/?produk_id=' . $id);
                 ?>
                     <!-- Product Card -->
@@ -270,7 +260,7 @@ if ( isset( $data_produk['data'] ) && is_array( $data_produk['data'] ) ) {
                 else:
                 ?>
                      <div class="col-span-full text-center py-10">
-                         <p class="text-gray-500">Belum ada produk tersedia dari API.</p>
+                         <p class="text-gray-500">Belum ada produk tersedia.</p>
                      </div>
                 <?php endif; ?>
             </div>
