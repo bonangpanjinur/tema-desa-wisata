@@ -50,7 +50,7 @@ if (empty($banners)) {
     ];
 }
 
-// Variasi warna gradient background
+// Variasi warna gradient background (opsional, karena gambar akan menutupi)
 $gradients = [
     'from-blue-600 to-cyan-500',
     'from-emerald-600 to-green-500',
@@ -82,18 +82,21 @@ $gradients = [
             $desc  = isset($banner['description']) ? $banner['description'] : ''; 
             
             // Logika Tampilan
-            $gradient_class = $gradients[$index % count($gradients)];
             $label = ($index == 0) ? 'Terbaru' : 'Info Desa';
             $label_bg = ($index % 2 == 0) ? 'bg-orange-500' : 'bg-blue-500';
         ?>
         
         <!-- Banner Item -->
-        <div class="min-w-[90%] md:min-w-0 h-48 md:h-80 bg-gradient-to-r <?php echo $gradient_class; ?> rounded-2xl relative snap-center shadow-lg overflow-hidden group">
+        <div class="min-w-[90%] md:min-w-0 h-48 md:h-80 bg-gray-200 rounded-2xl relative snap-center shadow-lg overflow-hidden group">
             <!-- Background Image -->
+            <!-- PERBAIKAN: Menghapus 'mix-blend-overlay' dan 'opacity-50' agar gambar ASLI -->
             <img src="<?php echo esc_url($img); ?>" 
-                 class="absolute inset-0 w-full h-full object-cover mix-blend-overlay opacity-50 group-hover:scale-105 transition duration-700"
+                 class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition duration-700"
                  alt="<?php echo esc_attr($title); ?>">
             
+            <!-- Gradient Overlay tipis di bagian bawah supaya teks terbaca -->
+            <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent pointer-events-none"></div>
+
             <!-- Content Overlay -->
             <div class="absolute bottom-6 left-6 text-white max-w-xs z-10">
                 <span class="text-xs font-bold <?php echo $label_bg; ?> px-3 py-1 rounded-full mb-3 inline-block shadow-sm">
@@ -105,7 +108,7 @@ $gradients = [
                 </h2>
                 
                 <?php if ($desc) : ?>
-                <p class="text-sm md:text-base opacity-90 mb-4 line-clamp-2 drop-shadow-sm">
+                <p class="text-sm md:text-base text-gray-100 mb-4 line-clamp-2 drop-shadow-sm">
                     <?php echo esc_html($desc); ?>
                 </p>
                 <?php endif; ?>
