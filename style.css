@@ -3,23 +3,28 @@ Theme Name: Desa Wisata API Client
 Theme URI: https://bonang.my.id
 Author: Bonang Panji Nur
 Author URI: https://bonang.my.id
-Description: Tema eksperimental yang mengambil data dari Desa Wisata Core via REST API.
-Version: 1.1.0
+Description: Tema modern yang terintegrasi dengan Desa Wisata Core via REST API.
+Version: 2.0.0
 Text Domain: dw-api-theme
 */
 
 /* --- VARIABLES & RESET --- */
 :root {
-    /* Update Warna agar sesuai referensi Sadesa (Hijau Lebih Cerah) */
-    --primary: #00BA61;        /* Hijau Sadesa */
+    /* Warna Utama Sadesa (Hijau Emerald Cerah) */
+    --primary: #00BA61;        
     --primary-dark: #00964E;
     --primary-light: #E0F7EB;  /* Background tombol detail */
     
+    /* Warna Aksen */
     --accent: #FFC107;         /* Kuning Rating */
+    --danger: #EF4444;         /* Merah Notifikasi */
+    
+    /* Typography & Background */
     --text-dark: #1F2937;
     --text-grey: #6B7280;
-    --bg-body: #F9FAFB;
+    --bg-body: #F9FAFB;        /* Abu-abu sangat muda */
     
+    /* Spacing & Radius */
     --radius-l: 16px;
     --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
 }
@@ -28,9 +33,13 @@ body {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     background: var(--bg-body);
     color: var(--text-dark);
+    margin: 0;
+    padding: 0;
 }
 
-/* Helper Classes untuk Button Detail (Sesuai Referensi) */
+/* --- UTILITIES --- */
+
+/* Tombol Detail (Hijau Muda Teks Hijau Tua) */
 .btn-detail-soft {
     background-color: var(--primary-light);
     color: var(--primary-dark);
@@ -39,6 +48,8 @@ body {
     padding: 6px 16px;
     border-radius: 8px;
     transition: all 0.2s;
+    text-decoration: none;
+    display: inline-block;
 }
 
 .btn-detail-soft:hover {
@@ -46,7 +57,7 @@ body {
     color: white;
 }
 
-/* Cart Icon Button */
+/* Tombol Cart Bulat */
 .btn-cart-circle {
     background-color: var(--primary-light);
     color: var(--primary-dark);
@@ -57,6 +68,8 @@ body {
     align-items: center;
     justify-content: center;
     transition: all 0.2s;
+    border: none;
+    cursor: pointer;
 }
 
 .btn-cart-circle:hover {
@@ -64,7 +77,7 @@ body {
     color: white;
 }
 
-/* Hide Scrollbar but allow scroll */
+/* Sembunyikan Scrollbar tapi tetap bisa di-scroll (untuk slider mobile) */
 .no-scrollbar::-webkit-scrollbar {
     display: none;
 }
