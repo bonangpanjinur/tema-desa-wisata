@@ -1,135 +1,195 @@
 <?php
-/**
- * Template Name: Halaman Riwayat Transaksi
- */
+/* Template Name: Halaman Transaksi */
 
+// 1. Cek Login
 if ( ! is_user_logged_in() ) {
-    wp_redirect( home_url('/login') );
+    wp_redirect( site_url('/login') );
     exit;
 }
 
 get_header();
-$user_id = get_current_user_id();
+
+$current_user_id = get_current_user_id();
+global $wpdb;
+
+// 2. Logika Tab & Filter Status
+$current_tab = isset($_GET['tab']) ? sanitize_text_field($_GET['tab']) : 'berjalan';
+
+// Mapping status untuk setiap tab
+$status_filters = [];
+switch ($current_tab) {
+    case 'selesai':
+        $status_filters = ["'selesai'"];
+        break;
+    case 'dibatalkan':
+        $status_filters = ["'dibatalkan'", "'pembayaran_gagal'", "'refunded'"];
+        break;
+    case 'berjalan':
+    default:
+        // Status berjalan mencakup menunggu bayar sampai dikirim
+        $status_filters = ["'menunggu_pembayaran'", "'menunggu_konfirmasi'", "'diproses'", "'diantar_ojek'", "'dikirim_ekspedisi'"];
+        break;
+}
+$status_string = implode(',', $status_filters);
+
+// 3. Query Database (Join Transaksi Utama & Sub)
+// Kita mengambil Sub-Transaksi (per Toko) karena status pengiriman ada di situ.
+// Kecuali status 'menunggu_pembayaran' yang ada di Transaksi Utama.
+
+$table_main = $wpdb->prefix . 'dw_transaksi';
+$table_sub  = $wpdb->prefix . 'dw_transaksi_sub';
+
+// Query yang agak kompleks untuk menangani logika status gabungan
+if ($current_tab === 'berjalan') {
+    // Untuk tab berjalan, kita cari yang sub-statusnya aktif ATAU main-statusnya menunggu pembayaran
+    $query = "
+        SELECT s.*, m.kode_unik, m.status_transaksi as status_bayar, m.tanggal_transaksi 
+        FROM $table_sub s
+        JOIN $table_main m ON s.id_transaksi = m.id
+        WHERE m.id_pembeli = %d
+        AND (
+            s.status_pesanan IN ($status_string) 
+            OR (m.status_transaksi = 'menunggu_pembayaran' AND s.status_pesanan != 'dibatalkan')
+        )
+        ORDER BY m.tanggal_transaksi DESC
+    ";
+} else {
+    // Untuk selesai/batal, cukup cek status sub order
+    $query = "
+        SELECT s.*, m.kode_unik, m.status_transaksi as status_bayar, m.tanggal_transaksi 
+        FROM $table_sub s
+        JOIN $table_main m ON s.id_transaksi = m.id
+        WHERE m.id_pembeli = %d
+        AND s.status_pesanan IN ($status_string)
+        ORDER BY m.tanggal_transaksi DESC
+    ";
+}
+
+$orders = $wpdb->get_results( $wpdb->prepare($query, $current_user_id) );
+
 ?>
 
-<div class="bg-gray-50 min-h-screen pb-20">
-    <div class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-30">
-        <div class="container mx-auto px-4 h-16 flex items-center gap-4">
-            <a href="<?php echo home_url('/akun-saya'); ?>" class="text-gray-500 hover:text-gray-900"><i class="ph-bold ph-arrow-left text-xl"></i></a>
-            <h1 class="font-bold text-lg text-gray-800">Daftar Transaksi</h1>
+<!-- Container Halaman -->
+<div class="app-container" style="padding-top: 0;">
+
+    <!-- Header Judul (Mobile Style) -->
+    <div class="section-header" style="background: var(--white); box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 0; padding-top: 20px;">
+        <div class="section-title">
+            <h3>Pesanan <span>Saya</span></h3>
         </div>
     </div>
 
-    <div class="container mx-auto px-4 py-6 max-w-2xl">
-        
-        <!-- Filter Status -->
-        <div class="flex gap-2 overflow-x-auto no-scrollbar mb-6 pb-2">
-            <button class="filter-btn active px-4 py-2 bg-gray-900 text-white rounded-full text-xs font-bold whitespace-nowrap" data-status="">Semua</button>
-            <button class="filter-btn px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-full text-xs font-bold whitespace-nowrap hover:bg-gray-50" data-status="menunggu_pembayaran">Belum Bayar</button>
-            <button class="filter-btn px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-full text-xs font-bold whitespace-nowrap hover:bg-gray-50" data-status="diproses">Diproses</button>
-            <button class="filter-btn px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-full text-xs font-bold whitespace-nowrap hover:bg-gray-50" data-status="dikirim_ekspedisi">Dikirim</button>
-            <button class="filter-btn px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-full text-xs font-bold whitespace-nowrap hover:bg-gray-50" data-status="selesai">Selesai</button>
-        </div>
+    <!-- Tabs Navigasi -->
+    <div class="tabs">
+        <a href="?tab=berjalan" class="tab <?php echo $current_tab === 'berjalan' ? 'active' : ''; ?>">Berjalan</a>
+        <a href="?tab=selesai" class="tab <?php echo $current_tab === 'selesai' ? 'active' : ''; ?>">Selesai</a>
+        <a href="?tab=dibatalkan" class="tab <?php echo $current_tab === 'dibatalkan' ? 'active' : ''; ?>">Dibatalkan</a>
+    </div>
 
-        <!-- List Transaksi Container -->
-        <div id="transaction-list" class="space-y-4">
-            <!-- Loading Skeleton -->
-            <div class="animate-pulse bg-white p-6 rounded-xl shadow-sm space-y-3">
-                <div class="h-4 bg-gray-200 rounded w-1/4 mb-4"></div>
-                <div class="h-16 bg-gray-100 rounded mb-4"></div>
-                <div class="h-4 bg-gray-200 rounded w-1/3"></div>
+    <!-- Daftar Pesanan -->
+    <div class="order-list">
+        <?php if ( empty($orders) ) : ?>
+            <div style="text-align: center; padding: 50px 20px; color: var(--text-grey);">
+                <i class="fas fa-shopping-bag" style="font-size: 3rem; margin-bottom: 15px; opacity: 0.3;"></i>
+                <p>Belum ada pesanan di tab ini.</p>
+                <a href="<?php echo get_post_type_archive_link('dw_produk'); ?>" class="btn-visit" style="margin-top: 15px; display: inline-block;">Mulai Belanja</a>
             </div>
-        </div>
-
-    </div>
-</div>
-
-<script>
-jQuery(document).ready(function($) {
-    const API_BASE = dwData.api_url;
-    const JWT_TOKEN = localStorage.getItem('dw_jwt_token');
-
-    function loadTransactions(status = '') {
-        const $list = $('#transaction-list');
-        $list.html('<div class="text-center py-10 text-gray-400"><i class="ph-duotone ph-spinner animate-spin text-2xl"></i><p class="text-xs mt-2">Memuat transaksi...</p></div>');
-
-        // Panggil API Pembeli Orders
-        $.ajax({
-            url: API_BASE + 'pembeli/orders',
-            type: 'GET',
-            headers: { 'Authorization': 'Bearer ' + JWT_TOKEN },
-            data: { status: status },
-            success: function(response) {
-                if(response.length === 0) {
-                    $list.html(`
-                        <div class="text-center py-12">
-                            <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400">
-                                <i class="ph-duotone ph-receipt text-3xl"></i>
-                            </div>
-                            <h3 class="text-sm font-bold text-gray-800">Belum ada transaksi</h3>
-                            <p class="text-xs text-gray-500 mt-1">Yuk mulai belanja produk desa!</p>
-                            <a href="${dwData.home_url}/produk" class="mt-4 inline-block px-6 py-2 bg-primary text-white text-xs font-bold rounded-lg">Mulai Belanja</a>
-                        </div>
-                    `);
-                    return;
+        <?php else : ?>
+            
+            <?php foreach ( $orders as $order ) : 
+                // Tentukan Status Label & Warna
+                $status_label = '';
+                $status_class = '';
+                
+                // Prioritas Status: Cek Pembayaran dulu, baru Pengiriman
+                if ($order->status_bayar === 'menunggu_pembayaran') {
+                    $status_label = 'Belum Dibayar';
+                    $status_class = 'status-batal'; // Merah muda/kuning
+                } elseif ($order->status_pesanan === 'selesai') {
+                    $status_label = 'Selesai';
+                    $status_class = 'status-selesai';
+                } elseif ($order->status_pesanan === 'dibatalkan') {
+                    $status_label = 'Dibatalkan';
+                    $status_class = 'status-batal';
+                } else {
+                    // Status pengiriman (diproses, dikirim, dll)
+                    $status_label = ucfirst(str_replace('_', ' ', $order->status_pesanan));
+                    $status_class = 'status-dikirim';
                 }
 
-                let html = '';
-                response.forEach(order => {
-                    // Mapping warna status
-                    let statusClass = 'bg-gray-100 text-gray-600';
-                    let statusLabel = order.status_transaksi;
+                // Ambil 1 Item Pertama untuk Preview Gambar
+                $table_items = $wpdb->prefix . 'dw_transaksi_items';
+                $first_item = $wpdb->get_row( $wpdb->prepare("SELECT * FROM $table_items WHERE id_sub_transaksi = %d LIMIT 1", $order->id) );
+                
+                // Hitung total item
+                $total_items_count = $wpdb->get_var( $wpdb->prepare("SELECT COUNT(*) FROM $table_items WHERE id_sub_transaksi = %d", $order->id) );
+                
+                // Gambar Produk
+                $img_url = 'https://via.placeholder.com/150';
+                if ($first_item) {
+                    $thumb_id = get_post_thumbnail_id($first_item->id_produk);
+                    if ($thumb_id) {
+                        $img_src = wp_get_attachment_image_src($thumb_id, 'thumbnail');
+                        $img_url = $img_src[0];
+                    }
+                }
+            ?>
+            
+            <div class="card-order">
+                <!-- Header Card: ID & Status -->
+                <div class="order-header">
+                    <span class="order-id">#<?php echo esc_html($order->kode_unik); ?></span>
+                    <span class="order-status <?php echo $status_class; ?>"><?php echo esc_html($status_label); ?></span>
+                </div>
+
+                <!-- Body Card: Item Info -->
+                <a href="<?php echo site_url('/detail-transaksi?id=' . $order->id_transaksi); ?>" class="order-item">
+                    <img src="<?php echo esc_url($img_url); ?>" class="order-img" alt="Produk">
+                    <div class="order-info">
+                        <div class="order-name">
+                            <?php echo $first_item ? esc_html($first_item->nama_produk) : 'Produk dihapus'; ?>
+                            <?php if ($total_items_count > 1) echo " <small>+ " . ($total_items_count - 1) . " produk lainnya</small>"; ?>
+                        </div>
+                        <div class="order-meta">
+                            <i class="fas fa-store"></i> <?php echo esc_html($order->nama_toko); ?> <br>
+                            <?php echo date_i18n('d M Y', strtotime($order->tanggal_transaksi)); ?>
+                        </div>
+                        <div class="order-total">
+                            <span style="font-weight: 700;">Total: <?php echo dw_format_rupiah($order->total_pesanan_toko); ?></span>
+                        </div>
+                    </div>
+                </a>
+
+                <!-- Footer Card: Action Buttons -->
+                <div style="border-top: 1px solid #eee; padding-top: 10px; margin-top: 10px; text-align: right;">
                     
-                    if(statusLabel === 'menunggu_pembayaran') { statusClass = 'bg-orange-100 text-orange-700'; statusLabel = 'Belum Bayar'; }
-                    else if(statusLabel === 'diproses') { statusClass = 'bg-blue-100 text-blue-700'; statusLabel = 'Diproses'; }
-                    else if(statusLabel === 'dikirim_ekspedisi') { statusClass = 'bg-purple-100 text-purple-700'; statusLabel = 'Dikirim'; }
-                    else if(statusLabel === 'selesai') { statusClass = 'bg-green-100 text-green-700'; statusLabel = 'Selesai'; }
-
-                    const total = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(order.total_transaksi);
-                    const date = new Date(order.tanggal_transaksi).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
-
-                    html += `
-                    <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
-                        <div class="flex justify-between items-start mb-3 border-b border-gray-50 pb-3">
-                            <div>
-                                <div class="flex items-center gap-2">
-                                    <i class="ph-fill ph-storefront text-gray-400"></i>
-                                    <span class="text-xs font-bold text-gray-800">Pesanan #${order.kode_unik}</span>
-                                </div>
-                                <span class="text-[10px] text-gray-400">${date}</span>
-                            </div>
-                            <span class="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${statusClass}">${statusLabel}</span>
-                        </div>
+                    <?php if ($order->status_bayar === 'menunggu_pembayaran') : ?>
+                        <a href="<?php echo site_url('/detail-transaksi?id=' . $order->id_transaksi); ?>" class="btn-track" style="background: var(--accent); color: var(--text-dark); border: none;">Bayar Sekarang</a>
+                    
+                    <?php elseif ( in_array($order->status_pesanan, ['dikirim_ekspedisi', 'diantar_ojek']) ) : ?>
+                        <?php if ($order->no_resi) : ?>
+                            <button class="btn-track" onclick="alert('Nomor Resi: <?php echo esc_js($order->no_resi); ?>')">Lacak Resi</button>
+                        <?php else: ?>
+                            <button class="btn-track">Lacak</button>
+                        <?php endif; ?>
                         
-                        <div class="flex justify-between items-end">
-                            <div>
-                                <span class="text-xs text-gray-500">Total Belanja</span>
-                                <div class="text-sm font-bold text-gray-900">${total}</div>
-                            </div>
-                            <a href="<?php echo home_url('/detail-transaksi?id='); ?>${order.id}" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-xs font-bold rounded-lg hover:bg-gray-50 transition">
-                                Lihat Detail
-                            </a>
-                        </div>
-                    </div>`;
-                });
-                $list.html(html);
-            },
-            error: function() {
-                $list.html('<div class="text-center text-red-500 text-xs py-4">Gagal memuat data. Periksa koneksi Anda.</div>');
-            }
-        });
-    }
+                        <!-- Tombol Konfirmasi Terima (Bisa ditambahkan AJAX logic nanti) -->
+                        <button class="btn-track" style="background: var(--primary); color: white; border: none;">Diterima</button>
 
-    // Init Load
-    loadTransactions();
+                    <?php elseif ($order->status_pesanan === 'selesai') : ?>
+                        <a href="<?php echo site_url('/tulis-ulasan?id=' . $order->id); ?>" class="btn-track">Beri Ulasan</a>
+                        <a href="<?php echo get_permalink($first_item->id_produk); ?>" class="btn-track" style="background: var(--primary-light); border:none;">Beli Lagi</a>
+                    
+                    <?php endif; ?>
 
-    // Filter Click
-    $('.filter-btn').click(function() {
-        $('.filter-btn').removeClass('bg-gray-900 text-white').addClass('bg-white text-gray-600 border border-gray-200');
-        $(this).removeClass('bg-white text-gray-600 border border-gray-200').addClass('bg-gray-900 text-white');
-        loadTransactions($(this).data('status'));
-    });
-});
-</script>
+                    <a href="<?php echo site_url('/detail-transaksi?id=' . $order->id_transaksi); ?>" class="btn-track" style="border: none; color: var(--text-grey);">Detail</a>
+                </div>
+            </div>
+
+            <?php endforeach; ?>
+        <?php endif; ?>
+    </div>
+
+</div>
 
 <?php get_footer(); ?>
