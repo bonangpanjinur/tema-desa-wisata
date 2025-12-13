@@ -3,87 +3,104 @@
 <head>
     <meta charset="<?php bloginfo( 'charset' ); ?>">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title><?php wp_title( '|', true, 'right' ); ?></title>
+    <title>Client Desa Wisata</title>
     <link rel="stylesheet" href="<?php echo get_stylesheet_uri(); ?>">
+    <style>
+        /* CSS Inline Tambahan untuk Debugging */
+        .debug-panel { background: #333; color: #fff; padding: 10px; font-family: monospace; font-size: 12px; margin-bottom: 20px; }
+        .error-msg { background: #ffdddd; border-left: 5px solid #f44336; padding: 15px; color: #333; margin: 20px 0; }
+        .empty-msg { background: #fff3cd; border-left: 5px solid #ff9800; padding: 15px; color: #333; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+        .card { background: white; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }
+        .card img { width: 100%; height: 200px; object-fit: cover; background: #eee; }
+        .card-body { padding: 15px; }
+        .btn { display: inline-block; background: #007bff; color: white; padding: 8px 15px; text-decoration: none; border-radius: 4px; margin-top: 10px; }
+    </style>
     <?php wp_head(); ?>
 </head>
 <body <?php body_class(); ?>>
 
-<header>
+<header style="background: white; padding: 20px; border-bottom: 1px solid #eee;">
     <div class="container">
-        <h1 class="site-title">
-            <a href="<?php echo home_url(); ?>" style="text-decoration:none; color:inherit;">
-                Client Desa Wisata
-            </a>
-        </h1>
-        <p>Tema ini mengambil data dari server terpisah.</p>
-        
-        <!-- Debug Status -->
-        <div class="status-box">
-            <?php echo dw_api_status_check(); ?>
-        </div>
+        <h1 style="margin:0;">Desa Wisata Client</h1>
+        <small style="color:gray;">Mengambil data dari: <strong>admin.bonang.my.id</strong></small>
     </div>
 </header>
 
 <main class="container">
-
-    <h2>Daftar Desa (Dari API)</h2>
+    
+    <h2>Daftar Desa</h2>
 
     <?php
-    /**
-     * CONTOH PENGGUNAAN API
-     * Kita memanggil endpoint custom plugin Anda.
-     * Pastikan endpoint ini benar di plugin core Anda.
-     * Biasanya: /wp-json/dw-api/v1/desa
-     */
-    
-    // Panggil fungsi yang kita buat di functions.php
-    // Ganti endpoint sesuai struktur route di plugin Anda (includes/rest-api/api-public.php)
-    $data_desa = dw_fetch_api_data( '/wp-json/dw-api/v1/public/desa' ); 
+    // 1. Tentukan Endpoint (Cek plugin Anda untuk memastikan ini benar)
+    // Kemungkinan besar: /wp-json/dw-api/v1/public/desa
+    $endpoint = '/wp-json/dw-api/v1/public/desa';
 
-    if ( $data_desa && is_array( $data_desa ) ) : 
+    // 2. Ambil Data
+    if ( function_exists('dw_fetch_api_data') ) {
+        $result = dw_fetch_api_data( $endpoint );
+    } else {
+        $result = array('error' => true, 'message' => 'Fungsi dw_fetch_api_data tidak ditemukan di functions.php');
+    }
+
+    // 3. Logika Tampilan
+    if ( isset( $result['error'] ) && $result['error'] === true ) : 
+        // --- JIKA ERROR ---
     ?>
-        
-        <div class="api-grid">
-            <?php foreach ( $data_desa as $desa ) : ?>
-                <div class="api-card">
-                    <!-- Pastikan key array sesuai dengan output JSON plugin Anda -->
-                    <h3><?php echo esc_html( $desa['nama_desa'] ?? 'Tanpa Judul' ); ?></h3>
-                    
-                    <?php if ( ! empty( $desa['thumbnail'] ) ) : ?>
-                        <img src="<?php echo esc_url( $desa['thumbnail'] ); ?>" alt="Foto Desa" style="width:100%; height:auto; border-radius:4px;">
-                    <?php endif; ?>
-
-                    <p><?php echo esc_html( wp_trim_words( $desa['deskripsi'] ?? '', 20 ) ); ?></p>
-                    
-                    <a href="<?php echo home_url( '/desa/?id=' . ($desa['id'] ?? 0) ); ?>" class="button">
-                        Lihat Detail
+        <div class="error-msg">
+            <h3>Gagal Mengambil Data</h3>
+            <p><strong>Pesan Error:</strong> <?php echo esc_html( $result['message'] ); ?></p>
+            <?php if(isset($result['debug'])) : ?>
+                <pre><?php echo esc_html( $result['debug'] ); ?></pre>
+            <?php endif; ?>
+            <hr>
+            <p><strong>Saran Perbaikan:</strong></p>
+            <ul>
+                <li>Coba buka URL ini di browser Anda untuk memastikan endpoint benar: <br>
+                    <a href="https://admin.bonang.my.id<?php echo $endpoint; ?>" target="_blank">
+                        https://admin.bonang.my.id<?php echo $endpoint; ?>
                     </a>
-                </div>
-            <?php endforeach; ?>
+                </li>
+                <li>Jika browser menampilkan JSON, berarti tema bisa konek, tapi mungkin format datanya beda.</li>
+            </ul>
         </div>
 
-    <?php else : ?>
+    <?php 
+    elseif ( empty( $result ) ) : 
+        // --- JIKA DATA KOSONG (Array Kosong) ---
+    ?>
+        <div class="empty-msg">
+            <p>Koneksi Berhasil, tetapi <strong>tidak ada data desa</strong> yang ditemukan (Array Kosong).</p>
+        </div>
 
-        <div class="error-box">
-            <h3>Gagal Mengambil Data</h3>
-            <p>Kemungkinan penyebab:</p>
-            <ul>
-                <li>URL API di Customizer belum diisi atau salah.</li>
-                <li>Plugin Desa Wisata Core di server mati.</li>
-                <li>Endpoint API salah (Cek dokumentasi plugin).</li>
-            </ul>
+    <?php 
+    else : 
+        // --- JIKA SUKSES ---
+    ?>
+        
+        <div class="grid">
+            <?php foreach ( $result as $item ) : ?>
+                <div class="card">
+                    <!-- Gambar Fallback jika thumbnail kosong -->
+                    <?php $img_url = !empty($item['thumbnail']) ? $item['thumbnail'] : 'https://via.placeholder.com/400x250?text=No+Image'; ?>
+                    <img src="<?php echo esc_url($img_url); ?>" alt="<?php echo esc_attr($item['nama_desa'] ?? 'Desa'); ?>">
+                    
+                    <div class="card-body">
+                        <!-- Sesuaikan key 'nama_desa', 'deskripsi' dengan JSON asli plugin Anda -->
+                        <h3 style="margin-top:0;"><?php echo esc_html( $item['nama_desa'] ?? 'Tanpa Nama' ); ?></h3>
+                        <p><?php echo esc_html( wp_trim_words( $item['deskripsi'] ?? '', 15 ) ); ?></p>
+                        
+                        <!-- Link ke Detail (Nanti kita buat file single.php) -->
+                        <!-- Kita kirim ID via parameter URL ?id=123 -->
+                        <a href="<?php echo home_url( '/?desa_id=' . ($item['id'] ?? 0) ); ?>" class="btn">Lihat Detail</a>
+                    </div>
+                </div>
+            <?php endforeach; ?>
         </div>
 
     <?php endif; ?>
 
 </main>
-
-<footer style="text-align:center; padding: 20px; margin-top:50px; background:#ddd;">
-    <div class="container">
-        &copy; <?php echo date('Y'); ?> Desa Wisata API Theme.
-    </div>
-</footer>
 
 <?php wp_footer(); ?>
 </body>

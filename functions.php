@@ -1,63 +1,87 @@
 <?php
 /**
- * Theme Functions
+ * Functions and definitions for Desa Wisata API Theme
  */
 
-function dw_theme_scripts() {
-    // Load Main CSS
-    wp_enqueue_style('dw-style', get_stylesheet_uri());
+// 1. Konfigurasi API
+function dw_api_customize_register( $wp_customize ) {
+    $wp_customize->add_section( 'dw_api_settings', array(
+        'title'    => __( 'Konfigurasi API Desa Wisata', 'dw-api-theme' ),
+        'priority' => 30,
+    ) );
+
+    $wp_customize->add_setting( 'dw_api_base_url', array(
+        'default'   => 'https://admin.bonang.my.id', // DEFAULT URL SERVER ANDA
+        'transport' => 'refresh',
+    ) );
+
+    $wp_customize->add_control( 'dw_api_base_url', array(
+        'label'    => __( 'URL Website Server (Core)', 'dw-api-theme' ),
+        'section'  => 'dw_api_settings',
+        'type'     => 'url',
+    ) );
+}
+add_action( 'customize_register', 'dw_api_customize_register' );
+
+/**
+ * 2. Fungsi Fetching Data dengan Error Handling Lengkap
+ */
+function dw_fetch_api_data( $endpoint, $cache_time = 3600 ) {
+    $base_url = get_theme_mod( 'dw_api_base_url', 'https://admin.bonang.my.id' ); // Fallback ke URL Anda
     
-    // Load Tailwind CSS (CDN for Development/Prototyping)
-    wp_enqueue_script('tailwindcss', 'https://cdn.tailwindcss.com', [], '3.4.0', false);
+    // Bersihkan slash di akhir URL jika ada
+    $base_url = untrailingslashit( $base_url );
+    $full_url = $base_url . $endpoint;
+
+    // Cek Cache dulu
+    $cache_key = 'dw_api_' . md5( $full_url );
+    $cached_data = get_transient( $cache_key );
     
-    // Load FontAwesome
-    wp_enqueue_style('fontawesome', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css', [], '6.0.0');
+    // Hapus baris ini jika ingin test realtime terus (matikan cache)
+    // if ( false !== $cached_data ) return $cached_data;
 
-    // Load Main JS
-    wp_enqueue_script('dw-main-js', get_template_directory_uri() . '/assets/js/main.js', ['jquery'], '1.0', true);
+    // Request ke Server
+    $response = wp_remote_get( $full_url, array(
+        'timeout'   => 20,
+        'sslverify' => false, // PENTING: Matikan verifikasi SSL sementara untuk mencegah error koneksi
+        'headers'   => array( 'Accept' => 'application/json' )
+    ) );
 
-    // Localize Script untuk AJAX URL
-    wp_localize_script('dw-main-js', 'dw_ajax', [
-        'ajax_url' => admin_url('admin-ajax.php'),
-        'nonce'    => wp_create_nonce('dw_ajax_nonce')
-    ]);
+    // Cek Error Koneksi (WP Error)
+    if ( is_wp_error( $response ) ) {
+        return array( 'error' => true, 'message' => $response->get_error_message() );
+    }
+
+    // Cek Kode HTTP
+    $response_code = wp_remote_retrieve_response_code( $response );
+    $body = wp_remote_retrieve_body( $response );
+
+    if ( $response_code !== 200 ) {
+        return array( 
+            'error' => true, 
+            'message' => "HTTP Error $response_code",
+            'debug'   => substr($body, 0, 200) // Tampilkan sedikit response body
+        );
+    }
+
+    // Decode JSON
+    $data = json_decode( $body, true );
+
+    if ( json_last_error() !== JSON_ERROR_NONE ) {
+        return array( 'error' => true, 'message' => 'Format JSON Salah/Rusak.' );
+    }
+
+    // Simpan Cache jika sukses
+    if ( ! isset( $data['error'] ) ) {
+        set_transient( $cache_key, $data, $cache_time );
+    }
+
+    return $data;
 }
-add_action('wp_enqueue_scripts', 'dw_theme_scripts');
 
-// Support Theme Features
-function dw_theme_setup() {
-    add_theme_support('title-tag');
-    add_theme_support('post-thumbnails');
-    add_theme_support('woocommerce');
+// 3. Helper Debug Status
+function dw_get_api_status() {
+    $url = get_theme_mod( 'dw_api_base_url', 'https://admin.bonang.my.id' );
+    return "Target Server: " . $url;
 }
-add_action('after_setup_theme', 'dw_theme_setup');
-
-// Menambahkan custom style untuk menyembunyikan scrollbar tapi tetap bisa scroll
-function dw_add_header_styles() {
-    ?>
-    <style>
-        /* Custom scrollbar hide for horizontal scrolling */
-        .no-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-        .no-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #e5e7eb; /* Gray-200 equivalent */
-        }
-        /* Fix for admin bar overlap on mobile if logged in */
-        .admin-bar header.sticky {
-            top: 32px;
-        }
-        @media screen and (max-width: 782px) {
-            .admin-bar header.sticky {
-                top: 46px;
-            }
-        }
-    </style>
-    <?php
-}
-add_action('wp_head', 'dw_add_header_styles');
+?>
