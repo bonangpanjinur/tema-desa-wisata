@@ -1,92 +1,107 @@
-<?php
-/**
- * Functions and definitions for Desa Wisata API Theme
- */
+<!DOCTYPE html>
+<html <?php language_attributes(); ?>>
+<head>
+    <meta charset="<?php bloginfo( 'charset' ); ?>">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Client Desa Wisata</title>
+    <link rel="stylesheet" href="<?php echo get_stylesheet_uri(); ?>">
+    <style>
+        /* CSS Inline Tambahan untuk Debugging */
+        .debug-panel { background: #333; color: #fff; padding: 10px; font-family: monospace; font-size: 12px; margin-bottom: 20px; }
+        .error-msg { background: #ffdddd; border-left: 5px solid #f44336; padding: 15px; color: #333; margin: 20px 0; }
+        .empty-msg { background: #fff3cd; border-left: 5px solid #ff9800; padding: 15px; color: #333; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+        .card { background: white; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }
+        .card img { width: 100%; height: 200px; object-fit: cover; background: #eee; }
+        .card-body { padding: 15px; }
+        .btn { display: inline-block; background: #007bff; color: white; padding: 8px 15px; text-decoration: none; border-radius: 4px; margin-top: 10px; }
+    </style>
+    <?php wp_head(); ?>
+</head>
+<body <?php body_class(); ?>>
 
-// 1. Tambahkan Pengaturan di Customizer untuk URL API
-// Ini agar Anda bisa mengganti alamat server tanpa ubah kodingan
-function dw_api_customize_register( $wp_customize ) {
-    $wp_customize->add_section( 'dw_api_settings', array(
-        'title'    => __( 'Konfigurasi API Desa Wisata', 'dw-api-theme' ),
-        'priority' => 30,
-    ) );
+<header style="background: white; padding: 20px; border-bottom: 1px solid #eee;">
+    <div class="container">
+        <h1 style="margin:0;">Desa Wisata Client</h1>
+        <small style="color:gray;">Mengambil data dari: <strong>admin.bonang.my.id</strong></small>
+    </div>
+</header>
 
-    $wp_customize->add_setting( 'dw_api_base_url', array(
-        'default'   => 'https://website-utama-anda.com', // Ganti default ini
-        'transport' => 'refresh',
-    ) );
-
-    $wp_customize->add_control( 'dw_api_base_url', array(
-        'label'    => __( 'URL Website Server (Core)', 'dw-api-theme' ),
-        'description' => 'Masukkan URL website tempat plugin Desa Wisata Core terinstall (tanpa slash di akhir).',
-        'section'  => 'dw_api_settings',
-        'type'     => 'url',
-    ) );
-}
-add_action( 'customize_register', 'dw_api_customize_register' );
-
-/**
- * 2. Fungsi Utama Fetching Data (Jantung Tema Ini)
- * Menggunakan Transients API untuk Caching agar tidak berat.
- * * @param string $endpoint Contoh: '/wp-json/dw-api/v1/desa'
- * @param int $cache_time Waktu simpan cache dalam detik (default 1 jam)
- * @return array|mixed Data JSON yang sudah di-decode atau false jika gagal
- */
-function dw_fetch_api_data( $endpoint, $cache_time = 3600 ) {
-    // Ambil URL dasar dari setting
-    $base_url = get_theme_mod( 'dw_api_base_url' );
+<main class="container">
     
-    if ( empty( $base_url ) ) {
-        return false;
+    <h2>Daftar Desa</h2>
+
+    <?php
+    // 1. Tentukan Endpoint (Cek plugin Anda untuk memastikan ini benar)
+    // Kemungkinan besar: /wp-json/dw-api/v1/public/desa
+    $endpoint = '/wp-json/dw-api/v1/public/desa';
+
+    // 2. Ambil Data
+    if ( function_exists('dw_fetch_api_data') ) {
+        $result = dw_fetch_api_data( $endpoint );
+    } else {
+        $result = array('error' => true, 'message' => 'Fungsi dw_fetch_api_data tidak ditemukan di functions.php');
     }
 
-    // Buat kunci cache unik berdasarkan endpoint
-    $cache_key = 'dw_api_' . md5( $endpoint );
-    
-    // Cek apakah data ada di cache database lokal
-    $cached_data = get_transient( $cache_key );
-    if ( false !== $cached_data ) {
-        return $cached_data; // Kembalikan data cache, tidak perlu request ke server
-    }
+    // 3. Logika Tampilan
+    if ( isset( $result['error'] ) && $result['error'] === true ) : 
+        // --- JIKA ERROR ---
+    ?>
+        <div class="error-msg">
+            <h3>Gagal Mengambil Data</h3>
+            <p><strong>Pesan Error:</strong> <?php echo esc_html( $result['message'] ); ?></p>
+            <?php if(isset($result['debug'])) : ?>
+                <pre><?php echo esc_html( $result['debug'] ); ?></pre>
+            <?php endif; ?>
+            <hr>
+            <p><strong>Saran Perbaikan:</strong></p>
+            <ul>
+                <li>Coba buka URL ini di browser Anda untuk memastikan endpoint benar: <br>
+                    <a href="https://admin.bonang.my.id<?php echo $endpoint; ?>" target="_blank">
+                        https://admin.bonang.my.id<?php echo $endpoint; ?>
+                    </a>
+                </li>
+                <li>Jika browser menampilkan JSON, berarti tema bisa konek, tapi mungkin format datanya beda.</li>
+            </ul>
+        </div>
 
-    // Jika tidak ada cache, LAKUKAN REQUEST KE SERVER
-    $full_url = $base_url . $endpoint;
-    
-    // Request ke API
-    $response = wp_remote_get( $full_url, array(
-        'timeout' => 15, // Tunggu maks 15 detik
-        'headers' => array(
-            'Accept' => 'application/json'
-        )
-    ) );
+    <?php 
+    elseif ( empty( $result ) ) : 
+        // --- JIKA DATA KOSONG (Array Kosong) ---
+    ?>
+        <div class="empty-msg">
+            <p>Koneksi Berhasil, tetapi <strong>tidak ada data desa</strong> yang ditemukan (Array Kosong).</p>
+        </div>
 
-    // Cek Error Koneksi
-    if ( is_wp_error( $response ) ) {
-        return null; // Gagal koneksi
-    }
+    <?php 
+    else : 
+        // --- JIKA SUKSES ---
+    ?>
+        
+        <div class="grid">
+            <?php foreach ( $result as $item ) : ?>
+                <div class="card">
+                    <!-- Gambar Fallback jika thumbnail kosong -->
+                    <?php $img_url = !empty($item['thumbnail']) ? $item['thumbnail'] : 'https://via.placeholder.com/400x250?text=No+Image'; ?>
+                    <img src="<?php echo esc_url($img_url); ?>" alt="<?php echo esc_attr($item['nama_desa'] ?? 'Desa'); ?>">
+                    
+                    <div class="card-body">
+                        <!-- Sesuaikan key 'nama_desa', 'deskripsi' dengan JSON asli plugin Anda -->
+                        <h3 style="margin-top:0;"><?php echo esc_html( $item['nama_desa'] ?? 'Tanpa Nama' ); ?></h3>
+                        <p><?php echo esc_html( wp_trim_words( $item['deskripsi'] ?? '', 15 ) ); ?></p>
+                        
+                        <!-- Link ke Detail (Nanti kita buat file single.php) -->
+                        <!-- Kita kirim ID via parameter URL ?id=123 -->
+                        <a href="<?php echo home_url( '/?desa_id=' . ($item['id'] ?? 0) ); ?>" class="btn">Lihat Detail</a>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
 
-    // Cek Kode HTTP (Harus 200 OK)
-    $response_code = wp_remote_retrieve_response_code( $response );
-    if ( $response_code !== 200 ) {
-        return null; // Server merespon error (404/500 dll)
-    }
+    <?php endif; ?>
 
-    // Ambil Body dan Decode JSON
-    $body = wp_remote_retrieve_body( $response );
-    $data = json_decode( $body, true ); // true = jadikan array asosiatif
+</main>
 
-    // Simpan ke Cache (Transient)
-    if ( ! empty( $data ) ) {
-        set_transient( $cache_key, $data, $cache_time );
-    }
-
-    return $data;
-}
-
-// 3. Helper untuk Debugging (Cek status koneksi)
-function dw_api_status_check() {
-    $base_url = get_theme_mod( 'dw_api_base_url' );
-    if( ! $base_url ) return "URL API belum disetting di Customize.";
-    return "Terhubung ke: " . $base_url;
-}
-?>
+<?php wp_footer(); ?>
+</body>
+</html>
