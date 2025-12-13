@@ -3,61 +3,81 @@
 <head>
     <meta charset="<?php bloginfo('charset'); ?>">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Tambahkan Google Font Inter agar mirip -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <?php wp_head(); ?>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
 </head>
-<body <?php body_class('bg-gray-100 font-inter text-gray-800'); ?>>
+<body <?php body_class('bg-gray-50 text-gray-800'); ?>>
 
-    <!-- Main Wrapper: Full Width on Desktop, Standard on Mobile -->
+    <!-- Main Wrapper -->
     <div id="app-wrapper" class="min-h-screen flex flex-col relative">
         
-        <!-- TOP HEADER & SEARCH (Sticky) -->
-        <header class="bg-emerald-600 text-white shadow-md sticky top-0 z-50">
-            <div class="container mx-auto px-4 py-3">
-                <div class="flex justify-between items-center gap-4">
-                    
-                    <!-- Logo & Brand -->
-                    <a href="<?php echo home_url(); ?>" class="flex items-center gap-2 hover:opacity-90 transition shrink-0">
-                        <i class="fas fa-leaf text-yellow-300 text-2xl"></i>
-                        <span class="font-bold text-xl tracking-wide hidden md:block"><?php bloginfo('name'); ?></span>
-                        <span class="font-bold text-lg tracking-wide md:hidden">DesaWisata</span>
-                    </a>
+        <!-- HEADER (Warna Hijau Cerah Sesuai Gambar) -->
+        <header class="bg-[#00BA61] text-white shadow-sm sticky top-0 z-50">
+            <div class="container mx-auto px-4 h-16 md:h-20 flex items-center gap-4 md:gap-8 justify-between">
+                
+                <!-- 1. LOGO (Kiri) -->
+                <a href="<?php echo home_url(); ?>" class="flex items-center gap-2 hover:opacity-90 transition shrink-0">
+                    <!-- Icon Daun Kuning -->
+                    <i class="fas fa-leaf text-yellow-300 text-2xl"></i>
+                    <!-- Nama Brand Putih Tebal -->
+                    <span class="font-bold text-xl md:text-2xl tracking-tight">Sadesa</span>
+                </a>
 
-                    <!-- Search Bar (Flexible Width) -->
-                    <div class="flex-1 max-w-2xl mx-auto">
-                        <form action="<?php echo home_url('/'); ?>" method="get" class="relative">
-                            <input type="text" name="s" placeholder="Cari wisata, produk, atau desa..." class="w-full py-2.5 pl-10 pr-4 rounded-lg text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 shadow-inner bg-emerald-50 focus:bg-white transition">
-                            <i class="fas fa-search absolute left-3 top-3 text-gray-400 text-sm"></i>
-                        </form>
+                <!-- 2. SEARCH BAR (Tengah - Lebar) -->
+                <div class="hidden md:block flex-1 max-w-2xl">
+                    <form action="<?php echo home_url('/'); ?>" method="get" class="relative w-full">
+                        <input type="text" name="s" 
+                               placeholder="Cari wisata, produk, atau desa..." 
+                               class="w-full h-11 pl-12 pr-4 rounded-lg text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-green-300 shadow-sm bg-white border-none placeholder-gray-400">
+                        <i class="fas fa-search absolute left-4 top-3.5 text-gray-400 text-lg"></i>
+                    </form>
+                </div>
+
+                <!-- 3. MENU NAVIGASI (Kanan) -->
+                <nav class="flex items-center gap-6">
+                    <!-- Menu Desktop -->
+                    <div class="hidden md:flex items-center gap-6 font-medium text-sm">
+                        <a href="<?php echo home_url(); ?>" class="hover:text-green-100 transition">Beranda</a>
+                        <a href="<?php echo home_url('/wisata'); ?>" class="hover:text-green-100 transition">Wisata</a>
+                        <a href="<?php echo home_url('/produk'); ?>" class="hover:text-green-100 transition">Produk</a>
                     </div>
-
-                    <!-- Desktop Navigation (Hidden on Mobile) -->
-                    <nav class="hidden md:flex items-center gap-6">
-                        <a href="<?php echo home_url(); ?>" class="text-sm font-medium hover:text-emerald-100 transition">Beranda</a>
-                        <a href="<?php echo home_url('/wisata'); ?>" class="text-sm font-medium hover:text-emerald-100 transition">Wisata</a>
-                        <a href="<?php echo home_url('/produk'); ?>" class="text-sm font-medium hover:text-emerald-100 transition">Produk</a>
-                        <div class="h-4 w-px bg-emerald-500"></div>
-                        <a href="<?php echo home_url('/cart'); ?>" class="relative hover:text-emerald-100 transition">
-                            <i class="fas fa-shopping-cart text-lg"></i>
-                            <!-- Cart Count Logic Here -->
+                    
+                    <!-- Icons (Cart & Akun) -->
+                    <div class="flex items-center gap-4">
+                        <a href="<?php echo home_url('/cart'); ?>" class="relative hover:text-green-100 transition">
+                            <i class="fas fa-shopping-cart text-xl"></i>
+                            <!-- Cart Badge Logic -->
+                            <span id="header-cart-count" class="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold hidden">0</span>
                         </a>
+                        
                         <?php if (is_user_logged_in()): ?>
-                            <a href="<?php echo home_url('/akun-saya'); ?>" class="flex items-center gap-2 bg-emerald-700 px-3 py-1.5 rounded-full hover:bg-emerald-800 transition">
-                                <i class="fas fa-user-circle"></i>
-                                <span class="text-sm">Akun Saya</span>
+                            <a href="<?php echo home_url('/akun-saya'); ?>" class="flex items-center gap-2 bg-white/20 px-3 py-1.5 rounded-full hover:bg-white/30 transition backdrop-blur-sm">
+                                <i class="fas fa-user-circle text-lg"></i>
+                                <span class="text-sm font-medium hidden md:block">Akun Saya</span>
                             </a>
                         <?php else: ?>
-                             <a href="<?php echo home_url('/login'); ?>" class="text-sm font-bold bg-white text-emerald-600 px-4 py-1.5 rounded-lg hover:bg-gray-100 transition">Masuk</a>
+                             <a href="<?php echo home_url('/login'); ?>" class="flex items-center gap-2 hover:text-green-100 font-medium text-sm">
+                                <i class="fas fa-user text-lg"></i>
+                                <span class="hidden md:block">Masuk</span>
+                             </a>
                         <?php endif; ?>
-                    </nav>
-
-                    <!-- Mobile Icons (Hidden on Desktop) -->
-                    <div class="flex gap-4 md:hidden">
-                        <a href="<?php echo home_url('/cart'); ?>" class="relative">
-                            <i class="fas fa-shopping-cart text-lg"></i>
-                        </a>
-                        <button><i class="fas fa-bell text-lg"></i></button>
                     </div>
-                </div>
+                </nav>
+
+            </div>
+            
+            <!-- Mobile Search Bar (Muncul di bawah header utama pada mobile) -->
+            <div class="md:hidden px-4 pb-3">
+                <form action="<?php echo home_url('/'); ?>" method="get" class="relative w-full">
+                    <input type="text" name="s" 
+                           placeholder="Cari wisata, produk..." 
+                           class="w-full h-10 pl-10 pr-4 rounded-lg text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-green-300 shadow-sm bg-white border-none">
+                    <i class="fas fa-search absolute left-3.5 top-3 text-gray-400"></i>
+                </form>
             </div>
         </header>
 

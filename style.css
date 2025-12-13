@@ -4,75 +4,71 @@ Theme URI: https://bonang.my.id
 Author: Bonang Panji Nur
 Author URI: https://bonang.my.id
 Description: Tema eksperimental yang mengambil data dari Desa Wisata Core via REST API.
-Version: 1.0.0
+Version: 1.1.0
 Text Domain: dw-api-theme
 */
 
+/* --- VARIABLES & RESET --- */
+:root {
+    /* Update Warna agar sesuai referensi Sadesa (Hijau Lebih Cerah) */
+    --primary: #00BA61;        /* Hijau Sadesa */
+    --primary-dark: #00964E;
+    --primary-light: #E0F7EB;  /* Background tombol detail */
+    
+    --accent: #FFC107;         /* Kuning Rating */
+    --text-dark: #1F2937;
+    --text-grey: #6B7280;
+    --bg-body: #F9FAFB;
+    
+    --radius-l: 16px;
+    --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
-    background: #f0f2f5;
-    color: #333;
-    line-height: 1.6;
-    margin: 0;
-    padding: 0;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--bg-body);
+    color: var(--text-dark);
 }
 
-.container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px;
-}
-
-header {
-    background: #fff;
-    padding: 20px 0;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    margin-bottom: 30px;
-}
-
-h1.site-title {
-    margin: 0;
-    color: #2c3e50;
-}
-
-/* Grid Card untuk Data API */
-.api-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 20px;
-}
-
-.api-card {
-    background: #fff;
+/* Helper Classes untuk Button Detail (Sesuai Referensi) */
+.btn-detail-soft {
+    background-color: var(--primary-light);
+    color: var(--primary-dark);
+    font-weight: 600;
+    font-size: 0.75rem;
+    padding: 6px 16px;
     border-radius: 8px;
-    padding: 20px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-    transition: transform 0.2s;
+    transition: all 0.2s;
 }
 
-.api-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+.btn-detail-soft:hover {
+    background-color: var(--primary);
+    color: white;
 }
 
-.api-card h3 {
-    margin-top: 0;
-    color: #e67e22;
+/* Cart Icon Button */
+.btn-cart-circle {
+    background-color: var(--primary-light);
+    color: var(--primary-dark);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
 }
 
-.status-box {
-    background: #d4edda;
-    color: #155724;
-    padding: 10px;
-    border-radius: 4px;
-    margin-bottom: 20px;
-    font-size: 0.9em;
+.btn-cart-circle:hover {
+    background-color: var(--primary);
+    color: white;
 }
 
-.error-box {
-    background: #f8d7da;
-    color: #721c24;
-    padding: 20px;
-    border-radius: 4px;
-    text-align: center;
+/* Hide Scrollbar but allow scroll */
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
 }
