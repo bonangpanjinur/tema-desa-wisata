@@ -1,76 +1,94 @@
 <?php
-/**
- * Template Name: Halaman Lupa Password
- */
+/* Template Name: Halaman Lupa Password */
 
-// Jika user sudah login, tidak perlu reset password
-if ( is_user_logged_in() ) {
-    wp_redirect( home_url() );
-    exit;
-}
+$error = '';
+$success = '';
 
-// Handle Form Submission (PHP Standard)
-$message = '';
-$message_type = ''; // success or error
-
-if ( $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['user_login']) ) {
-    $user_login = sanitize_text_field( $_POST['user_login'] );
+if (isset($_POST['user_login']) && isset($_POST['dw_lostpass_nonce']) && wp_verify_nonce($_POST['dw_lostpass_nonce'], 'dw_lostpass_action')) {
     
-    // Fungsi bawaan WP untuk menghandle lost password
-    $errors = retrieve_password();
+    $user_login = sanitize_text_field($_POST['user_login']);
     
-    if ( is_wp_error( $errors ) ) {
-        $message = $errors->get_error_message();
-        $message_type = 'bg-red-500';
+    if (empty($user_login)) {
+        $error = 'Masukkan email atau username Anda.';
     } else {
-        $message = 'Silakan cek email Anda untuk tautan reset password.';
-        $message_type = 'bg-green-500';
+        // Menggunakan fungsi bawaan WP untuk menghandle reset password
+        $errors = retrieve_password();
+        
+        if (is_wp_error($errors)) {
+            $error = $errors->get_error_message();
+        } else {
+            $success = 'Link reset password telah dikirim ke email Anda. Silakan cek Inbox atau folder Spam.';
+        }
     }
 }
 
 get_header(); 
 ?>
 
-<div class="min-h-[80vh] bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-    <div class="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Reset Kata Sandi
-        </h2>
-        <p class="mt-2 text-center text-sm text-gray-600">
-            Masukkan email atau username Anda, kami akan mengirimkan tautan reset.
-        </p>
-    </div>
+<div class="min-h-screen bg-gray-100 flex items-center justify-center py-10 px-4">
+    
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden border border-gray-100 relative">
+        
+        <!-- Back Button Absolute -->
+        <a href="<?php echo home_url('/login'); ?>" class="absolute top-4 left-4 text-gray-400 hover:text-emerald-600 transition z-20">
+            <i class="fas fa-arrow-left text-xl"></i>
+        </a>
 
-    <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div class="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+        <!-- Header -->
+        <div class="pt-10 pb-6 px-6 text-center">
+            <div class="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center text-orange-500 mx-auto mb-4 border-4 border-white shadow-md">
+                <i class="fas fa-lock-open text-3xl"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-gray-800">Lupa Kata Sandi?</h2>
+            <p class="text-gray-500 text-sm mt-2 max-w-xs mx-auto">Jangan khawatir. Masukkan email Anda dan kami akan mengirimkan instruksi reset password.</p>
+        </div>
+
+        <div class="px-8 pb-10">
             
-            <?php if ( ! empty( $message ) ) : ?>
-                <div class="mb-4 p-4 rounded text-sm text-white <?php echo $message_type; ?>">
-                    <?php echo $message; ?>
+            <?php if ($error): ?>
+                <div class="bg-red-50 text-red-600 p-3 rounded-lg text-xs mb-6 flex items-start gap-2 border border-red-100">
+                    <i class="fas fa-exclamation-triangle mt-0.5"></i> 
+                    <span><?php echo $error; ?></span>
                 </div>
             <?php endif; ?>
 
-            <form method="post" class="space-y-6">
-                <div>
-                    <label for="user_login" class="block text-sm font-medium text-gray-700"> Username atau Email </label>
-                    <div class="mt-1">
-                        <input id="user_login" name="user_login" type="text" required class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm">
+            <?php if ($success): ?>
+                <div class="bg-green-50 text-green-700 p-5 rounded-xl text-center border border-green-100">
+                    <i class="fas fa-paper-plane text-4xl text-green-500 mb-3 block"></i>
+                    <h3 class="font-bold text-lg mb-1">Email Terkirim!</h3>
+                    <p class="text-sm opacity-90 mb-4"><?php echo $success; ?></p>
+                    <a href="<?php echo home_url('/login'); ?>" class="text-green-700 font-bold text-sm underline hover:text-green-800">Kembali ke Halaman Login</a>
+                </div>
+            <?php else: ?>
+
+                <form action="" method="post" class="space-y-5">
+                    
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1 ml-1">Email atau Username</label>
+                        <div class="relative group">
+                            <i class="fas fa-at absolute left-4 top-3.5 text-gray-400 group-focus-within:text-emerald-500 transition"></i>
+                            <input type="text" name="user_login" class="w-full bg-gray-50 border border-gray-200 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-emerald-500 focus:bg-white transition text-sm text-gray-700 placeholder-gray-400" placeholder="Masukkan email terdaftar" required>
+                        </div>
                     </div>
-                </div>
 
-                <div>
-                    <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
-                        Kirim Tautan Reset
-                    </button>
-                </div>
-            </form>
+                    <div class="pt-2">
+                        <?php wp_nonce_field('dw_lostpass_action', 'dw_lostpass_nonce'); ?>
+                        <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-200 hover:bg-emerald-700 hover:shadow-xl transition transform hover:-translate-y-0.5">
+                            Kirim Link Reset
+                        </button>
+                    </div>
 
-            <div class="mt-6 text-center">
-                <a href="<?php echo home_url('/login'); ?>" class="text-sm font-medium text-primary hover:text-green-500">
-                    <i class="fas fa-arrow-left mr-1"></i> Kembali ke Login
-                </a>
-            </div>
+                </form>
+
+            <?php endif; ?>
+
         </div>
+        
+        <!-- Footer Decoration -->
+        <div class="bg-gray-50 p-4 text-center border-t border-gray-100">
+            <p class="text-xs text-gray-400">Masih mengalami kendala? <a href="#" class="text-emerald-600 font-medium">Hubungi Admin</a></p>
+        </div>
+
     </div>
 </div>
 
