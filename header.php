@@ -39,7 +39,7 @@
                 <a href="<?php echo home_url(); ?>" class="flex items-center gap-2 hover:opacity-90 transition shrink-0">
                     <!-- Icon Daun -->
                     <i class="fas fa-leaf text-yellow-300 text-2xl"></i>
-                    <!-- Nama Brand -->
+                    <!-- Nama Brand (Dinamis dari Settings WordPress) -->
                     <span class="font-bold text-xl md:text-2xl tracking-tight"><?php bloginfo('name'); ?></span>
                 </a>
 
@@ -72,12 +72,15 @@
                     </a>
 
                     <!-- User Account -->
-                    <?php if (is_user_logged_in()): ?>
+                    <?php if (is_user_logged_in()): 
+                        $current_user = wp_get_current_user();
+                        $display_name = explode(' ', $current_user->display_name)[0]; // Ambil nama depan saja
+                    ?>
                         <a href="<?php echo home_url('/akun-saya'); ?>" class="flex items-center gap-2 bg-white/10 pl-2 pr-4 py-1.5 rounded-full hover:bg-white/20 transition backdrop-blur-sm border border-white/10">
-                            <div class="w-7 h-7 bg-yellow-100 rounded-full flex items-center justify-center text-yellow-600">
-                                <i class="fas fa-user text-xs"></i>
+                            <div class="w-7 h-7 bg-yellow-100 rounded-full flex items-center justify-center text-yellow-600 overflow-hidden">
+                                <?php echo get_avatar($current_user->ID, 28); ?>
                             </div>
-                            <span class="text-xs font-semibold hidden md:block max-w-[100px] truncate">Akun Saya</span>
+                            <span class="text-xs font-semibold hidden md:block max-w-[100px] truncate">Hai, <?php echo esc_html($display_name); ?></span>
                         </a>
                     <?php else: ?>
                          <a href="<?php echo home_url('/login'); ?>" class="hidden md:flex items-center gap-2 bg-white text-primary px-5 py-2 rounded-full text-sm font-bold shadow-md hover:bg-gray-100 hover:shadow-lg transition transform hover:-translate-y-0.5">
