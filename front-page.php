@@ -7,21 +7,21 @@
 
 get_header();
 
-// --- LOGIKA BANNER VIA REST API ---
-// Mengambil data banner dari plugin Desa Wisata Core via API
-// Endpoint ini biasanya menyediakan data: image_url, title, description, link
+// =================================================================================
+// 1. LOGIKA PENGAMBILAN DATA (DATA FETCHING)
+// =================================================================================
+
+// --- A. GET BANNERS ---
 $banners = [];
-$api_url = get_rest_url(null, 'dw-api/v1/public/banners');
+// Endpoint API Plugin Desa Wisata Core
+$banner_api_url = get_rest_url(null, 'dw-api/v1/public/banners'); 
 
-// Request ke API dengan timeout
-$response = wp_remote_get($api_url, array('timeout' => 10, 'sslverify' => false));
+$response = wp_remote_get($banner_api_url, array('timeout' => 5, 'sslverify' => false));
 
-// Validasi Response
 if (!is_wp_error($response) && wp_remote_retrieve_response_code($response) === 200) {
     $body = wp_remote_retrieve_body($response);
     $data = json_decode($body, true);
-    
-    // Sesuaikan dengan format response API (biasanya dibungkus 'data' atau langsung array)
+    // Handle format response standard { success: true, data: [...] } atau langsung array
     if (isset($data['data']) && is_array($data['data'])) {
         $banners = $data['data'];
     } elseif (is_array($data)) {
@@ -29,98 +29,89 @@ if (!is_wp_error($response) && wp_remote_retrieve_response_code($response) === 2
     }
 }
 
-// FALLBACK: Jika API kosong/gagal, gunakan data dummy agar layout tidak kosong/rusak
+// Fallback: Jika API kosong/error, gunakan data dummy agar layout tidak rusak
 if (empty($banners)) {
     $banners = [
         [
             'image_url' => 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80',
-            'title' => 'Jelajah Alam Desa',
+            'title'     => 'Jelajah Alam Desa',
             'description' => 'Nikmati diskon 20% untuk paket camping keluarga minggu ini.',
-            'link' => '#',
-            'label' => 'Promo Spesial'
+            'link'      => '#',
+            'label'     => 'Promo Spesial' // Field simulasi
         ],
         [
             'image_url' => 'https://images.unsplash.com/photo-1596423736798-75b43694f540?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80',
-            'title' => 'Kerajinan Bambu',
+            'title'     => 'Kerajinan Bambu',
             'description' => 'Karya otentik pengrajin lokal dengan kualitas ekspor.',
-            'link' => '#',
-            'label' => 'Produk Unggulan'
+            'link'      => '#',
+            'label'     => 'Produk Unggulan'
         ]
     ];
 }
 
-// Array warna gradient background untuk variasi visual banner
+// Variasi warna gradient background agar banner terlihat bervariasi
 $gradients = [
-    'from-blue-600 to-cyan-500',    // Biru - Cyan
-    'from-emerald-600 to-green-500', // Hijau
-    'from-purple-600 to-indigo-500', // Ungu
-    'from-orange-500 to-red-500',    // Merah-Oranye
-    'from-pink-600 to-rose-500'      // Pink
+    'from-blue-600 to-cyan-500',
+    'from-emerald-600 to-green-500',
+    'from-purple-600 to-indigo-500',
+    'from-orange-500 to-red-500',
+    'from-pink-600 to-rose-500'
 ];
+
 ?>
 
-<!-- HERO SECTION: Dynamic Banner Layout -->
+<!-- =================================================================================
+     2. TAMPILAN (VIEW)
+     ================================================================================= -->
+
+<!-- HERO SECTION: Desktop Layout Update -->
 <div class="mt-4 px-0 md:px-0">
     <!-- Banner Slider (Horizontal Scroll on Mobile, Grid on Desktop) -->
     <div class="flex md:grid md:grid-cols-2 overflow-x-auto gap-4 no-scrollbar snap-x md:snap-none pb-4 md:pb-0">
         
         <?php foreach ($banners as $index => $banner) : 
-            // 1. Persiapan Data (Handle kemungkinan key kosong)
-            $img = isset($banner['image_url']) ? $banner['image_url'] : '';
-            $title = isset($banner['title']) ? $banner['title'] : 'Info Desa';
-            $desc = isset($banner['description']) ? $banner['description'] : '';
-            $link = isset($banner['link']) ? $banner['link'] : '#';
+            // Sanitasi & Persiapan Variabel
+            $img   = !empty($banner['image_url']) ? $banner['image_url'] : 'https://via.placeholder.com/800x400?text=No+Image';
+            $title = !empty($banner['title']) ? $banner['title'] : 'Info Desa Wisata';
+            $desc  = !empty($banner['description']) ? $banner['description'] : '';
+            $link  = !empty($banner['link']) ? $banner['link'] : '#';
             
-            // 2. Styling Dinamis
-            // Pilih gradient berdasarkan urutan index (looping jika data banyak)
+            // Logika Tampilan
             $gradient_class = $gradients[$index % count($gradients)];
-            
-            // Label Badge (gunakan data jika ada, atau default)
+            // Jika tidak ada label dari API, buat otomatis berdasarkan urutan
             $label = isset($banner['label']) ? $banner['label'] : ($index == 0 ? 'Terbaru' : 'Info Desa');
             $label_bg = ($index % 2 == 0) ? 'bg-orange-500' : 'bg-blue-500';
-            
-            // Warna teks tombol menyesuaikan nuansa gradient (opsional, disederhanakan ke text-gray-800 agar kontras di tombol putih)
-            $btn_text_color = 'text-gray-800'; 
         ?>
         
         <!-- Banner Item -->
         <div class="min-w-[90%] md:min-w-0 h-48 md:h-80 bg-gradient-to-r <?php echo $gradient_class; ?> rounded-2xl relative snap-center shadow-lg overflow-hidden group">
+            <!-- Background Image -->
+            <img src="<?php echo esc_url($img); ?>" 
+                 class="absolute inset-0 w-full h-full object-cover mix-blend-overlay opacity-50 group-hover:scale-105 transition duration-700"
+                 alt="<?php echo esc_attr($title); ?>">
             
-            <!-- Background Image dengan Overlay -->
-            <img src="<?php echo esc_url($img); ?>" class="absolute inset-0 w-full h-full object-cover mix-blend-overlay opacity-50 group-hover:scale-105 transition duration-700" alt="<?php echo esc_attr($title); ?>">
-            
-            <!-- Content Text -->
-            <div class="absolute bottom-6 left-6 text-white max-w-xs">
-                <!-- Badge -->
+            <!-- Content Overlay -->
+            <div class="absolute bottom-6 left-6 text-white max-w-xs z-10">
                 <span class="text-xs font-bold <?php echo $label_bg; ?> px-3 py-1 rounded-full mb-3 inline-block shadow-sm">
                     <?php echo esc_html($label); ?>
                 </span>
                 
-                <!-- Title -->
                 <h2 class="font-bold text-2xl md:text-4xl mb-2 leading-tight drop-shadow-md">
                     <?php echo esc_html($title); ?>
                 </h2>
                 
-                <!-- Description -->
                 <?php if ($desc) : ?>
-                    <p class="text-sm md:text-base opacity-90 mb-4 line-clamp-2 drop-shadow-sm">
-                        <?php echo esc_html($desc); ?>
-                    </p>
+                <p class="text-sm md:text-base opacity-90 mb-4 line-clamp-2 drop-shadow-sm">
+                    <?php echo esc_html($desc); ?>
+                </p>
                 <?php endif; ?>
                 
-                <!-- Action Button -->
-                <?php if ($link && $link !== '#') : ?>
-                    <a href="<?php echo esc_url($link); ?>" class="inline-block bg-white <?php echo $btn_text_color; ?> px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-100 transition shadow-md">
-                        Lihat Detail
-                    </a>
-                <?php else: ?>
-                     <button class="bg-white <?php echo $btn_text_color; ?> px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-100 transition shadow-md">
-                        Lihat Detail
-                     </button>
-                <?php endif; ?>
+                <a href="<?php echo esc_url($link); ?>" class="inline-block bg-white text-gray-800 px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-100 transition shadow-md">
+                    Lihat Detail
+                </a>
             </div>
         </div>
-
+        
         <?php endforeach; ?>
 
     </div>
@@ -177,9 +168,10 @@ $gradients = [
         
         if ($query_wisata->have_posts()) :
             while ($query_wisata->have_posts()) : $query_wisata->the_post();
+                // Mengambil meta data (pastikan key meta sesuai dengan plugin backend)
                 $harga = get_post_meta(get_the_ID(), 'harga_tiket', true) ?: 0;
                 $lokasi = get_post_meta(get_the_ID(), 'lokasi', true) ?: 'Desa Wisata';
-                $rating = 4.8; 
+                $rating = 4.8; // Hardcode sementara atau ambil dari meta reviews
                 $image_url = has_post_thumbnail() ? get_the_post_thumbnail_url(get_the_ID(), 'medium_large') : 'https://via.placeholder.com/500x300?text=No+Image';
         ?>
             <!-- Wisata Card -->
@@ -196,7 +188,7 @@ $gradients = [
                     <div class="mt-auto flex justify-between items-center border-t border-dashed border-gray-100 pt-3">
                         <div class="flex flex-col">
                             <span class="text-[10px] text-gray-400">Tiket Masuk</span>
-                            <span class="text-emerald-600 font-bold text-sm">Rp <?php echo number_format($harga, 0, ',', '.'); ?></span>
+                            <span class="text-emerald-600 font-bold text-sm">Rp <?php echo number_format((float)$harga, 0, ',', '.'); ?></span>
                         </div>
                         <a href="<?php the_permalink(); ?>" class="text-emerald-600 bg-emerald-50 hover:bg-emerald-600 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition">Detail</a>
                     </div>
@@ -235,6 +227,7 @@ $gradients = [
         
         if ($query_produk->have_posts()) :
             while ($query_produk->have_posts()) : $query_produk->the_post();
+                // Mengambil meta data
                 $harga = get_post_meta(get_the_ID(), 'harga', true) ?: 0;
                 $penjual = get_post_meta(get_the_ID(), 'nama_toko', true) ?: 'UMKM Desa';
                 $terjual = get_post_meta(get_the_ID(), 'terjual', true) ?: 0;
@@ -254,7 +247,7 @@ $gradients = [
                 </a>
                 <div class="mt-auto flex justify-between items-end">
                     <div class="flex flex-col">
-                        <span class="text-emerald-700 font-bold text-sm">Rp <?php echo number_format($harga, 0, ',', '.'); ?></span>
+                        <span class="text-emerald-700 font-bold text-sm">Rp <?php echo number_format((float)$harga, 0, ',', '.'); ?></span>
                         <span class="text-[10px] text-gray-400">Terjual <?php echo $terjual; ?>+</span>
                     </div>
                     <button class="bg-emerald-50 text-emerald-600 w-8 h-8 rounded-full flex items-center justify-center hover:bg-emerald-600 hover:text-white transition shadow-sm border border-emerald-100">
