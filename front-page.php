@@ -11,40 +11,42 @@ get_header();
 // 1. LOGIKA PENGAMBILAN DATA (DATA FETCHING)
 // =================================================================================
 
-// --- A. GET BANNERS ---
+// --- A. GET BANNERS (VIA DATABASE LANGSUNG) ---
+// Menggunakan $wpdb lebih cepat & stabil daripada menembak API sendiri (wp_remote_get)
+// yang sering gagal karena masalah Loopback/Timeout di server lokal/hosting.
+
+global $wpdb;
 $banners = [];
-// Endpoint API Plugin Desa Wisata Core
-$banner_api_url = get_rest_url(null, 'dw-api/v1/public/banners'); 
+$table_banner = $wpdb->prefix . 'dw_banners';
 
-$response = wp_remote_get($banner_api_url, array('timeout' => 5, 'sslverify' => false));
-
-if (!is_wp_error($response) && wp_remote_retrieve_response_code($response) === 200) {
-    $body = wp_remote_retrieve_body($response);
-    $data = json_decode($body, true);
-    // Handle format response standard { success: true, data: [...] } atau langsung array
-    if (isset($data['data']) && is_array($data['data'])) {
-        $banners = $data['data'];
-    } elseif (is_array($data)) {
-        $banners = $data;
+// 1. Cek apakah tabel plugin 'dw_banners' benar-benar ada di database
+if ($wpdb->get_var("SHOW TABLES LIKE '$table_banner'") === $table_banner) {
+    
+    // 2. Query data: Ambil banner yang Aktif (is_active = 1), urutkan terbaru
+    // Hasil dikembalikan sebagai Array Asosiatif (ARRAY_A) agar kompatibel dengan kode tampilan
+    $results = $wpdb->get_results("SELECT * FROM $table_banner WHERE is_active = 1 ORDER BY id DESC", ARRAY_A);
+    
+    if (!empty($results)) {
+        $banners = $results;
     }
 }
 
-// Fallback: Jika API kosong/error, gunakan data dummy agar layout tidak rusak
+// Fallback: Jika Database Kosong (Belum upload banner), gunakan data dummy
 if (empty($banners)) {
     $banners = [
         [
             'image_url' => 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80',
             'title'     => 'Jelajah Alam Desa',
-            'description' => 'Nikmati diskon 20% untuk paket camping keluarga minggu ini.',
+            'description' => 'Data belum diisi. Silakan upload Banner di Menu Desa Wisata > Banner.',
             'link'      => '#',
-            'label'     => 'Promo Spesial' // Field simulasi
+            'label'     => 'Contoh Data'
         ],
         [
             'image_url' => 'https://images.unsplash.com/photo-1596423736798-75b43694f540?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80',
             'title'     => 'Kerajinan Bambu',
-            'description' => 'Karya otentik pengrajin lokal dengan kualitas ekspor.',
+            'description' => 'Ini adalah tampilan contoh jika belum ada banner aktif.',
             'link'      => '#',
-            'label'     => 'Produk Unggulan'
+            'label'     => 'Contoh Data'
         ]
     ];
 }
