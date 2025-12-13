@@ -1,79 +1,74 @@
 <?php get_header(); ?>
 
-<div style="padding: 10px 20px; max-width: 1200px; margin: 0 auto;">
-    <div class="section-header" style="padding: 10px 0 15px 0;">
-        <div class="section-title">
-            <h3>Jelajahi <span>Wisata Alam</span></h3>
-        </div>
-    </div>
+<div class="px-4 mt-4 mb-2">
+    <h2 class="font-bold text-xl text-gray-800">Jelajah Wisata</h2>
+    <p class="text-xs text-gray-500">Temukan surga tersembunyi di desa kami</p>
+</div>
 
-    <!-- Filter Wisata -->
-    <div class="explore-filters">
-        <a href="<?php echo get_post_type_archive_link('dw_wisata'); ?>" class="filter-pill <?php echo !isset($_GET['kategori']) ? 'active' : ''; ?>">Semua</a>
-        <?php
-        $terms = get_terms( array( 'taxonomy' => 'kategori_wisata', 'hide_empty' => true ) );
-        if ( ! empty( $terms ) && ! is_wp_error( $terms ) ) {
-            foreach ( $terms as $term ) {
-                $is_active = ( isset($_GET['kategori']) && $_GET['kategori'] == $term->slug ) ? 'active' : '';
-                $term_link = add_query_arg( 'kategori', $term->slug, get_post_type_archive_link('dw_wisata') );
-                echo '<a href="' . esc_url( $term_link ) . '" class="filter-pill ' . esc_attr( $is_active ) . '">' . esc_html( $term->name ) . '</a>';
-            }
-        }
-        ?>
-    </div>
-    
-    <!-- List Wisata (Vertical) -->
-    <div style="margin-top: 20px;">
-    <?php 
-    $paged = ( get_query_var( 'paged' ) ) ? get_query_var( 'paged' ) : 1;
-    $args = array(
-        'post_type' => 'dw_wisata',
-        'posts_per_page' => 10,
-        'paged' => $paged,
-        'post_status' => 'publish'
-    );
-    if ( isset( $_GET['kategori'] ) && !empty( $_GET['kategori'] ) ) {
-        $args['tax_query'] = array( array(
-            'taxonomy' => 'kategori_wisata',
-            'field'    => 'slug',
-            'terms'    => sanitize_text_field( $_GET['kategori'] ),
-        ) );
-    }
-    $query = new WP_Query( $args );
-
-    if ( $query->have_posts() ) : 
-        while ( $query->have_posts() ) : $query->the_post(); 
-            $harga = get_post_meta( get_the_ID(), '_dw_harga_tiket', true );
-            $lokasi = get_post_meta( get_the_ID(), '_dw_kabupaten', true );
-    ?>
-    <div class="card-wisata-full">
-        <a href="<?php the_permalink(); ?>">
-            <?php if ( has_post_thumbnail() ) { the_post_thumbnail('large'); } else { echo '<img src="https://via.placeholder.com/600x300?text=Wisata" />'; } ?>
-            <div class="card-wisata-content">
-                <div class="card-wisata-title"><?php the_title(); ?></div>
-                <div class="card-wisata-meta">
-                    <span><i class="fas fa-map-marker-alt"></i> <?php echo esc_html($lokasi); ?></span>
-                    <span><i class="fas fa-ticket-alt"></i> <?php echo number_format((float)$harga, 0, ',', '.'); ?></span>
-                </div>
-                <div class="btn-track" style="display:inline-block; border-radius:8px;">Lihat Detail</div>
-            </div>
-        </a>
-    </div>
-    <?php endwhile; wp_reset_postdata(); else : ?>
-        <p style="text-align:center; color:#777; padding:20px;">Wisata belum tersedia.</p>
-    <?php endif; ?>
-    </div>
-
-    <!-- Pagination -->
-    <div style="padding: 20px 0; text-align: center;">
-        <?php echo paginate_links( array(
-            'total' => $query->max_num_pages,
-            'current' => $paged,
-            'prev_text' => '<i class="fas fa-chevron-left"></i>',
-            'next_text' => '<i class="fas fa-chevron-right"></i>',
-            'type' => 'list'
-        ) ); ?>
+<!-- Filter Chips (Static Prototype) -->
+<div class="px-4 mb-4 overflow-x-auto no-scrollbar">
+    <div class="flex gap-2">
+        <button class="bg-emerald-600 text-white px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap">Semua</button>
+        <button class="bg-white text-gray-600 border border-gray-200 px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap">Alam</button>
+        <button class="bg-white text-gray-600 border border-gray-200 px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap">Budaya</button>
+        <button class="bg-white text-gray-600 border border-gray-200 px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap">Kuliner</button>
     </div>
 </div>
+
+<div class="px-4 pb-6 space-y-4">
+    <?php if ( have_posts() ) : ?>
+        <?php while ( have_posts() ) : the_post(); 
+            $harga = get_post_meta(get_the_ID(), 'harga_tiket', true) ?: 0;
+            $lokasi = get_post_meta(get_the_ID(), 'lokasi', true) ?: 'Desa Wisata';
+            $rating = 4.8; // Placeholder
+            $image_url = has_post_thumbnail() ? get_the_post_thumbnail_url(get_the_ID(), 'large') : 'https://via.placeholder.com/600x400?text=No+Image';
+        ?>
+            <!-- Wisata Card (List Style) -->
+            <a href="<?php the_permalink(); ?>" class="block bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden group">
+                <div class="h-40 bg-gray-200 relative overflow-hidden">
+                    <img src="<?php echo esc_url($image_url); ?>" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
+                    <div class="absolute top-3 right-3 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm">
+                        <i class="fas fa-star text-yellow-400"></i> <?php echo $rating; ?>
+                    </div>
+                </div>
+                <div class="p-4">
+                    <div class="flex justify-between items-start mb-1">
+                        <h3 class="font-bold text-gray-800 text-lg leading-tight"><?php the_title(); ?></h3>
+                    </div>
+                    <p class="text-xs text-gray-500 mb-3 flex items-center gap-1">
+                        <i class="fas fa-map-marker-alt text-red-500"></i> <?php echo esc_html($lokasi); ?>
+                    </p>
+                    <div class="flex justify-between items-center border-t border-dashed border-gray-100 pt-3">
+                        <div>
+                            <p class="text-[10px] text-gray-400">Mulai dari</p>
+                            <p class="text-emerald-600 font-bold text-base">Rp <?php echo number_format($harga, 0, ',', '.'); ?></p>
+                        </div>
+                        <span class="bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg text-xs font-medium group-hover:bg-emerald-600 group-hover:text-white transition">Lihat Detail</span>
+                    </div>
+                </div>
+            </a>
+        <?php endwhile; ?>
+        
+        <!-- Pagination -->
+        <div class="flex justify-center mt-6">
+            <?php
+            the_posts_pagination(array(
+                'prev_text' => '<i class="fas fa-chevron-left"></i>',
+                'next_text' => '<i class="fas fa-chevron-right"></i>',
+                'class'     => 'flex gap-2 text-sm'
+            ));
+            ?>
+        </div>
+
+    <?php else : ?>
+        <div class="text-center py-10 bg-white rounded-xl">
+            <i class="fas fa-map-signs text-4xl text-gray-300 mb-3"></i>
+            <p class="text-gray-500">Belum ada wisata yang ditemukan.</p>
+        </div>
+    <?php endif; ?>
+</div>
+
+<!-- Spacer agar tidak tertutup nav bar -->
+<div class="h-6"></div>
 
 <?php get_footer(); ?>

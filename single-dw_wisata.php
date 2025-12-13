@@ -1,152 +1,100 @@
-<?php
-/**
- * Template Name: Single Wisata
- * Description: Menampilkan detail lengkap destinasi wisata.
- */
-
-get_header(); ?>
+<?php get_header(); ?>
 
 <?php while ( have_posts() ) : the_post(); 
-    $post_id = get_the_ID();
-    
-    // Meta Data dari Plugin
-    $alamat = get_post_meta($post_id, '_dw_alamat', true);
-    $harga_tiket = get_post_meta($post_id, '_dw_harga_tiket', true);
-    $jam_buka = get_post_meta($post_id, '_dw_jam_buka', true);
-    $kontak = get_post_meta($post_id, '_dw_kontak', true);
-    $fasilitas = get_post_meta($post_id, '_dw_fasilitas', true); // Array
-    $maps_url = get_post_meta($post_id, '_dw_url_google_maps', true);
-    $gallery_ids = get_post_meta($post_id, '_dw_galeri_foto', true);
-    $video_url = get_post_meta($post_id, '_dw_video_url', true);
-    
-    $thumb_url = has_post_thumbnail() ? get_the_post_thumbnail_url(null, 'full') : 'https://via.placeholder.com/1200x600';
+    $harga = get_post_meta(get_the_ID(), 'harga_tiket', true) ?: 0;
+    $lokasi = get_post_meta(get_the_ID(), 'lokasi', true) ?: 'Desa Wisata';
+    $durasi = get_post_meta(get_the_ID(), 'durasi', true) ?: 'Seharian';
+    $image_url = has_post_thumbnail() ? get_the_post_thumbnail_url(get_the_ID(), 'full') : 'https://via.placeholder.com/800x600?text=No+Image';
 ?>
 
 <!-- Hero Image -->
-<div class="relative h-[400px] md:h-[500px] w-full bg-gray-900">
-    <img src="<?php echo esc_url($thumb_url); ?>" class="w-full h-full object-cover opacity-60">
-    <div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
-    <div class="absolute bottom-0 left-0 right-0 p-6 md:p-12 container mx-auto">
-        <span class="bg-primary text-white text-xs font-bold px-3 py-1 rounded-full mb-4 inline-block">
-            <?php echo get_the_term_list($post_id, 'kategori_wisata', '', ', ', ''); ?>
-        </span>
-        <h1 class="text-3xl md:text-5xl font-bold text-white mb-2"><?php the_title(); ?></h1>
-        <?php if($alamat): ?>
-            <p class="text-gray-300 flex items-center gap-2 text-sm md:text-base">
-                <i class="fas fa-map-marker-alt text-red-400"></i> <?php echo esc_html($alamat); ?>
-            </p>
-        <?php endif; ?>
-    </div>
-</div>
-
-<div class="bg-white py-12 min-h-screen">
-    <div class="container mx-auto px-4">
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
-            
-            <!-- Konten Utama -->
-            <div class="lg:col-span-2">
-                
-                <!-- Deskripsi -->
-                <div class="mb-10">
-                    <h2 class="text-2xl font-bold text-gray-800 mb-4">Tentang Destinasi</h2>
-                    <div class="prose max-w-none text-gray-600 leading-relaxed">
-                        <?php the_content(); ?>
-                    </div>
-                </div>
-
-                <!-- Galeri Foto -->
-                <?php if ( ! empty( $gallery_ids ) ) : $ids = explode(',', $gallery_ids); ?>
-                <div class="mb-10">
-                    <h2 class="text-2xl font-bold text-gray-800 mb-6">Galeri Foto</h2>
-                    <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        <?php foreach($ids as $img_id): $img_url = wp_get_attachment_image_url($img_id, 'large'); ?>
-                            <a href="<?php echo esc_url($img_url); ?>" class="block h-40 rounded-lg overflow-hidden hover:opacity-90 transition bg-gray-100">
-                                <img src="<?php echo esc_url($img_url); ?>" class="w-full h-full object-cover">
-                            </a>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-                <?php endif; ?>
-
-                <!-- Fasilitas -->
-                <?php if ( ! empty( $fasilitas ) && is_array($fasilitas) ) : ?>
-                <div class="mb-10">
-                    <h2 class="text-2xl font-bold text-gray-800 mb-6">Fasilitas Tersedia</h2>
-                    <div class="grid grid-cols-2 gap-4">
-                        <?php foreach($fasilitas as $fas): ?>
-                            <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
-                                <i class="fas fa-check-circle text-green-500"></i>
-                                <span class="text-gray-700 font-medium"><?php echo esc_html($fas); ?></span>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-                <?php endif; ?>
-
-            </div>
-
-            <!-- Sidebar Info -->
-            <div class="lg:col-span-1">
-                <div class="sticky top-24 space-y-6">
-                    
-                    <!-- Info Box -->
-                    <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
-                        <h3 class="text-xl font-bold text-gray-800 mb-6 border-b pb-4">Informasi Kunjungan</h3>
-                        
-                        <div class="space-y-5">
-                            <div>
-                                <span class="block text-xs text-gray-400 uppercase tracking-wider mb-1">Harga Tiket</span>
-                                <div class="flex items-center gap-3 text-gray-700">
-                                    <i class="fas fa-ticket-alt text-primary w-6"></i>
-                                    <span class="font-bold text-lg"><?php echo $harga_tiket ? esc_html($harga_tiket) : 'Gratis'; ?></span>
-                                </div>
-                            </div>
-
-                            <div>
-                                <span class="block text-xs text-gray-400 uppercase tracking-wider mb-1">Jam Operasional</span>
-                                <div class="flex items-center gap-3 text-gray-700">
-                                    <i class="far fa-clock text-primary w-6"></i>
-                                    <span><?php echo $jam_buka ? esc_html($jam_buka) : 'Setiap Hari'; ?></span>
-                                </div>
-                            </div>
-
-                            <?php if($kontak): ?>
-                            <div>
-                                <span class="block text-xs text-gray-400 uppercase tracking-wider mb-1">Kontak Informasi</span>
-                                <div class="flex items-center gap-3 text-gray-700">
-                                    <i class="fas fa-phone-alt text-primary w-6"></i>
-                                    <span><?php echo esc_html($kontak); ?></span>
-                                </div>
-                            </div>
-                            <?php endif; ?>
-                        </div>
-
-                        <?php if($maps_url): ?>
-                        <div class="mt-8">
-                            <a href="<?php echo esc_url($maps_url); ?>" target="_blank" class="block w-full bg-primary text-white text-center font-bold py-3 rounded-lg hover:bg-secondary transition shadow-md hover:shadow-lg">
-                                <i class="fas fa-location-arrow mr-2"></i> Petunjuk Arah
-                            </a>
-                        </div>
-                        <?php endif; ?>
-                    </div>
-
-                    <!-- Share -->
-                    <div class="bg-gray-50 p-6 rounded-xl border border-gray-200 text-center">
-                        <p class="text-sm text-gray-500 mb-4">Bagikan destinasi ini</p>
-                        <div class="flex justify-center gap-4">
-                            <button class="w-10 h-10 rounded-full bg-blue-600 text-white hover:opacity-90"><i class="fab fa-facebook-f"></i></button>
-                            <button class="w-10 h-10 rounded-full bg-green-500 text-white hover:opacity-90"><i class="fab fa-whatsapp"></i></button>
-                            <button class="w-10 h-10 rounded-full bg-sky-500 text-white hover:opacity-90"><i class="fab fa-twitter"></i></button>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
-
+<div class="relative h-64 w-full">
+    <img src="<?php echo esc_url($image_url); ?>" class="w-full h-full object-cover">
+    <div class="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
+    <a href="javascript:history.back()" class="absolute top-4 left-4 bg-white/20 backdrop-blur-md text-white w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/40 transition">
+        <i class="fas fa-arrow-left"></i>
+    </a>
+    <div class="absolute bottom-4 left-4 right-4 text-white">
+        <span class="bg-emerald-500 text-[10px] font-bold px-2 py-0.5 rounded mb-2 inline-block">Wisata</span>
+        <h1 class="text-2xl font-bold leading-tight mb-1"><?php the_title(); ?></h1>
+        <div class="flex items-center gap-4 text-xs text-gray-200">
+            <span class="flex items-center gap-1"><i class="fas fa-map-marker-alt text-red-400"></i> <?php echo esc_html($lokasi); ?></span>
+            <span class="flex items-center gap-1"><i class="fas fa-star text-yellow-400"></i> 4.8 (120 Review)</span>
         </div>
     </div>
 </div>
 
+<!-- Content Container -->
+<div class="bg-gray-50 -mt-4 rounded-t-3xl relative z-10 px-5 pt-6 pb-24 min-h-[500px]">
+    
+    <!-- Info Grid -->
+    <div class="flex justify-between bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6">
+        <div class="text-center">
+            <div class="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 mx-auto mb-1">
+                <i class="fas fa-clock"></i>
+            </div>
+            <p class="text-[10px] text-gray-500">Durasi</p>
+            <p class="text-xs font-bold text-gray-800"><?php echo esc_html($durasi); ?></p>
+        </div>
+        <div class="text-center border-l border-gray-100 pl-4">
+            <div class="w-10 h-10 bg-orange-50 rounded-full flex items-center justify-center text-orange-600 mx-auto mb-1">
+                <i class="fas fa-user-friends"></i>
+            </div>
+            <p class="text-[10px] text-gray-500">Kapasitas</p>
+            <p class="text-xs font-bold text-gray-800">50 Pax</p>
+        </div>
+        <div class="text-center border-l border-gray-100 pl-4">
+            <div class="w-10 h-10 bg-green-50 rounded-full flex items-center justify-center text-green-600 mx-auto mb-1">
+                <i class="fas fa-ticket-alt"></i>
+            </div>
+            <p class="text-[10px] text-gray-500">Tiket</p>
+            <p class="text-xs font-bold text-gray-800">Tersedia</p>
+        </div>
+    </div>
+
+    <!-- Deskripsi -->
+    <div class="mb-6">
+        <h3 class="font-bold text-gray-800 mb-2">Deskripsi</h3>
+        <div class="prose prose-sm text-gray-600 leading-relaxed text-sm">
+            <?php the_content(); ?>
+        </div>
+    </div>
+
+    <!-- Fasilitas (Hardcoded Example) -->
+    <div class="mb-6">
+        <h3 class="font-bold text-gray-800 mb-3">Fasilitas</h3>
+        <div class="grid grid-cols-2 gap-3">
+            <div class="flex items-center gap-2 text-sm text-gray-600">
+                <i class="fas fa-check-circle text-emerald-500"></i> Parkir Luas
+            </div>
+            <div class="flex items-center gap-2 text-sm text-gray-600">
+                <i class="fas fa-check-circle text-emerald-500"></i> Toilet Bersih
+            </div>
+            <div class="flex items-center gap-2 text-sm text-gray-600">
+                <i class="fas fa-check-circle text-emerald-500"></i> Warung Makan
+            </div>
+            <div class="flex items-center gap-2 text-sm text-gray-600">
+                <i class="fas fa-check-circle text-emerald-500"></i> Spot Foto
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Floating Action Bar (Above Footer Nav) -->
+<div class="fixed bottom-[70px] left-0 right-0 sm:max-w-md sm:mx-auto px-4 z-30 pointer-events-none">
+    <div class="bg-white rounded-xl shadow-lg border border-gray-100 p-4 flex items-center justify-between pointer-events-auto">
+        <div>
+            <p class="text-[10px] text-gray-500">Harga Tiket</p>
+            <p class="text-emerald-600 font-bold text-lg">Rp <?php echo number_format($harga, 0, ',', '.'); ?></p>
+        </div>
+        <button class="bg-emerald-600 text-white px-6 py-2.5 rounded-lg font-bold text-sm hover:bg-emerald-700 transition shadow-md shadow-emerald-200">
+            Booking Sekarang
+        </button>
+    </div>
+</div>
+
 <?php endwhile; ?>
+
+<div class="h-10"></div> <!-- Extra spacer for floating bar -->
 
 <?php get_footer(); ?>
