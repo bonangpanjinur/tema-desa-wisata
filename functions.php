@@ -72,24 +72,7 @@ function dw_contact_admin_button() {
 }
 add_shortcode('dw_contact_admin', 'dw_contact_admin_button');
 
-// 6. Redirect Login Berdasarkan Role
-function dw_login_redirect( $redirect_to, $request, $user ) {
-    if ( isset( $user->roles ) && is_array( $user->roles ) ) {
-        if ( in_array( 'administrator', $user->roles ) ) {
-            return admin_url();
-        } elseif ( in_array( 'pengelola_desa', $user->roles ) ) {
-            return site_url( '/dashboard-desa' );
-        } elseif ( in_array( 'pedagang', $user->roles ) ) {
-            return site_url( '/dashboard-toko' );
-        } else {
-            return site_url( '/akun-saya' );
-        }
-    }
-    return $redirect_to;
-}
-add_filter( 'login_redirect', 'dw_login_redirect', 10, 3 );
-
-// 7. Menambahkan Class pada Body untuk styling spesifik
+// 6. Menambahkan Class pada Body untuk styling spesifik
 function dw_body_classes( $classes ) {
     if ( dw_is_mobile() ) {
         $classes[] = 'is-mobile-device';
