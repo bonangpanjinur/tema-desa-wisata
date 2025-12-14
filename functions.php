@@ -79,8 +79,9 @@ if ( ! function_exists( 'dw_get_product_price' ) ) {
 
 /**
  * Redirect User setelah Login berdasarkan Role
+ * [UPDATE] Nama fungsi diganti menjadi tema_dw_login_redirect agar tidak bentrok dengan plugin
  */
-function dw_login_redirect($redirect_to, $request, $user) {
+function tema_dw_login_redirect($redirect_to, $request, $user) {
     if (isset($user->roles) && is_array($user->roles)) {
         if (in_array('administrator', $user->roles)) {
             return admin_url();
@@ -94,17 +95,19 @@ function dw_login_redirect($redirect_to, $request, $user) {
     }
     return $redirect_to;
 }
-add_filter('login_redirect', 'dw_login_redirect', 10, 3);
+// Menggunakan Priority 20 agar dijalankan setelah fungsi plugin (jika ada)
+add_filter('login_redirect', 'tema_dw_login_redirect', 20, 3);
 
 /**
  * Start Session jika belum ada (Untuk Cart)
+ * [UPDATE] Nama fungsi diganti menjadi tema_dw_start_session agar tidak bentrok
  */
-function dw_start_session() {
+function tema_dw_start_session() {
     if (!session_id()) {
         session_start();
     }
 }
-add_action('init', 'dw_start_session', 1);
+add_action('init', 'tema_dw_start_session', 1);
 
 /**
  * Mendapatkan item di keranjang (Helper sederhana)
