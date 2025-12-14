@@ -4,338 +4,140 @@
  */
 get_header();
 
-// =================================================================================
-// 1. DATA FETCHING (DATABASE & WP_QUERY)
-// =================================================================================
-
-$debug_messages = [];
-
-// --- A. Banner Data (Dari Tabel Database Plugin) ---
 global $wpdb;
-$table_banner = $wpdb->prefix . 'dw_banners';
+
+// === 1. GET BANNER FROM DB ===
+$table_banner = $wpdb->prefix . 'dw_banner';
 $banners = [];
-
-// Cek apakah tabel ada di database
-if ($wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table_banner)) == $table_banner) {
-    // Ambil banner yang statusnya active
-    $db_banners = $wpdb->get_results("SELECT * FROM $table_banner WHERE status = 'active' ORDER BY id DESC LIMIT 5");
-    
-    if (!empty($db_banners)) {
-        foreach ($db_banners as $b) {
-            $banners[] = [
-                'gambar'      => !empty($b->image_url) ? $b->image_url : get_template_directory_uri() . '/assets/img/banner-placeholder.jpg',
-                'judul'       => $b->title,
-                'label'       => 'Info Desa', 
-                'label_color' => 'bg-blue-600',
-                'link'        => !empty($b->link) ? $b->link : '#'
-            ];
-        }
-        // Set banner pertama jadi 'Terbaru' (Styling)
-        if (isset($banners[0])) {
-            $banners[0]['label'] = 'Terbaru';
-            $banners[0]['label_color'] = 'bg-orange-500';
-        }
-    }
+// Cek tabel ada dulu agar tidak error fatal jika plugin mati
+if($wpdb->get_var("SHOW TABLES LIKE '$table_banner'") == $table_banner) {
+    $banners = $wpdb->get_results("SELECT * FROM $table_banner WHERE status = 'aktif' ORDER BY prioritas ASC LIMIT 5");
 }
 
-// Fallback Banner (Jika Database Kosong / Tabel Tidak Ada)
-if (empty($banners)) {
+// Fallback Banner
+if(empty($banners)) {
     $banners = [
-        [
-            'gambar' => 'https://images.unsplash.com/photo-1596423736798-75b43694f540?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80',
-            'judul' => 'Pesona Alam Desa', 'label' => 'Terbaru', 'label_color' => 'bg-orange-500', 'link' => '#'
-        ],
-        [
-            'gambar' => 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80',
-            'judul' => 'Kuliner Tradisional', 'label' => 'Info Desa', 'label_color' => 'bg-blue-500', 'link' => '#'
-        ]
+        (object)['gambar' => 'https://via.placeholder.com/1200x500', 'judul' => 'Selamat Datang di Desa Wisata', 'link' => '#']
     ];
-}
-
-// --- FUNGSI HELPER KATEGORI ---
-function get_first_category_name($post_id, $post_type) {
-    // Tentukan nama taxonomy berdasarkan post type
-    $taxonomy = 'category'; // Default WP
-    if ($post_type === 'dw_wisata') {
-        $taxonomy = 'dw_kategori_wisata'; // Sesuaikan dengan register_taxonomy di plugin
-    } elseif ($post_type === 'dw_produk') {
-        $taxonomy = 'dw_kategori_produk'; // Sesuaikan dengan register_taxonomy di plugin
-    }
-
-    // Cek apakah taxonomy tersebut ada, jika tidak, cari taxonomy pertama yang tersedia untuk post type ini
-    if (!taxonomy_exists($taxonomy)) {
-        $taxonomies = get_object_taxonomies($post_type);
-        if (!empty($taxonomies)) {
-            $taxonomy = $taxonomies[0];
-        }
-    }
-
-    $terms = get_the_terms($post_id, $taxonomy);
-    if (!empty($terms) && !is_wp_error($terms)) {
-        return $terms[0]->name;
-    }
-    
-    // Fallback jika tidak ada kategori
-    return ($post_type === 'dw_wisata') ? 'Wisata' : 'Produk';
-}
-
-// --- B. Wisata Data ---
-$list_wisata = [];
-$args_wisata = array(
-    'post_type'      => 'dw_wisata',
-    'posts_per_page' => 4,
-    'orderby'        => 'date',
-    'order'          => 'DESC',
-    'post_status'    => 'publish'
-);
-$query_wisata = new WP_Query($args_wisata);
-
-if ($query_wisata->have_posts()) {
-    while ($query_wisata->have_posts()) {
-        $query_wisata->the_post();
-        
-        // Ambil Gambar dengan Fallback
-        $thumb_url = get_the_post_thumbnail_url(get_the_ID(), 'medium_large');
-        if (empty($thumb_url)) {
-            $thumb_url = 'https://via.placeholder.com/400x300?text=No+Image'; // Gambar placeholder default
-        }
-
-        $list_wisata[] = [
-            'id'          => get_the_ID(),
-            'nama_wisata' => get_the_title(),
-            'lokasi'      => get_post_meta(get_the_ID(), 'dw_lokasi', true) ?: 'Desa Wisata',
-            'harga_tiket' => get_post_meta(get_the_ID(), 'dw_harga_tiket', true) ?: 0,
-            'rating'      => 4.8, 
-            'thumbnail'   => $thumb_url,
-            'slug'        => get_post_field('post_name'),
-            'kategori'    => get_first_category_name(get_the_ID(), 'dw_wisata') // Dinamis
-        ];
-    }
-    wp_reset_postdata();
-}
-
-// --- C. Produk Data ---
-$list_produk = [];
-$args_produk = array(
-    'post_type'      => 'dw_produk',
-    'posts_per_page' => 10,
-    'orderby'        => 'date',
-    'order'          => 'DESC',
-    'post_status'    => 'publish'
-);
-$query_produk = new WP_Query($args_produk);
-
-if ($query_produk->have_posts()) {
-    while ($query_produk->have_posts()) {
-        $query_produk->the_post();
-        
-        $seller_id = get_post_field('post_author');
-        $nama_toko = get_the_author_meta('display_name', $seller_id);
-        $harga = function_exists('dw_get_product_price') ? dw_get_product_price(get_the_ID()) : get_post_meta(get_the_ID(), 'dw_harga', true);
-
-        // Ambil Gambar dengan Fallback
-        $thumb_url = get_the_post_thumbnail_url(get_the_ID(), 'medium');
-        if (empty($thumb_url)) {
-            $thumb_url = 'https://via.placeholder.com/300x300?text=Produk'; 
-        }
-
-        $list_produk[] = [
-            'id'          => get_the_ID(),
-            'nama_produk' => get_the_title(),
-            'nama_toko'   => $nama_toko ?: 'UMKM Desa',
-            'harga_dasar' => $harga ?: 0,
-            'thumbnail'   => $thumb_url,
-            'kategori'    => get_first_category_name(get_the_ID(), 'dw_produk') // Dinamis
-        ];
-    }
-    wp_reset_postdata();
 }
 ?>
 
-<!-- =================================================================================
-     2. VIEW SECTION (SADESA STYLE) - 100% ORIGINAL DESIGN
-     ================================================================================= -->
-
-<!-- SECTION 1: HERO BANNERS -->
-<div class="mb-10 mt-4">
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-        <?php foreach ($banners as $index => $banner) : 
-            $img = $banner['gambar'];
-            $title = $banner['judul'];
-            $label = $banner['label'];
-            $label_bg = $banner['label_color'];
-            $link_url = $banner['link'];
-        ?>
-        <div class="relative h-48 md:h-64 rounded-2xl overflow-hidden group shadow-md cursor-pointer">
-            <img src="<?php echo esc_url($img); ?>" class="w-full h-full object-cover transition duration-700 group-hover:scale-110" onerror="this.src='https://via.placeholder.com/800x400?text=Banner+Image'">
-            <div class="banner-overlay absolute inset-0"></div> <!-- CSS di main.css -->
-            
-            <div class="absolute bottom-6 left-6 max-w-xs z-10 text-white">
-                <span class="<?php echo $label_bg; ?> text-[10px] md:text-xs font-bold px-3 py-1 rounded-full mb-3 inline-block shadow-sm uppercase tracking-wide">
-                    <?php echo esc_html($label); ?>
-                </span>
-                <h2 class="font-bold text-2xl md:text-3xl leading-tight mb-4 drop-shadow-md">
-                    <?php echo esc_html($title); ?>
-                </h2>
-                <a href="<?php echo esc_url($link_url); ?>" class="inline-block bg-white text-gray-800 text-xs md:text-sm font-bold px-5 py-2.5 rounded-lg hover:bg-gray-100 transition shadow-lg transform hover:-translate-y-0.5">
-                    Lihat Detail
-                </a>
+<!-- HERO SLIDER / BANNER -->
+<div class="container mx-auto px-4 mt-6 mb-10">
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+        <!-- Main Banner (Ambil yg pertama) -->
+        <div class="md:col-span-8 relative h-[300px] md:h-[400px] rounded-2xl overflow-hidden group">
+            <?php $main_banner = $banners[0]; ?>
+            <img src="<?php echo esc_url($main_banner->gambar); ?>" class="w-full h-full object-cover transition duration-700 group-hover:scale-105">
+            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+            <div class="absolute bottom-8 left-8 text-white max-w-lg">
+                <span class="bg-yellow-500 text-black text-xs font-bold px-3 py-1 rounded-full mb-3 inline-block">Unggulan</span>
+                <h2 class="text-3xl font-bold mb-2 leading-tight"><?php echo esc_html($main_banner->judul); ?></h2>
+                <a href="<?php echo esc_url($main_banner->link); ?>" class="inline-block bg-primary hover:bg-green-700 text-white px-6 py-2 rounded-lg font-bold transition mt-2">Lihat Detail</a>
             </div>
         </div>
-        <?php endforeach; ?>
+
+        <!-- Side Banners (Sisa) -->
+        <div class="md:col-span-4 flex flex-col gap-6 h-[300px] md:h-[400px]">
+            <?php 
+            // Ambil banner ke-2 dan ke-3
+            $side_banners = array_slice($banners, 1, 2); 
+            foreach($side_banners as $b): 
+            ?>
+            <div class="relative flex-1 rounded-2xl overflow-hidden group">
+                <img src="<?php echo esc_url($b->gambar); ?>" class="w-full h-full object-cover transition duration-500 group-hover:scale-110">
+                <div class="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition"></div>
+                <div class="absolute bottom-4 left-4 text-white">
+                    <h3 class="font-bold text-lg"><?php echo esc_html($b->judul); ?></h3>
+                </div>
+                <a href="<?php echo esc_url($b->link); ?>" class="absolute inset-0 z-10"></a>
+            </div>
+            <?php endforeach; ?>
+        </div>
     </div>
 </div>
 
-<!-- SECTION 2: MENU KATEGORI -->
-<div class="mb-12">
-    <div class="grid grid-cols-4 md:flex md:justify-center md:gap-16 gap-4">
+<!-- CATEGORY MENU -->
+<div class="container mx-auto px-4 mb-12">
+    <div class="grid grid-cols-4 gap-4 md:flex md:justify-center md:gap-10">
         <a href="<?php echo home_url('/wisata'); ?>" class="flex flex-col items-center gap-3 group">
-            <div class="cat-icon-wrapper w-14 h-14 md:w-16 md:h-16 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center shadow-sm group-hover:bg-green-600 group-hover:text-white">
-                <i class="fas fa-map-marked-alt text-2xl md:text-3xl"></i>
+            <div class="w-16 h-16 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center text-2xl shadow-sm group-hover:bg-primary group-hover:text-white transition">
+                <i class="fas fa-map-marked-alt"></i>
             </div>
-            <span class="text-xs md:text-sm font-bold text-gray-600 group-hover:text-green-600 transition-colors">Wisata</span>
+            <span class="font-bold text-gray-600 text-sm">Wisata</span>
         </a>
         <a href="<?php echo home_url('/produk'); ?>" class="flex flex-col items-center gap-3 group">
-            <div class="cat-icon-wrapper w-14 h-14 md:w-16 md:h-16 bg-orange-100 text-orange-500 rounded-2xl flex items-center justify-center shadow-sm group-hover:bg-orange-500 group-hover:text-white">
-                <i class="fas fa-box-open text-2xl md:text-3xl"></i>
+            <div class="w-16 h-16 bg-orange-100 text-orange-500 rounded-2xl flex items-center justify-center text-2xl shadow-sm group-hover:bg-orange-500 group-hover:text-white transition">
+                <i class="fas fa-shopping-basket"></i>
             </div>
-            <span class="text-xs md:text-sm font-bold text-gray-600 group-hover:text-orange-500 transition-colors">Produk</span>
+            <span class="font-bold text-gray-600 text-sm">Produk</span>
+        </a>
+        <a href="<?php echo home_url('/desa'); ?>" class="flex flex-col items-center gap-3 group">
+            <div class="w-16 h-16 bg-blue-100 text-blue-500 rounded-2xl flex items-center justify-center text-2xl shadow-sm group-hover:bg-blue-500 group-hover:text-white transition">
+                <i class="fas fa-home"></i>
+            </div>
+            <span class="font-bold text-gray-600 text-sm">Jelajah Desa</span>
         </a>
         <a href="#" class="flex flex-col items-center gap-3 group">
-            <div class="cat-icon-wrapper w-14 h-14 md:w-16 md:h-16 bg-blue-100 text-blue-500 rounded-2xl flex items-center justify-center shadow-sm group-hover:bg-blue-500 group-hover:text-white">
-                <i class="fas fa-bed text-2xl md:text-3xl"></i>
+            <div class="w-16 h-16 bg-purple-100 text-purple-500 rounded-2xl flex items-center justify-center text-2xl shadow-sm group-hover:bg-purple-500 group-hover:text-white transition">
+                <i class="fas fa-utensils"></i>
             </div>
-            <span class="text-xs md:text-sm font-bold text-gray-600 group-hover:text-blue-500 transition-colors">Homestay</span>
-        </a>
-        <a href="#" class="flex flex-col items-center gap-3 group">
-            <div class="cat-icon-wrapper w-14 h-14 md:w-16 md:h-16 bg-purple-100 text-purple-500 rounded-2xl flex items-center justify-center shadow-sm group-hover:bg-purple-500 group-hover:text-white">
-                <i class="fas fa-utensils text-2xl md:text-3xl"></i>
-            </div>
-            <span class="text-xs md:text-sm font-bold text-gray-600 group-hover:text-purple-500 transition-colors">Kuliner</span>
+            <span class="font-bold text-gray-600 text-sm">Kuliner</span>
         </a>
     </div>
 </div>
 
-<!-- SECTION 3: WISATA POPULER -->
-<div class="mb-10">
+<!-- PRODUK TERBARU (CPT: dw_produk) -->
+<div class="container mx-auto px-4 mb-16">
     <div class="flex justify-between items-end mb-6">
         <div>
-            <h3 class="font-bold text-xl md:text-2xl text-gray-800">Wisata Populer</h3>
-            <p class="text-sm text-gray-500 mt-1">Destinasi favorit wisatawan minggu ini</p>
+            <h2 class="text-2xl font-bold text-gray-800">Produk UMKM Terbaru</h2>
+            <p class="text-gray-500 text-sm">Oleh-oleh asli dari desa wisata</p>
         </div>
-        <a href="<?php echo home_url('/wisata'); ?>" class="text-primary text-sm font-bold hover:underline flex items-center gap-1">
-            Lihat Semua <i class="fas fa-arrow-right text-xs"></i>
-        </a>
+        <a href="<?php echo home_url('/produk'); ?>" class="text-primary font-bold text-sm hover:underline">Lihat Semua</a>
     </div>
 
-    <!-- Grid Card Wisata -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-        <?php if (!empty($list_wisata)) : ?>
-            <?php foreach($list_wisata as $wisata): 
-                $wisata = (array)$wisata;
-                $id = $wisata['id'];
-                $img = $wisata['thumbnail'];
-                $title = $wisata['nama_wisata'];
-                $loc = $wisata['lokasi'];
-                $price = ($wisata['harga_tiket'] > 0) ? 'Rp '.number_format($wisata['harga_tiket'],0,',','.') : 'Gratis';
-                $rating = $wisata['rating'];
-                $kategori_label = $wisata['kategori']; // Kategori Dinamis
+    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+        <?php
+        $args = array(
+            'post_type' => 'dw_produk',
+            'posts_per_page' => 5,
+            'post_status' => 'publish'
+        );
+        $produk = new WP_Query($args);
+        
+        if($produk->have_posts()): while($produk->have_posts()): $produk->the_post();
+            // Ambil harga dari meta plugin
+            $harga = get_post_meta(get_the_ID(), 'dw_harga_produk', true);
+            $lokasi = get_post_meta(get_the_ID(), 'dw_lokasi_produk', true);
+        ?>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition group">
+            <div class="relative aspect-square bg-gray-100">
+                <?php if(has_post_thumbnail()): ?>
+                    <img src="<?php the_post_thumbnail_url('medium'); ?>" class="w-full h-full object-cover">
+                <?php else: ?>
+                    <img src="https://via.placeholder.com/300" class="w-full h-full object-cover">
+                <?php endif; ?>
                 
-                $link = get_permalink($id);
-            ?>
-            <div class="card-sadesa group">
-                <div class="card-img-wrap">
-                    <img src="<?php echo esc_url($img); ?>" alt="<?php echo esc_attr($title); ?>" onerror="this.src='https://via.placeholder.com/400x300?text=Wisata'">
-                    <div class="badge-rating"><i class="fas fa-star text-yellow-400"></i> <?php echo $rating; ?></div>
-                    
-                    <!-- DINAMIS: Label Kategori -->
-                    <div class="badge-category"><?php echo esc_html($kategori_label); ?></div>
-                </div>
-                
-                <div class="card-body">
-                    <h3 class="card-title group-hover:text-primary transition"><?php echo esc_html($title); ?></h3>
-                    <div class="card-meta">
-                        <i class="fas fa-map-marker-alt text-red-400"></i>
-                        <span class="truncate"><?php echo esc_html($loc); ?></span>
-                    </div>
-                    
-                    <div class="card-footer">
-                        <div>
-                            <p class="price-label">Tiket Masuk</p>
-                            <p class="price-tag"><?php echo $price; ?></p>
-                        </div>
-                        <a href="<?php echo esc_url($link); ?>" class="btn-detail">Lihat Detail <i class="fas fa-arrow-right ml-1"></i></a>
-                    </div>
-                </div>
-            </div>
-            <?php endforeach; ?>
-        <?php else: ?>
-            <div class="col-span-4 text-center text-gray-500 py-10">Belum ada data wisata.</div>
-        <?php endif; ?>
-    </div>
-</div>
-
-<!-- SECTION 4: PRODUK UMKM -->
-<div class="mb-10">
-    <div class="flex justify-between items-end mb-6">
-        <div>
-            <h3 class="font-bold text-xl md:text-2xl text-gray-800">Produk UMKM</h3>
-            <p class="text-sm text-gray-500 mt-1">Oleh-oleh autentik langsung dari desa</p>
-        </div>
-        <a href="<?php echo home_url('/produk'); ?>" class="text-primary text-sm font-bold hover:underline flex items-center gap-1">
-            Lihat Semua <i class="fas fa-arrow-right text-xs"></i>
-        </a>
-    </div>
-
-    <!-- Grid Produk -->
-    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
-        <?php if (!empty($list_produk)) : ?>
-            <?php foreach($list_produk as $produk): 
-                $produk = (array)$produk;
-                $id = $produk['id'];
-                $img = $produk['thumbnail'];
-                $title = $produk['nama_produk'];
-                $shop = $produk['nama_toko'];
-                $price = number_format($produk['harga_dasar'], 0, ',', '.');
-                $kategori_label = $produk['kategori']; // Kategori Dinamis
-                
-                $link = get_permalink($id);
-            ?>
-            <div class="card-sadesa group relative">
-                <a href="<?php echo esc_url($link); ?>" class="block h-full flex flex-col">
-                    <div class="card-img-wrap aspect-square bg-gray-100 relative">
-                        <img src="<?php echo esc_url($img); ?>" alt="<?php echo esc_attr($title); ?>" onerror="this.src='https://via.placeholder.com/300x300?text=Produk'">
-                        
-                        <!-- DINAMIS: Label Kategori (Opsional: ditampilkan kecil di atas gambar) -->
-                        <span class="absolute top-2 left-2 bg-white/90 backdrop-blur text-[9px] px-2 py-1 rounded text-gray-600 font-bold shadow-sm">
-                            <?php echo esc_html($kategori_label); ?>
-                        </span>
-                    </div>
-                    <div class="card-body p-3 flex-1">
-                        <h4 class="text-sm font-bold text-gray-800 leading-snug mb-1 line-clamp-2 min-h-[2.5em] group-hover:text-primary transition"><?php echo esc_html($title); ?></h4>
-                        <div class="flex items-center gap-1 mb-2 text-[10px] text-gray-500">
-                            <i class="fas fa-store"></i> <span class="truncate"><?php echo esc_html($shop); ?></span>
-                        </div>
-                        <div class="mt-auto pt-2 border-t border-dashed border-gray-100 flex justify-between items-end">
-                            <div>
-                                <p class="text-primary font-bold text-sm">Rp <?php echo $price; ?></p>
-                                <p class="text-[9px] text-gray-400">Terjual 0</p>
-                            </div>
-                        </div>
-                    </div>
-                </a>
-                <!-- Add to Cart Button (Overlay) -->
-                <button class="btn-add-cart absolute bottom-3 right-3 shadow-sm z-10 add-to-cart-btn"
-                        data-product-id="<?php echo $id; ?>" 
-                        data-product-name="<?php echo esc_attr($title); ?>" 
-                        data-product-price="<?php echo $produk['harga_dasar']; ?>" 
-                        data-product-image="<?php echo esc_url($img); ?>">
-                    <i class="fas fa-cart-plus text-xs"></i>
+                <!-- Add to Cart Button -->
+                <button class="absolute bottom-3 right-3 bg-white text-primary w-10 h-10 rounded-full flex items-center justify-center shadow-md hover:bg-primary hover:text-white transition btn-add-cart" 
+                        data-product-id="<?php the_ID(); ?>" 
+                        data-quantity="1">
+                    <i class="fas fa-cart-plus"></i>
                 </button>
             </div>
-            <?php endforeach; ?>
-        <?php else: ?>
-            <div class="col-span-5 text-center text-gray-500 py-10">Belum ada data produk.</div>
+            <div class="p-4">
+                <div class="text-xs text-gray-400 mb-1 flex items-center gap-1">
+                    <i class="fas fa-map-marker-alt"></i> <?php echo esc_html($lokasi ?: 'Desa Wisata'); ?>
+                </div>
+                <h3 class="font-bold text-gray-800 line-clamp-2 mb-2 min-h-[3rem]">
+                    <a href="<?php the_permalink(); ?>"><?php the_title(); ?></a>
+                </h3>
+                <div class="font-bold text-primary text-lg"><?php echo dw_format_rupiah($harga); ?></div>
+            </div>
+        </div>
+        <?php endwhile; wp_reset_postdata(); else: ?>
+            <div class="col-span-full text-center py-10 text-gray-500">Belum ada produk.</div>
         <?php endif; ?>
     </div>
 </div>
