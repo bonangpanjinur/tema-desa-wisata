@@ -39,7 +39,7 @@ jobs:
           local-dir: ./
           
           # Folder tujuan di server (Pastikan path ini benar)
-          server-dir: /public_html/m.rizqunatourtravel.com/wp-content/themes/tema-desa-wisata/
+          server-dir: /public_html/sadesa.site/wp-content/themes/tema-desa-wisata/
           
           # Exclude file/folder agar tidak di-upload/dihapus
           exclude: |
