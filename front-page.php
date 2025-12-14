@@ -4,314 +4,339 @@
  */
 get_header();
 
+// =================================================================================
+// 1. DATA FETCHING (DATABASE & WP_QUERY) - Integrasi Plugin Core
+// =================================================================================
+
 global $wpdb;
 
-// 1. QUERY BANNER DARI DATABASE (Tabel: dw_banner)
-// Pastikan tabel ini sinkron dengan plugin Anda. Jika di plugin namanya 'dw_banners', sesuaikan.
-// Di functions.php Anda pakai prefix . 'dw_pedagang', jadi asumsi prefix WP standar.
-$table_banner = $wpdb->prefix . 'dw_banner'; 
+// --- A. Banner Data (Dari Tabel Database Plugin: dw_banner) ---
+$table_banner = $wpdb->prefix . 'dw_banner'; // Sesuaikan nama tabel prefix
 $banners = [];
 
-// Cek tabel exist untuk mencegah error
-if ($wpdb->get_var("SHOW TABLES LIKE '$table_banner'") == $table_banner) {
-    // Mengambil banner aktif
-    $banners = $wpdb->get_results("SELECT * FROM $table_banner WHERE status = 'aktif' ORDER BY prioritas ASC LIMIT 5");
+// Cek apakah tabel ada di database
+if ($wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table_banner)) == $table_banner) {
+    // Ambil banner yang statusnya aktif
+    $db_banners = $wpdb->get_results("SELECT * FROM $table_banner WHERE status = 'aktif' ORDER BY prioritas ASC LIMIT 5");
+    
+    if (!empty($db_banners)) {
+        foreach ($db_banners as $index => $b) {
+            // Label Logic (Styling asli)
+            $label = 'Info Desa';
+            $label_color = 'bg-blue-600';
+            if ($index === 0) {
+                $label = 'Terbaru';
+                $label_color = 'bg-orange-500';
+            }
+
+            $banners[] = [
+                'gambar'      => !empty($b->gambar) ? $b->gambar : 'https://via.placeholder.com/1200x600?text=Banner',
+                'judul'       => $b->judul,
+                'label'       => $label, 
+                'label_color' => $label_color,
+                'link'        => !empty($b->link) ? $b->link : '#'
+            ];
+        }
+    }
 }
 
-// Fallback jika banner kosong atau tabel belum ada
+// Fallback Banner (Jika Database Kosong)
 if (empty($banners)) {
     $banners = [
-        (object) [
-            'gambar' => 'https://via.placeholder.com/1200x600?text=Selamat+Datang+di+Desa+Wisata',
-            'judul' => 'Jelajahi Keindahan Desa Wisata',
-            'link' => '#'
+        [
+            'gambar' => 'https://images.unsplash.com/photo-1596423736798-75b43694f540?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80',
+            'judul' => 'Pesona Alam Desa', 'label' => 'Terbaru', 'label_color' => 'bg-orange-500', 'link' => '#'
         ],
-        (object) [
-            'gambar' => 'https://via.placeholder.com/1200x600?text=Produk+UMKM+Unggulan',
-            'judul' => 'Dukung Ekonomi Lokal dengan Produk UMKM',
-            'link' => '#'
+        [
+            'gambar' => 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80',
+            'judul' => 'Kuliner Tradisional', 'label' => 'Info Desa', 'label_color' => 'bg-blue-500', 'link' => '#'
         ]
     ];
 }
+
+// --- FUNGSI HELPER KATEGORI ---
+function get_first_category_name_front($post_id, $post_type) {
+    $taxonomy = ($post_type === 'dw_wisata') ? 'dw_kategori_wisata' : 'dw_kategori_produk';
+    $terms = get_the_terms($post_id, $taxonomy);
+    if (!empty($terms) && !is_wp_error($terms)) {
+        return $terms[0]->name;
+    }
+    return ($post_type === 'dw_wisata') ? 'Wisata' : 'Produk';
+}
+
+// --- B. Wisata Data (CPT + Meta Plugin) ---
+$list_wisata = [];
+$args_wisata = array(
+    'post_type'      => 'dw_wisata',
+    'posts_per_page' => 4,
+    'orderby'        => 'date',
+    'order'          => 'DESC',
+    'post_status'    => 'publish'
+);
+$query_wisata = new WP_Query($args_wisata);
+
+if ($query_wisata->have_posts()) {
+    while ($query_wisata->have_posts()) {
+        $query_wisata->the_post();
+        
+        // Ambil Meta Data dari Plugin
+        $lokasi = get_post_meta(get_the_ID(), 'dw_lokasi', true) ?: 'Desa Wisata';
+        $harga = get_post_meta(get_the_ID(), 'dw_harga_tiket', true);
+        
+        // Fallback Image
+        $thumb_url = get_the_post_thumbnail_url(get_the_ID(), 'medium_large') ?: 'https://via.placeholder.com/400x300?text=Wisata';
+
+        $list_wisata[] = [
+            'id'          => get_the_ID(),
+            'nama_wisata' => get_the_title(),
+            'lokasi'      => $lokasi,
+            'harga_tiket' => $harga,
+            'rating'      => 4.8, 
+            'thumbnail'   => $thumb_url,
+            'slug'        => get_post_field('post_name'),
+            'kategori'    => get_first_category_name_front(get_the_ID(), 'dw_wisata')
+        ];
+    }
+    wp_reset_postdata();
+}
+
+// --- C. Produk Data (CPT + Meta Plugin + Relasi Pedagang) ---
+$list_produk = [];
+$args_produk = array(
+    'post_type'      => 'dw_produk',
+    'posts_per_page' => 10, // Menampilkan 10 produk (2 baris di desktop)
+    'orderby'        => 'rand',
+    'post_status'    => 'publish'
+);
+$query_produk = new WP_Query($args_produk);
+
+if ($query_produk->have_posts()) {
+    while ($query_produk->have_posts()) {
+        $query_produk->the_post();
+        
+        $seller_id = get_post_field('post_author');
+        // Integrasi Nama Toko dari Tabel dw_pedagang (jika function tersedia)
+        $nama_toko = get_the_author_meta('display_name', $seller_id);
+        if (function_exists('dw_get_pedagang_data')) {
+            $pedagang = dw_get_pedagang_data($seller_id);
+            if ($pedagang) $nama_toko = $pedagang->nama_toko;
+        }
+
+        $harga = get_post_meta(get_the_ID(), 'dw_harga_produk', true);
+        $thumb_url = get_the_post_thumbnail_url(get_the_ID(), 'medium') ?: 'https://via.placeholder.com/300x300?text=Produk';
+
+        $list_produk[] = [
+            'id'          => get_the_ID(),
+            'nama_produk' => get_the_title(),
+            'nama_toko'   => $nama_toko,
+            'harga_dasar' => $harga,
+            'thumbnail'   => $thumb_url,
+            'kategori'    => get_first_category_name_front(get_the_ID(), 'dw_produk')
+        ];
+    }
+    wp_reset_postdata();
+}
 ?>
 
-<!-- SECTION: HERO CAROUSEL BANNER -->
-<div class="relative bg-gray-900 mb-12">
-    <!-- Carousel Container -->
-    <div id="hero-carousel" class="relative w-full h-[400px] md:h-[500px] overflow-hidden">
+<!-- =================================================================================
+     2. VIEW SECTION (SADESA STYLE - ORIGINAL DESIGN)
+     ================================================================================= -->
+
+<!-- SECTION 1: HERO BANNERS -->
+<div class="mb-10 mt-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
         <?php foreach ($banners as $index => $banner) : 
-            $active_class = ($index === 0) ? 'opacity-100 z-10' : 'opacity-0 z-0';
-            $img = !empty($banner->gambar) ? $banner->gambar : 'https://via.placeholder.com/1200x600';
+            $img = $banner['gambar'];
+            $title = $banner['judul'];
+            $label = $banner['label'];
+            $label_bg = $banner['label_color'];
+            $link_url = $banner['link'];
         ?>
-        <div class="carousel-item absolute inset-0 transition-opacity duration-700 ease-in-out <?php echo $active_class; ?>" data-index="<?php echo $index; ?>">
-            <!-- Image -->
-            <img src="<?php echo esc_url($img); ?>" class="w-full h-full object-cover opacity-60" alt="<?php echo esc_attr($banner->judul); ?>">
+        <div class="relative h-48 md:h-64 rounded-2xl overflow-hidden group shadow-md cursor-pointer">
+            <img src="<?php echo esc_url($img); ?>" class="w-full h-full object-cover transition duration-700 group-hover:scale-110" onerror="this.src='https://via.placeholder.com/800x400?text=Banner+Image'">
+            <div class="banner-overlay absolute inset-0"></div> <!-- CSS di main.css -->
             
-            <!-- Content Overlay -->
-            <div class="absolute inset-0 flex items-center justify-center">
-                <div class="text-center text-white px-4 max-w-3xl">
-                    <h2 class="text-3xl md:text-5xl font-bold mb-4 drop-shadow-md tracking-tight leading-tight">
-                        <?php echo esc_html($banner->judul); ?>
-                    </h2>
-                    <?php if (!empty($banner->link) && $banner->link !== '#') : ?>
-                        <a href="<?php echo esc_url($banner->link); ?>" class="inline-block mt-4 bg-primary hover:bg-green-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition transform hover:-translate-y-1">
-                            Lihat Detail
-                        </a>
-                    <?php endif; ?>
-                </div>
+            <div class="absolute bottom-6 left-6 max-w-xs z-10 text-white">
+                <span class="<?php echo $label_bg; ?> text-[10px] md:text-xs font-bold px-3 py-1 rounded-full mb-3 inline-block shadow-sm uppercase tracking-wide">
+                    <?php echo esc_html($label); ?>
+                </span>
+                <h2 class="font-bold text-2xl md:text-3xl leading-tight mb-4 drop-shadow-md">
+                    <?php echo esc_html($title); ?>
+                </h2>
+                <a href="<?php echo esc_url($link_url); ?>" class="inline-block bg-white text-gray-800 text-xs md:text-sm font-bold px-5 py-2.5 rounded-lg hover:bg-gray-100 transition shadow-lg transform hover:-translate-y-0.5">
+                    Lihat Detail
+                </a>
             </div>
         </div>
         <?php endforeach; ?>
     </div>
-
-    <!-- Carousel Controls (Hanya muncul jika lebih dari 1 banner) -->
-    <?php if (count($banners) > 1) : ?>
-        <button id="prev-slide" class="absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-white/20 hover:bg-white/40 text-white p-3 rounded-full backdrop-blur-sm transition">
-            <i class="fas fa-chevron-left text-xl"></i>
-        </button>
-        <button id="next-slide" class="absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-white/20 hover:bg-white/40 text-white p-3 rounded-full backdrop-blur-sm transition">
-            <i class="fas fa-chevron-right text-xl"></i>
-        </button>
-        
-        <!-- Indicators -->
-        <div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex gap-2">
-            <?php foreach ($banners as $index => $banner) : 
-                $dot_active = ($index === 0) ? 'bg-white w-8' : 'bg-white/50 w-2 hover:bg-white/80';
-            ?>
-                <button class="carousel-dot h-2 rounded-full transition-all duration-300 <?php echo $dot_active; ?>" data-index="<?php echo $index; ?>"></button>
-            <?php endforeach; ?>
-        </div>
-    <?php endif; ?>
 </div>
 
-<script>
-// Simple Vanilla JS Carousel Script
-document.addEventListener('DOMContentLoaded', function() {
-    const items = document.querySelectorAll('.carousel-item');
-    const dots = document.querySelectorAll('.carousel-dot');
-    const prevBtn = document.getElementById('prev-slide');
-    const nextBtn = document.getElementById('next-slide');
-    let currentIndex = 0;
-    const totalItems = items.length;
-    let autoSlideInterval;
+<!-- SECTION 2: MENU KATEGORI -->
+<div class="mb-12">
+    <div class="grid grid-cols-4 md:flex md:justify-center md:gap-16 gap-4">
+        <a href="<?php echo home_url('/wisata'); ?>" class="flex flex-col items-center gap-3 group">
+            <div class="cat-icon-wrapper w-14 h-14 md:w-16 md:h-16 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center shadow-sm group-hover:bg-green-600 group-hover:text-white">
+                <i class="fas fa-map-marked-alt text-2xl md:text-3xl"></i>
+            </div>
+            <span class="text-xs md:text-sm font-bold text-gray-600 group-hover:text-green-600 transition-colors">Wisata</span>
+        </a>
+        <a href="<?php echo home_url('/produk'); ?>" class="flex flex-col items-center gap-3 group">
+            <div class="cat-icon-wrapper w-14 h-14 md:w-16 md:h-16 bg-orange-100 text-orange-500 rounded-2xl flex items-center justify-center shadow-sm group-hover:bg-orange-500 group-hover:text-white">
+                <i class="fas fa-box-open text-2xl md:text-3xl"></i>
+            </div>
+            <span class="text-xs md:text-sm font-bold text-gray-600 group-hover:text-orange-500 transition-colors">Produk</span>
+        </a>
+        <a href="#" class="flex flex-col items-center gap-3 group">
+            <div class="cat-icon-wrapper w-14 h-14 md:w-16 md:h-16 bg-blue-100 text-blue-500 rounded-2xl flex items-center justify-center shadow-sm group-hover:bg-blue-500 group-hover:text-white">
+                <i class="fas fa-bed text-2xl md:text-3xl"></i>
+            </div>
+            <span class="text-xs md:text-sm font-bold text-gray-600 group-hover:text-blue-500 transition-colors">Homestay</span>
+        </a>
+        <a href="#" class="flex flex-col items-center gap-3 group">
+            <div class="cat-icon-wrapper w-14 h-14 md:w-16 md:h-16 bg-purple-100 text-purple-500 rounded-2xl flex items-center justify-center shadow-sm group-hover:bg-purple-500 group-hover:text-white">
+                <i class="fas fa-utensils text-2xl md:text-3xl"></i>
+            </div>
+            <span class="text-xs md:text-sm font-bold text-gray-600 group-hover:text-purple-500 transition-colors">Kuliner</span>
+        </a>
+    </div>
+</div>
 
-    if (totalItems <= 1) return; // No need script if only 1 slide
-
-    function showSlide(index) {
-        // Handle wrapping
-        if (index < 0) index = totalItems - 1;
-        if (index >= totalItems) index = 0;
-        currentIndex = index;
-
-        // Update Items
-        items.forEach(item => {
-            item.classList.remove('opacity-100', 'z-10');
-            item.classList.add('opacity-0', 'z-0');
-        });
-        items[currentIndex].classList.remove('opacity-0', 'z-0');
-        items[currentIndex].classList.add('opacity-100', 'z-10');
-
-        // Update Dots
-        dots.forEach(dot => {
-            dot.className = 'carousel-dot h-2 rounded-full transition-all duration-300 bg-white/50 w-2 hover:bg-white/80';
-        });
-        dots[currentIndex].className = 'carousel-dot h-2 rounded-full transition-all duration-300 bg-white w-8';
-    }
-
-    function nextSlide() { showSlide(currentIndex + 1); }
-    function prevSlide() { showSlide(currentIndex - 1); }
-
-    // Event Listeners
-    if(nextBtn) nextBtn.addEventListener('click', () => { nextSlide(); resetTimer(); });
-    if(prevBtn) prevBtn.addEventListener('click', () => { prevSlide(); resetTimer(); });
-
-    dots.forEach((dot, idx) => {
-        dot.addEventListener('click', () => {
-            showSlide(idx);
-            resetTimer();
-        });
-    });
-
-    // Auto Slide
-    function startTimer() { autoSlideInterval = setInterval(nextSlide, 5000); }
-    function resetTimer() { clearInterval(autoSlideInterval); startTimer(); }
-    
-    startTimer();
-});
-</script>
-
-<!-- SECTION: WISATA POPULER -->
-<div class="container mx-auto px-4 mb-16">
-    <div class="flex flex-col md:flex-row justify-between items-end mb-8 gap-4">
+<!-- SECTION 3: WISATA POPULER -->
+<div class="mb-10">
+    <div class="flex justify-between items-end mb-6">
         <div>
-            <h2 class="text-3xl font-bold text-gray-800 mb-2">Destinasi Wisata Pilihan</h2>
-            <p class="text-gray-500">Temukan tempat terbaik untuk liburan Anda di desa</p>
+            <h3 class="font-bold text-xl md:text-2xl text-gray-800">Wisata Populer</h3>
+            <p class="text-sm text-gray-500 mt-1">Destinasi favorit wisatawan minggu ini</p>
         </div>
-        <a href="<?php echo home_url('/wisata'); ?>" class="text-primary font-bold hover:text-green-700 flex items-center gap-2 transition">
-            Lihat Semua Wisata <i class="fas fa-arrow-right"></i>
+        <a href="<?php echo home_url('/wisata'); ?>" class="text-primary text-sm font-bold hover:underline flex items-center gap-1">
+            Lihat Semua <i class="fas fa-arrow-right text-xs"></i>
         </a>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        <?php
-        $args_wisata = array(
-            'post_type'      => 'dw_wisata',
-            'posts_per_page' => 3, // Tampilkan 3 wisata
-            'orderby'        => 'date',
-            'order'          => 'DESC',
-            'post_status'    => 'publish'
-        );
-        $wisata_query = new WP_Query($args_wisata);
-
-        if ($wisata_query->have_posts()) :
-            while ($wisata_query->have_posts()) : $wisata_query->the_post();
-                // Meta Data Plugin
-                $lokasi = get_post_meta(get_the_ID(), 'dw_lokasi', true);
-                $harga_tiket = get_post_meta(get_the_ID(), 'dw_harga_tiket', true);
-                $img = get_the_post_thumbnail_url(get_the_ID(), 'large') ?: 'https://via.placeholder.com/600x400';
-        ?>
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden group hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-            <div class="relative h-64 overflow-hidden">
-                <img src="<?php echo esc_url($img); ?>" alt="<?php the_title(); ?>" class="w-full h-full object-cover transition duration-700 group-hover:scale-110">
-                <div class="absolute top-4 left-4 bg-white/90 backdrop-blur-md px-4 py-1.5 rounded-full text-xs font-bold text-gray-800 shadow-sm flex items-center gap-1">
-                    <i class="fas fa-ticket-alt text-orange-500"></i> 
-                    <?php echo ($harga_tiket) ? dw_format_rupiah($harga_tiket) : 'Gratis'; ?>
+    <!-- Grid Card Wisata -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+        <?php if (!empty($list_wisata)) : ?>
+            <?php foreach($list_wisata as $wisata): 
+                $wisata = (array)$wisata;
+                $id = $wisata['id'];
+                $img = $wisata['thumbnail'];
+                $title = $wisata['nama_wisata'];
+                $loc = $wisata['lokasi'];
+                $price = ($wisata['harga_tiket'] > 0) ? 'Rp '.number_format($wisata['harga_tiket'],0,',','.') : 'Gratis';
+                $rating = $wisata['rating'];
+                $kategori_label = $wisata['kategori']; 
+                
+                $link = get_permalink($id);
+            ?>
+            <div class="card-sadesa group">
+                <div class="card-img-wrap">
+                    <img src="<?php echo esc_url($img); ?>" alt="<?php echo esc_attr($title); ?>" onerror="this.src='https://via.placeholder.com/400x300?text=Wisata'">
+                    <div class="badge-rating"><i class="fas fa-star text-yellow-400"></i> <?php echo $rating; ?></div>
+                    
+                    <div class="badge-category"><?php echo esc_html($kategori_label); ?></div>
+                </div>
+                
+                <div class="card-body">
+                    <h3 class="card-title group-hover:text-primary transition"><?php echo esc_html($title); ?></h3>
+                    <div class="card-meta">
+                        <i class="fas fa-map-marker-alt text-red-400"></i>
+                        <span class="truncate"><?php echo esc_html($loc); ?></span>
+                    </div>
+                    
+                    <div class="card-footer">
+                        <div>
+                            <p class="price-label">Tiket Masuk</p>
+                            <p class="price-tag"><?php echo $price; ?></p>
+                        </div>
+                        <a href="<?php echo esc_url($link); ?>" class="btn-detail">Lihat Detail <i class="fas fa-arrow-right ml-1"></i></a>
+                    </div>
                 </div>
             </div>
-            <div class="p-6">
-                <div class="text-xs text-gray-500 mb-2 flex items-center gap-1 uppercase tracking-wide font-semibold">
-                    <i class="fas fa-map-marker-alt text-primary"></i> <?php echo esc_html($lokasi ?: 'Lokasi Belum Diatur'); ?>
-                </div>
-                <h3 class="text-xl font-bold text-gray-800 mb-3 line-clamp-2 group-hover:text-primary transition">
-                    <a href="<?php the_permalink(); ?>"><?php the_title(); ?></a>
-                </h3>
-                <p class="text-gray-600 text-sm line-clamp-3 mb-4 leading-relaxed">
-                    <?php echo wp_trim_words(get_the_excerpt(), 18); ?>
-                </p>
-                <a href="<?php the_permalink(); ?>" class="inline-flex items-center text-sm font-bold text-primary hover:underline">
-                    Baca Selengkapnya
-                </a>
-            </div>
-        </div>
-        <?php endwhile; wp_reset_postdata(); else: ?>
-            <div class="col-span-full py-12 text-center bg-gray-50 rounded-xl border border-dashed border-gray-300 text-gray-500">
+            <?php endforeach; ?>
+        <?php else: ?>
+            <div class="col-span-4 text-center text-gray-500 py-10 bg-gray-50 rounded-xl border border-dashed border-gray-200">
                 Belum ada data wisata.
             </div>
         <?php endif; ?>
     </div>
 </div>
 
-<!-- SECTION: PRODUK UMKM -->
-<div class="bg-gray-50 py-16">
-    <div class="container mx-auto px-4">
-        <div class="flex flex-col md:flex-row justify-between items-end mb-8 gap-4">
-            <div>
-                <h2 class="text-3xl font-bold text-gray-800 mb-2">Produk UMKM Lokal</h2>
-                <p class="text-gray-500">Oleh-oleh autentik dan kerajinan tangan dari desa</p>
-            </div>
-            <a href="<?php echo home_url('/produk'); ?>" class="text-primary font-bold hover:text-green-700 flex items-center gap-2 transition">
-                Belanja Sekarang <i class="fas fa-shopping-bag"></i>
-            </a>
+<!-- SECTION 4: PRODUK UMKM -->
+<div class="mb-10">
+    <div class="flex justify-between items-end mb-6">
+        <div>
+            <h3 class="font-bold text-xl md:text-2xl text-gray-800">Produk UMKM</h3>
+            <p class="text-sm text-gray-500 mt-1">Oleh-oleh autentik langsung dari desa</p>
         </div>
+        <a href="<?php echo home_url('/produk'); ?>" class="text-primary text-sm font-bold hover:underline flex items-center gap-1">
+            Lihat Semua <i class="fas fa-arrow-right text-xs"></i>
+        </a>
+    </div>
 
-        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-            <?php
-            $args_produk = array(
-                'post_type'      => 'dw_produk',
-                'posts_per_page' => 10, // Tampilkan 10 produk
-                'orderby'        => 'rand', // Acak agar lebih variatif di home
-                'post_status'    => 'publish'
-            );
-            $produk_query = new WP_Query($args_produk);
-
-            if ($produk_query->have_posts()) :
-                while ($produk_query->have_posts()) : $produk_query->the_post();
-                    // Meta Data Plugin
-                    $harga = get_post_meta(get_the_ID(), 'dw_harga_produk', true);
-                    $lokasi_produk = get_post_meta(get_the_ID(), 'dw_lokasi_produk', true);
-                    $img_prod = get_the_post_thumbnail_url(get_the_ID(), 'medium') ?: 'https://via.placeholder.com/300';
-                    
-                    // Author / Toko
-                    $author_id = get_the_author_meta('ID');
-                    $nama_toko = get_the_author_meta('display_name'); 
-                    // Jika ada fungsi dw_get_pedagang_data di functions.php, bisa dipakai untuk nama toko real
-                    if (function_exists('dw_get_pedagang_data')) {
-                        $pedagang = dw_get_pedagang_data($author_id);
-                        if ($pedagang) $nama_toko = $pedagang->nama_toko;
-                    }
+    <!-- Grid Produk -->
+    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
+        <?php if (!empty($list_produk)) : ?>
+            <?php foreach($list_produk as $produk): 
+                $produk = (array)$produk;
+                $id = $produk['id'];
+                $img = $produk['thumbnail'];
+                $title = $produk['nama_produk'];
+                $shop = $produk['nama_toko'];
+                $price_raw = $produk['harga_dasar'];
+                $price = ($price_raw) ? number_format($price_raw, 0, ',', '.') : 'Hubungi';
+                $kategori_label = $produk['kategori']; 
+                
+                $link = get_permalink($id);
             ?>
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition group flex flex-col h-full relative">
-                <!-- Thumbnail -->
-                <a href="<?php the_permalink(); ?>" class="block relative aspect-square bg-gray-100 overflow-hidden">
-                    <img src="<?php echo esc_url($img_prod); ?>" alt="<?php the_title(); ?>" class="w-full h-full object-cover group-hover:scale-110 transition duration-500">
-                    <?php if(!$harga): ?>
-                        <div class="absolute top-2 right-2 bg-gray-800 text-white text-[10px] px-2 py-1 rounded">Info</div>
-                    <?php endif; ?>
-                </a>
-
-                <!-- Content -->
-                <div class="p-4 flex flex-col flex-1">
-                    <div class="text-[10px] text-gray-400 mb-1 flex items-center gap-1">
-                        <i class="fas fa-store"></i> <?php echo esc_html($nama_toko); ?>
-                    </div>
-                    
-                    <h3 class="font-bold text-gray-800 text-sm leading-snug line-clamp-2 mb-2 flex-1 group-hover:text-primary transition">
-                        <a href="<?php the_permalink(); ?>"><?php the_title(); ?></a>
-                    </h3>
-                    
-                    <div class="flex justify-between items-end mt-auto pt-2 border-t border-gray-50">
-                        <div class="font-bold text-primary text-base">
-                            <?php echo ($harga) ? dw_format_rupiah($harga) : 'Hubungi'; ?>
-                        </div>
+            <div class="card-sadesa group relative">
+                <a href="<?php echo esc_url($link); ?>" class="block h-full flex flex-col">
+                    <div class="card-img-wrap aspect-square bg-gray-100 relative">
+                        <img src="<?php echo esc_url($img); ?>" alt="<?php echo esc_attr($title); ?>" onerror="this.src='https://via.placeholder.com/300x300?text=Produk'">
                         
-                        <!-- Tombol Add to Cart (AJAX) -->
-                        <button class="w-8 h-8 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center hover:bg-primary hover:text-white transition shadow-sm btn-add-cart" 
-                                data-product-id="<?php the_ID(); ?>" 
-                                title="Tambah ke Keranjang">
-                            <i class="fas fa-cart-plus text-xs"></i>
-                        </button>
+                        <span class="absolute top-2 left-2 bg-white/90 backdrop-blur text-[9px] px-2 py-1 rounded text-gray-600 font-bold shadow-sm">
+                            <?php echo esc_html($kategori_label); ?>
+                        </span>
                     </div>
-                </div>
+                    <div class="card-body p-3 flex-1">
+                        <h4 class="text-sm font-bold text-gray-800 leading-snug mb-1 line-clamp-2 min-h-[2.5em] group-hover:text-primary transition"><?php echo esc_html($title); ?></h4>
+                        <div class="flex items-center gap-1 mb-2 text-[10px] text-gray-500">
+                            <i class="fas fa-store"></i> <span class="truncate"><?php echo esc_html($shop); ?></span>
+                        </div>
+                        <div class="mt-auto pt-2 border-t border-dashed border-gray-100 flex justify-between items-end">
+                            <div>
+                                <p class="text-primary font-bold text-sm">Rp <?php echo $price; ?></p>
+                                <p class="text-[9px] text-gray-400">Terjual 0</p>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+                <!-- Add to Cart Button (Overlay) - AJAX Handler via functions.php -->
+                <button type="button" 
+                        class="btn-add-cart absolute bottom-3 right-3 shadow-sm z-10 btn-add-to-cart"
+                        data-product-id="<?php echo $id; ?>" 
+                        data-quantity="1">
+                    <i class="fas fa-cart-plus text-xs"></i>
+                </button>
             </div>
-            <?php endwhile; wp_reset_postdata(); else: ?>
-                <div class="col-span-full py-12 text-center text-gray-400">
-                    Belum ada produk yang ditampilkan.
-                </div>
-            <?php endif; ?>
-        </div>
-        
-        <div class="text-center mt-10">
-            <a href="<?php echo home_url('/produk'); ?>" class="inline-block bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold py-3 px-8 rounded-full transition">
-                Lihat Seluruh Produk
-            </a>
-        </div>
+            <?php endforeach; ?>
+        <?php else: ?>
+            <div class="col-span-5 text-center text-gray-500 py-10 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                Belum ada data produk.
+            </div>
+        <?php endif; ?>
     </div>
 </div>
 
-<!-- SECTION: PROMO / CTA (Optional) -->
-<div class="bg-primary py-16 text-white text-center">
-    <div class="container mx-auto px-4">
-        <h2 class="text-3xl font-bold mb-4">Ingin Menjadi Mitra Desa Wisata?</h2>
-        <p class="text-green-100 max-w-2xl mx-auto mb-8 text-lg">Bergabunglah dengan ribuan pedagang dan pengelola desa wisata lainnya. Promosikan potensi desa Anda ke seluruh dunia.</p>
-        <div class="flex justify-center gap-4">
-            <a href="<?php echo home_url('/register'); ?>" class="bg-white text-primary font-bold py-3 px-8 rounded-full shadow-lg hover:bg-gray-100 transition transform hover:-translate-y-1">
-                Daftar Sekarang
-            </a>
-            <a href="<?php echo home_url('/tentang'); ?>" class="bg-transparent border-2 border-white text-white font-bold py-3 px-8 rounded-full hover:bg-white hover:text-primary transition">
-                Pelajari Lebih Lanjut
-            </a>
-        </div>
-    </div>
-</div>
-
+<!-- Script Tambahan untuk Cart di Homepage -->
 <script>
-// Script Khusus untuk tombol add to cart di homepage (Simple AJAX Trigger)
 jQuery(document).ready(function($) {
-    $('.btn-add-cart').on('click', function(e) {
+    $('.btn-add-to-cart').on('click', function(e) {
         e.preventDefault();
         var btn = $(this);
         var originalIcon = btn.html();
         
+        // Efek Loading
         btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin text-xs"></i>');
 
         $.post(dw_ajax.ajax_url, {
@@ -321,12 +346,10 @@ jQuery(document).ready(function($) {
             quantity: 1
         }, function(response) {
             if(response.success) {
+                // Efek Sukses
                 btn.html('<i class="fas fa-check text-xs"></i>').addClass('bg-green-600 text-white').removeClass('bg-gray-100 text-gray-600');
                 
-                // Update badge cart di header jika ada (Optional)
-                var currentCount = parseInt($('#header-cart-count').text()) || 0;
-                $('#header-cart-count').text(currentCount + 1).removeClass('hidden scale-0').addClass('flex scale-100');
-                
+                // Kembalikan tombol setelah 2 detik
                 setTimeout(function() {
                     btn.html(originalIcon).removeClass('bg-green-600 text-white').addClass('bg-gray-100 text-gray-600').prop('disabled', false);
                 }, 2000);
