@@ -1,119 +1,101 @@
-<?php get_header(); ?>
+<?php
+/**
+ * Template Name: Profil Desa
+ * Description: Menampilkan data dari tabel dw_desa
+ */
+get_header(); 
+global $wpdb;
 
-<!-- Hero Banner Desa -->
-<div class="desa-hero" style="background: #f8f9fa; padding: 60px 0; text-align: center;">
-    <div class="container">
-        <?php if ( has_post_thumbnail() ) : ?>
-            <div class="desa-logo mb-3">
-                <?php the_post_thumbnail('thumbnail', ['class' => 'rounded-circle shadow', 'style' => 'width: 150px; height: 150px; object-fit: cover;']); ?>
-            </div>
-        <?php endif; ?>
-        <h1 class="display-4"><?php the_title(); ?></h1>
-        <p class="lead"><?php echo get_post_meta(get_the_ID(), '_alamat_desa', true); ?></p>
+$desa = null;
+$table_desa = $wpdb->prefix . 'dw_desa';
+
+// Logika 1: Cek via Parameter URL ID (Dari Archive yg pake DB)
+if (isset($_GET['id'])) {
+    $desa_id = intval($_GET['id']);
+    $desa = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_desa WHERE id = %d", $desa_id));
+} 
+// Logika 2: Cek via Single Post (Permalinks WP)
+elseif (is_singular('dw_desa')) {
+    $author_id = get_post_field('post_author', get_the_ID());
+    $desa = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_desa WHERE id_user_desa = %d", $author_id));
+}
+
+// Fallback tampilan jika data tidak ditemukan
+if (!$desa) {
+    echo '<div class="container py-20 text-center text-gray-500">Data Desa tidak ditemukan dalam database.</div>';
+    get_footer(); exit;
+}
+?>
+
+<!-- Hero Header Desa -->
+<div class="relative bg-gray-900 h-[300px] md:h-[400px]">
+    <?php $bg_img = !empty($desa->foto) ? $desa->foto : 'https://via.placeholder.com/1200x600'; ?>
+    <img src="<?php echo esc_url($bg_img); ?>" class="w-full h-full object-cover opacity-40">
+    <div class="absolute inset-0 flex items-center justify-center">
+        <div class="text-center text-white px-4">
+            <h1 class="text-3xl md:text-5xl font-bold mb-2"><?php echo esc_html($desa->nama_desa); ?></h1>
+            <p class="text-lg opacity-90"><i class="fas fa-map-marker-alt text-red-500 mr-2"></i><?php echo esc_html($desa->kabupaten . ', ' . $desa->provinsi); ?></p>
+        </div>
     </div>
 </div>
 
-<div class="container py-5">
-    <div class="row">
+<div class="container mx-auto px-4 py-10 -mt-20 relative z-10">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
         <!-- Sidebar Info -->
-        <div class="col-lg-4 mb-4">
-            <div class="card shadow-sm border-0">
-                <div class="card-body">
-                    <h5 class="card-title">Tentang Desa</h5>
-                    <div class="card-text">
-                        <?php the_content(); ?>
+        <div class="lg:col-span-1">
+            <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100 sticky top-24">
+                <h3 class="font-bold text-gray-800 text-lg mb-4 border-b pb-2">Informasi Desa</h3>
+                <div class="space-y-4 text-sm text-gray-600">
+                    <div>
+                        <span class="block font-bold text-gray-700">Kecamatan</span>
+                        <?php echo esc_html($desa->kecamatan); ?>
                     </div>
-                    <hr>
-                    <div class="contact-info">
-                        <p><strong>Kontak:</strong> <?php echo get_post_meta(get_the_ID(), '_kontak_desa', true); ?></p>
-                        <p><strong>Kepala Desa:</strong> <?php echo get_post_meta(get_the_ID(), '_kepala_desa', true); ?></p>
+                    <div>
+                        <span class="block font-bold text-gray-700">Kelurahan</span>
+                        <?php echo esc_html($desa->kelurahan); ?>
+                    </div>
+                    <div>
+                        <span class="block font-bold text-gray-700">Alamat Lengkap</span>
+                        <?php echo esc_html($desa->alamat_lengkap); ?>
+                    </div>
+                    <hr class="border-gray-100">
+                    <div>
+                        <span class="block font-bold text-gray-700">Bergabung Sejak</span>
+                        <?php echo date('d M Y', strtotime($desa->created_at)); ?>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Main Content: Wisata & Produk -->
-        <div class="col-lg-8">
-            
-            <!-- List Wisata di Desa Ini -->
-            <h3 class="section-title mb-4">Destinasi Wisata</h3>
-            <div class="row mb-5">
-                <?php
-                $desa_id = get_the_ID();
-                $wisata_query = new WP_Query(array(
-                    'post_type' => 'dw_wisata',
-                    'posts_per_page' => 4,
-                    'meta_key' => '_desa_id',
-                    'meta_value' => $desa_id
-                ));
-
-                if ( $wisata_query->have_posts() ) :
-                    while ( $wisata_query->have_posts() ) : $wisata_query->the_post();
-                        ?>
-                        <div class="col-md-6 mb-4">
-                            <div class="card h-100 border-0 shadow-sm product-card">
-                                <a href="<?php the_permalink(); ?>">
-                                    <?php if(has_post_thumbnail()): ?>
-                                        <?php the_post_thumbnail('medium', ['class' => 'card-img-top', 'style' => 'height: 200px; object-fit: cover;']); ?>
-                                    <?php else: ?>
-                                        <div class="bg-light d-flex align-items-center justify-content-center" style="height: 200px;">No Image</div>
-                                    <?php endif; ?>
-                                </a>
-                                <div class="card-body">
-                                    <h5 class="card-title"><a href="<?php the_permalink(); ?>" class="text-dark"><?php the_title(); ?></a></h5>
-                                    <p class="text-primary font-weight-bold"><?php echo dw_format_price(get_post_meta(get_the_ID(), '_harga_tiket', true)); ?></p>
-                                </div>
-                            </div>
-                        </div>
-                        <?php
-                    endwhile;
-                    wp_reset_postdata();
-                else :
-                    echo '<p class="col-12 text-muted">Belum ada data wisata.</p>';
-                endif;
-                ?>
+        <!-- Main Content -->
+        <div class="lg:col-span-2">
+            <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 mb-8">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">Tentang Desa</h2>
+                <div class="prose max-w-none text-gray-600 leading-relaxed">
+                    <?php echo wpautop(esc_html($desa->deskripsi)); ?>
+                </div>
             </div>
 
-            <!-- List Produk di Desa Ini -->
-            <h3 class="section-title mb-4">Produk UMKM Desa</h3>
-            <div class="row">
+            <!-- Produk Desa (Query Related) -->
+            <div>
+                <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                    <i class="fas fa-box-open text-primary"></i> Produk UMKM Desa Ini
+                </h3>
+                
                 <?php
-                $produk_query = new WP_Query(array(
-                    'post_type' => 'dw_produk',
-                    'posts_per_page' => 4,
-                    'meta_key' => '_desa_id',
-                    'meta_value' => $desa_id
-                ));
-
-                if ( $produk_query->have_posts() ) :
-                    while ( $produk_query->have_posts() ) : $produk_query->the_post();
-                        ?>
-                        <div class="col-md-6 mb-4">
-                            <div class="card h-100 border-0 shadow-sm product-card">
-                                <a href="<?php the_permalink(); ?>">
-                                    <?php if(has_post_thumbnail()): ?>
-                                        <?php the_post_thumbnail('medium', ['class' => 'card-img-top', 'style' => 'height: 200px; object-fit: cover;']); ?>
-                                    <?php else: ?>
-                                        <div class="bg-light d-flex align-items-center justify-content-center" style="height: 200px;">No Image</div>
-                                    <?php endif; ?>
-                                </a>
-                                <div class="card-body">
-                                    <h5 class="card-title"><a href="<?php the_permalink(); ?>" class="text-dark"><?php the_title(); ?></a></h5>
-                                    <p class="text-primary font-weight-bold"><?php echo dw_format_price(get_post_meta(get_the_ID(), '_harga_produk', true)); ?></p>
-                                    <a href="<?php the_permalink(); ?>" class="btn btn-sm btn-outline-primary mt-2">Lihat Detail</a>
-                                </div>
-                            </div>
-                        </div>
-                        <?php
-                    endwhile;
-                    wp_reset_postdata();
-                else :
-                    echo '<p class="col-12 text-muted">Belum ada produk UMKM.</p>';
-                endif;
+                // Ambil produk yg authornya adalah pedagang di desa ini
+                // Query complex: Cari pedagang di tabel dw_pedagang where id_desa = desa->id, lalu ambil post produk mereka
+                // Simplifikasi: Ambil semua produk where meta dw_lokasi LIKE nama desa (jika sistem meta sync)
+                // Atau tampilkan placeholder jika belum ada relasi advance
                 ?>
+                <div class="p-6 bg-blue-50 rounded-xl border border-blue-100 text-blue-800 text-center">
+                    <p>Jelajahi produk-produk unggulan dari <?php echo esc_html($desa->nama_desa); ?> di halaman Produk.</p>
+                    <a href="<?php echo home_url('/produk'); ?>" class="inline-block mt-3 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-700">Lihat Produk</a>
+                </div>
             </div>
-
         </div>
+
     </div>
 </div>
 

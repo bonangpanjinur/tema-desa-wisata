@@ -9,144 +9,142 @@ if ( ! is_user_logged_in() || ! isset($_GET['id']) ) {
 }
 
 get_header(); 
-$order_id = intval($_GET['id']);
+global $wpdb;
+
+$order_id = intval($_GET['id']); // Ini adalah ID Transaksi Induk (Parent)
+$user_id = get_current_user_id();
+
+// 1. Ambil Data Transaksi Utama
+$tbl_transaksi = $wpdb->prefix . 'dw_transaksi';
+$transaksi = $wpdb->get_row($wpdb->prepare(
+    "SELECT * FROM $tbl_transaksi WHERE id = %d AND id_pembeli = %d", 
+    $order_id, $user_id
+));
+
+if (!$transaksi) {
+    echo '<div class="container py-20 text-center">Pesanan tidak ditemukan.</div>';
+    get_footer(); exit;
+}
+
+// 2. Ambil Sub Transaksi (Per Toko)
+$tbl_sub = $wpdb->prefix . 'dw_transaksi_sub';
+$sub_transaksi = $wpdb->get_results($wpdb->prepare(
+    "SELECT * FROM $tbl_sub WHERE id_transaksi = %d", 
+    $order_id
+));
+
+// 3. Helper Status Badge
+function dw_get_status_badge($status) {
+    $colors = [
+        'menunggu_pembayaran' => 'bg-orange-100 text-orange-700',
+        'menunggu_konfirmasi' => 'bg-yellow-100 text-yellow-700',
+        'diproses'            => 'bg-blue-100 text-blue-700',
+        'dikirim_ekspedisi'   => 'bg-purple-100 text-purple-700',
+        'selesai'             => 'bg-green-100 text-green-700',
+        'dibatalkan'          => 'bg-red-100 text-red-700',
+    ];
+    $cls = isset($colors[$status]) ? $colors[$status] : 'bg-gray-100 text-gray-600';
+    $label = ucwords(str_replace('_', ' ', $status));
+    return "<span class='px-3 py-1 rounded-full text-xs font-bold $cls'>$label</span>";
+}
+
+// Decode Alamat JSON
+$alamat_kirim = json_decode($transaksi->alamat_pengiriman);
+// Fallback jika bukan JSON (legacy support)
+$nama_penerima = is_object($alamat_kirim) ? $alamat_kirim->nama : $transaksi->nama_penerima;
+$no_hp = is_object($alamat_kirim) ? $alamat_kirim->hp : $transaksi->no_hp;
+$alamat_lengkap = is_object($alamat_kirim) ? $alamat_kirim->alamat : $transaksi->alamat_lengkap_snapshot;
 ?>
 
 <div class="bg-gray-50 min-h-screen pb-24">
     <!-- Header -->
     <div class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-30">
         <div class="container mx-auto px-4 h-16 flex items-center gap-4">
-            <a href="<?php echo home_url('/transaksi'); ?>" class="text-gray-500 hover:text-gray-900"><i class="ph-bold ph-arrow-left text-xl"></i></a>
-            <h1 class="font-bold text-lg text-gray-800">Detail Pesanan</h1>
+            <a href="<?php echo home_url('/transaksi'); ?>" class="text-gray-500 hover:text-gray-900"><i class="fas fa-arrow-left text-xl"></i></a>
+            <h1 class="font-bold text-lg text-gray-800">Detail Pesanan #<?php echo esc_html($transaksi->kode_unik); ?></h1>
         </div>
     </div>
 
-    <div id="order-detail-container" class="container mx-auto px-4 py-6 max-w-2xl">
-        <!-- Loading State -->
-        <div class="animate-pulse space-y-4">
-            <div class="h-24 bg-white rounded-xl"></div>
-            <div class="h-40 bg-white rounded-xl"></div>
+    <div class="container mx-auto px-4 py-6 max-w-2xl">
+        
+        <!-- Status Utama -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-4">
+            <div class="flex justify-between items-center mb-4">
+                <div class="text-sm text-gray-500">Tanggal: <span class="font-bold text-gray-900"><?php echo date('d M Y H:i', strtotime($transaksi->created_at)); ?></span></div>
+                <?php echo dw_get_status_badge($transaksi->status_transaksi); ?>
+            </div>
+            
+            <?php if($transaksi->status_transaksi == 'menunggu_pembayaran'): ?>
+            <div class="bg-orange-50 border border-orange-100 p-4 rounded-xl mb-3">
+                <p class="text-sm text-orange-800 mb-2">Silakan transfer ke rekening berikut:</p>
+                <div class="font-bold text-lg text-gray-800">BCA 1234567890 <span class="text-sm font-normal text-gray-500">(a.n Desa Wisata)</span></div>
+                <div class="font-bold text-lg text-gray-800">BRI 0987654321 <span class="text-sm font-normal text-gray-500">(a.n Desa Wisata)</span></div>
+            </div>
+            <!-- Tombol Konfirmasi (Placeholder Link WA) -->
+            <a href="https://wa.me/?text=Konfirmasi%20Pesanan%20<?php echo $transaksi->kode_unik; ?>" target="_blank" class="block w-full bg-primary text-white py-3 rounded-xl font-bold shadow-lg text-center hover:bg-green-700 transition">
+                Konfirmasi Pembayaran
+            </a>
+            <?php endif; ?>
+        </div>
+
+        <!-- Rincian Per Toko -->
+        <?php foreach($sub_transaksi as $sub): 
+            $tbl_items = $wpdb->prefix . 'dw_transaksi_items';
+            $items = $wpdb->get_results($wpdb->prepare("SELECT * FROM $tbl_items WHERE id_sub_transaksi = %d", $sub->id));
+        ?>
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-4">
+            <div class="flex justify-between items-center mb-3 pb-3 border-b border-dashed border-gray-100">
+                <h3 class="font-bold text-sm text-gray-900 flex items-center gap-2">
+                    <i class="fas fa-store text-gray-400"></i> <?php echo esc_html($sub->nama_toko); ?>
+                </h3>
+                <?php echo dw_get_status_badge($sub->status_pesanan); ?>
+            </div>
+
+            <div class="space-y-4">
+                <?php foreach($items as $item): 
+                    // Ambil gambar produk asli
+                    $img_url = get_the_post_thumbnail_url($item->id_produk, 'thumbnail') ?: 'https://via.placeholder.com/150';
+                ?>
+                <div class="flex gap-4">
+                    <div class="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 border border-gray-200">
+                        <img src="<?php echo esc_url($img_url); ?>" class="w-full h-full object-cover">
+                    </div>
+                    <div class="flex-1">
+                        <h4 class="text-sm font-bold text-gray-800 line-clamp-1"><?php echo esc_html($item->nama_produk); ?></h4>
+                        <p class="text-xs text-gray-500"><?php echo $item->kuantitas; ?> x <?php echo dw_format_rupiah($item->harga_satuan); ?></p>
+                    </div>
+                    <div class="text-sm font-bold text-gray-900">
+                        <?php echo dw_format_rupiah($item->total_harga); ?>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+            
+            <div class="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
+                <span class="text-xs text-gray-500">Subtotal Toko</span>
+                <span class="font-bold text-gray-800"><?php echo dw_format_rupiah($sub->total_pesanan_toko); ?></span>
+            </div>
+        </div>
+        <?php endforeach; ?>
+
+        <!-- Info Pengiriman -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-6">
+            <h3 class="font-bold text-sm text-gray-900 mb-3">Info Pengiriman</h3>
+            <div class="text-sm text-gray-600 space-y-1">
+                <p><span class="font-semibold">Penerima:</span> <?php echo esc_html($nama_penerima); ?></p>
+                <p><span class="font-semibold">No HP:</span> <?php echo esc_html($no_hp); ?></p>
+                <p><span class="font-semibold">Alamat:</span> <?php echo esc_html($alamat_lengkap); ?></p>
+            </div>
+        </div>
+
+        <!-- Total Akhir Sticky -->
+        <div class="fixed bottom-0 left-0 right-0 bg-white p-4 border-t border-gray-100 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+            <div class="container mx-auto max-w-2xl flex justify-between items-center">
+                <span class="text-gray-600 font-medium">Total Bayar</span>
+                <span class="text-xl font-bold text-primary"><?php echo dw_format_rupiah($transaksi->total_akhir); ?></span>
+            </div>
         </div>
     </div>
 </div>
-
-<!-- Modal Upload Bukti -->
-<div id="modal-upload" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl w-full max-w-sm p-6">
-        <h3 class="font-bold text-lg mb-4">Upload Bukti Transfer</h3>
-        <form id="form-upload-bukti">
-            <input type="hidden" name="order_id" value="<?php echo $order_id; ?>">
-            <div class="mb-4">
-                <label class="block text-xs font-medium text-gray-700 mb-2">Pilih Foto</label>
-                <input type="file" name="file" accept="image/*" required class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-white hover:file:bg-secondary">
-            </div>
-            <div class="flex gap-3">
-                <button type="button" onclick="$('#modal-upload').addClass('hidden')" class="flex-1 py-2 border border-gray-300 rounded-lg text-sm font-bold">Batal</button>
-                <button type="submit" class="flex-1 py-2 bg-primary text-white rounded-lg text-sm font-bold">Upload</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<script>
-jQuery(document).ready(function($) {
-    const API_BASE = dwData.api_url;
-    const JWT_TOKEN = localStorage.getItem('dw_jwt_token');
-    const ORDER_ID = <?php echo $order_id; ?>;
-
-    function loadDetail() {
-        $.ajax({
-            url: API_BASE + 'pembeli/orders/' + ORDER_ID,
-            type: 'GET',
-            headers: { 'Authorization': 'Bearer ' + JWT_TOKEN },
-            success: function(res) {
-                const order = res; // Sesuaikan struktur response API
-                const $cont = $('#order-detail-container');
-                
-                // Status Logic
-                let statusBadge = `<span class="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs font-bold">${order.status_transaksi}</span>`;
-                let actionButton = '';
-
-                if(order.status_transaksi === 'menunggu_pembayaran') {
-                    statusBadge = `<span class="bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs font-bold">Belum Bayar</span>`;
-                    actionButton = `<button onclick="$('#modal-upload').removeClass('hidden')" class="w-full bg-primary text-white py-3 rounded-xl font-bold shadow-lg mb-3">Upload Bukti Bayar</button>`;
-                }
-
-                // Render HTML
-                let itemsHtml = '';
-                if(order.sub_pesanan) {
-                    order.sub_pesanan.forEach(sub => {
-                        sub.items.forEach(item => {
-                            itemsHtml += `
-                            <div class="flex gap-4 py-3 border-b border-gray-50 last:border-0">
-                                <div class="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
-                                    <!-- Placeholder img, idealnya API return image url -->
-                                    <div class="w-full h-full flex items-center justify-center text-gray-400"><i class="ph-fill ph-image"></i></div>
-                                </div>
-                                <div class="flex-1">
-                                    <h4 class="text-sm font-bold text-gray-800 line-clamp-1">${item.nama_produk}</h4>
-                                    <p class="text-xs text-gray-500">${item.jumlah} x Rp ${new Intl.NumberFormat('id-ID').format(item.harga_satuan)}</p>
-                                </div>
-                                <div class="text-sm font-bold text-gray-900">
-                                    Rp ${new Intl.NumberFormat('id-ID').format(item.total_harga)}
-                                </div>
-                            </div>`;
-                        });
-                    });
-                }
-
-                const html = `
-                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-4">
-                        <div class="flex justify-between items-center mb-4">
-                            <div class="text-sm text-gray-500">Kode: <span class="font-bold text-gray-900">#${order.kode_unik}</span></div>
-                            ${statusBadge}
-                        </div>
-                        <div class="flex justify-between items-center py-3 border-t border-dashed border-gray-200">
-                            <span class="text-sm text-gray-600">Total Tagihan</span>
-                            <span class="text-lg font-bold text-primary">Rp ${new Intl.NumberFormat('id-ID').format(order.total_transaksi)}</span>
-                        </div>
-                    </div>
-
-                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-4">
-                        <h3 class="font-bold text-sm text-gray-900 mb-3">Rincian Barang</h3>
-                        ${itemsHtml}
-                    </div>
-
-                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-6">
-                        <h3 class="font-bold text-sm text-gray-900 mb-3">Info Pengiriman</h3>
-                        <div class="text-sm text-gray-600 space-y-1">
-                            <p><span class="font-semibold">Penerima:</span> ${order.alamat_pengiriman.nama_penerima}</p>
-                            <p><span class="font-semibold">No HP:</span> ${order.alamat_pengiriman.no_hp}</p>
-                            <p><span class="font-semibold">Alamat:</span> ${order.alamat_pengiriman.alamat_lengkap}</p>
-                        </div>
-                    </div>
-
-                    <div class="fixed bottom-0 left-0 right-0 bg-white p-4 border-t border-gray-100">
-                        <div class="container mx-auto max-w-2xl">
-                            ${actionButton}
-                            <a href="https://wa.me/?text=Halo%20saya%20butuh%20bantuan%20pesanan%20${order.kode_unik}" target="_blank" class="block w-full text-center py-3 border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50">
-                                Bantuan
-                            </a>
-                        </div>
-                    </div>
-                `;
-                $cont.html(html);
-            }
-        });
-    }
-
-    loadDetail();
-
-    // Handle Upload
-    $('#form-upload-bukti').on('submit', function(e){
-        e.preventDefault();
-        const formData = new FormData(this);
-        // ... Logic upload ke API dw_api_upload_media & dw_api_confirm_payment ...
-        // Simplifikasi:
-        alert('Fitur upload akan diaktifkan segera.');
-        $('#modal-upload').addClass('hidden');
-    });
-});
-</script>
 
 <?php get_footer(); ?>

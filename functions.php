@@ -42,7 +42,8 @@ add_action('wp_enqueue_scripts', 'tema_desa_wisata_scripts');
 
 // 3. Session Start (Penting untuk Cart)
 function dw_theme_start_session() {
-    if (!session_id()) {
+    // Cek apakah session belum mulai DAN header belum terkirim
+    if (!session_id() && !headers_sent()) {
         session_start();
     }
 }
@@ -54,23 +55,29 @@ add_action('init', 'dw_theme_start_session', 1);
  * ============================================================================
  */
 
-// Format Rupiah
-function dw_format_rupiah($angka) {
-    return 'Rp ' . number_format((float)$angka, 0, ',', '.');
+// Format Rupiah (Cek function_exists agar tidak bentrok dengan plugin)
+if (!function_exists('dw_format_rupiah')) {
+    function dw_format_rupiah($angka) {
+        return 'Rp ' . number_format((float)$angka, 0, ',', '.');
+    }
 }
 
 // Ambil Data Pedagang berdasarkan ID User WP
-function dw_get_pedagang_data($user_id) {
-    global $wpdb;
-    $table = $wpdb->prefix . 'dw_pedagang';
-    return $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE id_user = %d", $user_id));
+if (!function_exists('dw_get_pedagang_data')) {
+    function dw_get_pedagang_data($user_id) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'dw_pedagang';
+        return $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE id_user = %d", $user_id));
+    }
 }
 
 // Ambil Data Desa berdasarkan ID User WP
-function dw_get_desa_data($user_id) {
-    global $wpdb;
-    $table = $wpdb->prefix . 'dw_desa';
-    return $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE id_user_desa = %d", $user_id));
+if (!function_exists('dw_get_desa_data')) {
+    function dw_get_desa_data($user_id) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'dw_desa';
+        return $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE id_user_desa = %d", $user_id));
+    }
 }
 
 /**
@@ -80,18 +87,22 @@ function dw_get_desa_data($user_id) {
  */
 
 // Get Cart
-function dw_get_cart_items() {
-    return isset($_SESSION['dw_cart']) ? $_SESSION['dw_cart'] : array();
+if (!function_exists('dw_get_cart_items')) {
+    function dw_get_cart_items() {
+        return isset($_SESSION['dw_cart']) ? $_SESSION['dw_cart'] : array();
+    }
 }
 
 // Get Cart Total
-function dw_get_cart_total() {
-    $items = dw_get_cart_items();
-    $total = 0;
-    foreach ($items as $item) {
-        $total += $item['price'] * $item['quantity'];
+if (!function_exists('dw_get_cart_total')) {
+    function dw_get_cart_total() {
+        $items = dw_get_cart_items();
+        $total = 0;
+        foreach ($items as $item) {
+            $total += $item['price'] * $item['quantity'];
+        }
+        return $total;
     }
-    return $total;
 }
 
 // AJAX Add to Cart
@@ -200,10 +211,15 @@ function dw_process_checkout_handler() {
 
     // 2. Insert Parent Transaction
     $kode_unik = 'TRX-' . strtoupper(wp_generate_password(6, false));
+    
+    $billing_name = sanitize_text_field($_POST['billing_name']);
+    $billing_phone = sanitize_text_field($_POST['billing_phone']);
+    $billing_addr = sanitize_textarea_field($_POST['billing_address']);
+    
     $billing_data = json_encode([
-        'nama' => sanitize_text_field($_POST['billing_name']),
-        'hp'   => sanitize_text_field($_POST['billing_phone']),
-        'alamat'=> sanitize_textarea_field($_POST['billing_address'])
+        'nama' => $billing_name,
+        'hp'   => $billing_phone,
+        'alamat'=> $billing_addr
     ]);
 
     $wpdb->insert($tbl_transaksi, [
@@ -214,9 +230,9 @@ function dw_process_checkout_handler() {
         'status_pesanan' => 'menunggu_pembayaran',
         'status_transaksi' => 'menunggu_pembayaran',
         'alamat_pengiriman' => $billing_data,
-        'nama_penerima' => sanitize_text_field($_POST['billing_name']),
-        'no_hp' => sanitize_text_field($_POST['billing_phone']),
-        'alamat_lengkap_snapshot' => sanitize_textarea_field($_POST['billing_address']),
+        'nama_penerima' => $billing_name,
+        'no_hp' => $billing_phone,
+        'alamat_lengkap_snapshot' => $billing_addr,
         'metode_pembayaran' => sanitize_text_field($_POST['payment_method']),
         'created_at' => current_time('mysql')
     ]);

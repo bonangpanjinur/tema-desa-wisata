@@ -1,76 +1,73 @@
 <?php
 /**
- * Template untuk menampilkan detail produk (CPT: dw_produk)
+ * Template Name: Detail Produk
  */
 get_header(); 
 
-// Ambil data dari plugin meta
+// Data Plugin
 $product_id = get_the_ID();
-$price = dw_get_product_price($product_id);
-$stock = get_post_meta($product_id, 'dw_stok', true);
-$lokasi = get_post_meta($product_id, 'dw_lokasi', true); // Asumsi key
-$pedagang_id = get_post_field('post_author', $product_id);
-$nama_pedagang = get_the_author_meta('display_name', $pedagang_id);
+$price = get_post_meta($product_id, 'dw_harga_produk', true);
+$stock = get_post_meta($product_id, 'dw_stok_produk', true);
+$lokasi = get_post_meta($product_id, 'dw_lokasi_produk', true);
+
+// Get Author/Pedagang Info
+$author_id = get_post_field('post_author', $product_id);
+$pedagang_data = dw_get_pedagang_data($author_id);
+$nama_toko = $pedagang_data ? $pedagang_data->nama_toko : get_the_author_meta('display_name', $author_id);
 ?>
 
-<div class="dw-single-product-section section-padding">
-    <div class="container">
+<div class="bg-white min-h-screen pb-20">
+    <div class="container mx-auto px-4 py-8">
         <?php while (have_posts()) : the_post(); ?>
-            <div class="row">
-                <!-- Kolom Gambar -->
-                <div class="col-md-6 mb-4">
-                    <div class="product-gallery">
+            <div class="flex flex-col md:flex-row gap-8">
+                <!-- Gallery -->
+                <div class="w-full md:w-1/2">
+                    <div class="aspect-square bg-gray-100 rounded-2xl overflow-hidden mb-4 relative">
                         <?php if (has_post_thumbnail()) : ?>
-                            <div class="main-image mb-3">
-                                <?php the_post_thumbnail('large', ['class' => 'img-fluid rounded shadow-sm']); ?>
-                            </div>
+                            <img src="<?php the_post_thumbnail_url('full'); ?>" class="w-full h-full object-cover">
                         <?php else : ?>
-                            <img src="<?php echo get_template_directory_uri(); ?>/assets/img/placeholder.jpg" class="img-fluid rounded" alt="No Image">
+                            <img src="https://via.placeholder.com/600" class="w-full h-full object-cover">
                         <?php endif; ?>
                     </div>
                 </div>
 
-                <!-- Kolom Detail -->
-                <div class="col-md-6">
-                    <div class="product-details">
-                        <span class="badge bg-secondary mb-2">Produk Desa</span>
-                        <h1 class="product-title mb-2"><?php the_title(); ?></h1>
-                        
-                        <div class="product-meta text-muted mb-3">
-                            <small><i class="fas fa-store"></i> <?php echo esc_html($nama_pedagang); ?></small> | 
-                            <small><i class="fas fa-map-marker-alt"></i> <?php echo esc_html($lokasi ? $lokasi : 'Desa Wisata'); ?></small>
+                <!-- Info Produk -->
+                <div class="w-full md:w-1/2">
+                    <div class="mb-4">
+                        <h1 class="text-2xl md:text-3xl font-bold text-gray-800 mb-2"><?php the_title(); ?></h1>
+                        <div class="flex items-center gap-2 text-sm text-gray-500 mb-4">
+                            <span class="flex items-center gap-1"><i class="fas fa-store text-orange-500"></i> <?php echo esc_html($nama_toko); ?></span>
+                            <span>&bull;</span>
+                            <span class="flex items-center gap-1"><i class="fas fa-map-marker-alt text-red-500"></i> <?php echo esc_html($lokasi); ?></span>
                         </div>
+                        <div class="text-3xl font-bold text-primary mb-6"><?php echo dw_format_rupiah($price); ?></div>
+                    </div>
 
-                        <h2 class="product-price text-primary mb-3">
-                            <?php echo dw_format_rupiah($price); ?>
-                        </h2>
-
-                        <div class="product-description mb-4">
-                            <?php the_content(); ?>
-                        </div>
-
-                        <div class="product-actions border-top pt-4">
-                            <form class="add-to-cart-form" id="form-add-to-cart">
-                                <div class="row g-2 align-items-center">
-                                    <div class="col-auto">
-                                        <label for="quantity" class="visually-hidden">Jumlah</label>
-                                        <input type="number" id="quantity" name="quantity" class="form-control" value="1" min="1" max="<?php echo esc_attr($stock); ?>">
-                                    </div>
-                                    <div class="col">
-                                        <!-- Tombol ini mentrigger assets/js/ajax-cart.js -->
-                                        <button type="button" class="btn btn-primary w-100 btn-add-to-cart" 
-                                            data-product-id="<?php echo get_the_ID(); ?>"
-                                            data-product-name="<?php the_title(); ?>"
-                                            data-product-price="<?php echo esc_attr($price); ?>"
-                                            data-product-image="<?php echo get_the_post_thumbnail_url(get_the_ID(), 'thumbnail'); ?>">
-                                            <i class="fas fa-shopping-cart me-2"></i> Tambah Keranjang
-                                        </button>
-                                    </div>
-                                </div>
-                            </form>
-                            <div class="mt-2">
-                                <small class="text-muted">Stok tersedia: <?php echo esc_html($stock ? $stock : 'Tak Terbatas'); ?></small>
+                    <!-- Add to Cart Form -->
+                    <div class="bg-gray-50 p-6 rounded-2xl border border-gray-100 mb-8">
+                        <div class="flex items-center gap-4 mb-4">
+                            <label class="font-bold text-gray-700">Jumlah:</label>
+                            <div class="flex items-center bg-white border border-gray-300 rounded-lg">
+                                <button type="button" onclick="document.getElementById('qty').stepDown()" class="px-3 py-1 text-gray-500 hover:bg-gray-100 rounded-l-lg">-</button>
+                                <input type="number" id="qty" value="1" min="1" max="<?php echo esc_attr($stock); ?>" class="w-12 text-center border-none focus:ring-0 p-1 text-gray-800 font-bold">
+                                <button type="button" onclick="document.getElementById('qty').stepUp()" class="px-3 py-1 text-gray-500 hover:bg-gray-100 rounded-r-lg">+</button>
                             </div>
+                            <span class="text-sm text-gray-500">Stok: <?php echo esc_html($stock ?: 'Tersedia'); ?></span>
+                        </div>
+
+                        <button type="button" id="btn-add-to-cart" 
+                            data-product-id="<?php echo $product_id; ?>"
+                            class="w-full bg-primary hover:bg-green-700 text-white font-bold py-4 rounded-xl shadow-lg transition flex items-center justify-center gap-2">
+                            <i class="fas fa-cart-plus"></i> Tambah ke Keranjang
+                        </button>
+                        <div id="cart-message" class="mt-3 text-center text-sm font-medium hidden"></div>
+                    </div>
+
+                    <!-- Tabs Deskripsi -->
+                    <div class="border-t border-gray-100 pt-6">
+                        <h3 class="font-bold text-lg text-gray-800 mb-3">Deskripsi Produk</h3>
+                        <div class="prose max-w-none text-gray-600 leading-relaxed">
+                            <?php the_content(); ?>
                         </div>
                     </div>
                 </div>
@@ -78,5 +75,32 @@ $nama_pedagang = get_the_author_meta('display_name', $pedagang_id);
         <?php endwhile; ?>
     </div>
 </div>
+
+<script>
+jQuery(document).ready(function($) {
+    $('#btn-add-to-cart').click(function(e) {
+        e.preventDefault();
+        const btn = $(this);
+        const qty = $('#qty').val();
+        
+        btn.prop('disabled', true).addClass('opacity-75').html('<i class="fas fa-spinner fa-spin"></i> Memproses...');
+
+        $.post(dw_ajax.ajax_url, {
+            action: 'dw_theme_add_to_cart',
+            nonce: dw_ajax.nonce,
+            product_id: btn.data('product-id'),
+            quantity: qty
+        }, function(res) {
+            btn.prop('disabled', false).removeClass('opacity-75').html('<i class="fas fa-check"></i> Berhasil!');
+            if(res.success) {
+                $('#cart-message').removeClass('text-red-500 hidden').addClass('text-green-600').html(res.data.message + ' <a href="'+dw_ajax.site_url+'/cart" class="underline">Lihat Keranjang</a>').fadeIn();
+                setTimeout(() => { btn.html('<i class="fas fa-cart-plus"></i> Tambah ke Keranjang'); }, 2000);
+            } else {
+                $('#cart-message').removeClass('text-green-600 hidden').addClass('text-red-500').text(res.data.message).fadeIn();
+            }
+        });
+    });
+});
+</script>
 
 <?php get_footer(); ?>
