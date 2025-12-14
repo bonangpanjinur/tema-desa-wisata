@@ -1,3 +1,27 @@
+<?php
+/**
+ * Logika Fetch Data Header dari API
+ * Mengambil pengaturan global seperti Nama Aplikasi dari Server Core.
+ */
+$brand_name = get_bloginfo( 'name' ); // Default fallback ke WP Local
+
+if ( function_exists( 'dw_fetch_api_data' ) ) {
+    // Kita panggil endpoint '/settings' (Pastikan endpoint ini dibuat di Plugin Core Anda)
+    // Gunakan transient cache di functions.php agar tidak memberatkan loading setiap halaman
+    $api_settings = dw_fetch_api_data( '/settings' ); 
+    
+    if ( ! empty( $api_settings ) && ! isset( $api_settings['error'] ) ) {
+        // Cek variasi key yang mungkin dikirim oleh API
+        if ( ! empty( $api_settings['app_name'] ) ) {
+            $brand_name = $api_settings['app_name'];
+        } elseif ( ! empty( $api_settings['site_title'] ) ) {
+            $brand_name = $api_settings['site_title'];
+        } elseif ( ! empty( $api_settings['nama_aplikasi'] ) ) {
+            $brand_name = $api_settings['nama_aplikasi'];
+        }
+    }
+}
+?>
 <!DOCTYPE html>
 <html <?php language_attributes(); ?>>
 <head>
@@ -39,8 +63,8 @@
                 <a href="<?php echo home_url(); ?>" class="flex items-center gap-2 hover:opacity-90 transition shrink-0">
                     <!-- Icon Daun -->
                     <i class="fas fa-leaf text-yellow-300 text-2xl"></i>
-                    <!-- Nama Brand (Dinamis dari Settings WordPress) -->
-                    <span class="font-bold text-xl md:text-2xl tracking-tight"><?php bloginfo('name'); ?></span>
+                    <!-- Nama Brand (Dinamis dari API) -->
+                    <span class="font-bold text-xl md:text-2xl tracking-tight"><?php echo esc_html( $brand_name ); ?></span>
                 </a>
 
                 <!-- 2. SEARCH BAR (Tengah - Hidden on Mobile initially) -->
