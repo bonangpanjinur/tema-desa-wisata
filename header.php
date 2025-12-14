@@ -1,23 +1,25 @@
 <?php
 /**
  * Logika Fetch Data Header dari API
- * Mengambil pengaturan global seperti Nama Aplikasi dari Server Core.
+ * Mengambil pengaturan global dari Plugin Core (api-public.php).
  */
-$brand_name = get_bloginfo( 'name' ); // Default fallback ke WP Local
+$brand_name = get_bloginfo( 'name' ); // Default (Fallback)
 
 if ( function_exists( 'dw_fetch_api_data' ) ) {
-    // Kita panggil endpoint '/settings' (Pastikan endpoint ini dibuat di Plugin Core Anda)
-    // Gunakan transient cache di functions.php agar tidak memberatkan loading setiap halaman
+    // Memanggil endpoint /settings yang ada di api-public.php
     $api_settings = dw_fetch_api_data( '/settings' ); 
     
+    // Debug: Uncomment baris di bawah jika ingin melihat raw data di layar (untuk dev)
+    // echo '<pre style="display:none">'; print_r($api_settings); echo '</pre>';
+
     if ( ! empty( $api_settings ) && ! isset( $api_settings['error'] ) ) {
-        // Cek variasi key yang mungkin dikirim oleh API
-        if ( ! empty( $api_settings['app_name'] ) ) {
+        // [FIX] Menggunakan key 'nama_website' sesuai output api-public.php
+        if ( ! empty( $api_settings['nama_website'] ) ) {
+            $brand_name = $api_settings['nama_website'];
+        } 
+        // Fallback ke key lain jika struktur API berubah
+        elseif ( ! empty( $api_settings['app_name'] ) ) {
             $brand_name = $api_settings['app_name'];
-        } elseif ( ! empty( $api_settings['site_title'] ) ) {
-            $brand_name = $api_settings['site_title'];
-        } elseif ( ! empty( $api_settings['nama_aplikasi'] ) ) {
-            $brand_name = $api_settings['nama_aplikasi'];
         }
     }
 }
@@ -30,7 +32,7 @@ if ( function_exists( 'dw_fetch_api_data' ) ) {
     <!-- Font Inter & FontAwesome -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Tailwind CSS (CDN untuk development, gunakan build process untuk production) -->
+    <!-- Tailwind CSS (Gunakan build process untuk production) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
