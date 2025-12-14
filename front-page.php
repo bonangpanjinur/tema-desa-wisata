@@ -5,30 +5,34 @@
 get_header();
 
 // =================================================================================
-// 1. DATA FETCHING (API) & FALLBACK
+// 1. DATA FETCHING (API) & DEBUGGING
 // =================================================================================
+
+$debug_messages = [];
 
 // --- A. Banner Data ---
 $endpoint_banner = '/wp-json/dw/v1/banner';
 $data_banner = function_exists('dw_fetch_api_data') ? dw_fetch_api_data($endpoint_banner) : [];
 $banners = [];
 
-if (isset($data_banner['data']) && is_array($data_banner['data'])) {
+if (isset($data_banner['error']) && $data_banner['error']) {
+    $debug_messages[] = "Banner Error: " . $data_banner['message'] . (isset($data_banner['debug']) ? " (" . $data_banner['debug'] . ")" : "");
+} elseif (isset($data_banner['data']) && is_array($data_banner['data'])) {
     $banners = $data_banner['data'];
-} elseif (is_array($data_banner) && !isset($data_banner['error'])) {
-    $banners = $data_banner;
+} elseif (is_array($data_banner)) {
+    $banners = $data_banner; // Direct array handling
 }
 
-// Fallback Banner jika API Kosong
+// Fallback Banner
 if (empty($banners)) {
     $banners = [
         [
             'gambar' => 'https://images.unsplash.com/photo-1596423736798-75b43694f540?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80',
-            'judul' => 'Pesona Alam Desa', 'label' => 'Terbaru', 'label_color' => 'bg-orange-500'
+            'judul' => 'Pesona Alam Desa', 'label' => 'Terbaru', 'label_color' => 'bg-orange-500', 'link' => '#'
         ],
         [
             'gambar' => 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80',
-            'judul' => 'Kuliner Tradisional', 'label' => 'Info Desa', 'label_color' => 'bg-blue-500'
+            'judul' => 'Kuliner Tradisional', 'label' => 'Info Desa', 'label_color' => 'bg-blue-500', 'link' => '#'
         ]
     ];
 }
@@ -36,10 +40,18 @@ if (empty($banners)) {
 // --- B. Wisata Data ---
 $endpoint_wisata = '/wp-json/dw/v1/wisata';
 $raw_wisata = function_exists('dw_fetch_api_data') ? dw_fetch_api_data($endpoint_wisata) : [];
-$list_wisata = $raw_wisata['data'] ?? ($raw_wisata['error'] ? [] : $raw_wisata);
+$list_wisata = [];
 
-// Fallback Wisata jika API Kosong (Agar Card tidak hilang)
-if (empty($list_wisata)) {
+if (isset($raw_wisata['error']) && $raw_wisata['error']) {
+    $debug_messages[] = "Wisata Error: " . $raw_wisata['message'];
+} else {
+    $list_wisata = $raw_wisata['data'] ?? $raw_wisata;
+}
+
+// Fallback Wisata
+$using_dummy_wisata = false;
+if (empty($list_wisata) || !is_array($list_wisata)) {
+    $using_dummy_wisata = true;
     $list_wisata = [
         ['id' => 1, 'nama_wisata' => 'Bukit Senja Indah', 'lokasi' => 'Desa Wisata', 'harga_tiket' => 15000, 'rating' => 4.8, 'thumbnail' => 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?ixlib=rb-1.2.1&auto=format&fit=crop&w=400&q=80', 'slug' => 'bukit-senja'],
         ['id' => 2, 'nama_wisata' => 'Air Terjun Segar', 'lokasi' => 'Desa Wisata', 'harga_tiket' => 10000, 'rating' => 4.5, 'thumbnail' => 'https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?ixlib=rb-1.2.1&auto=format&fit=crop&w=400&q=80', 'slug' => 'air-terjun'],
@@ -47,15 +59,23 @@ if (empty($list_wisata)) {
         ['id' => 4, 'nama_wisata' => 'Danau Biru', 'lokasi' => 'Desa Wisata', 'harga_tiket' => 5000, 'rating' => 4.7, 'thumbnail' => 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?ixlib=rb-1.2.1&auto=format&fit=crop&w=400&q=80', 'slug' => 'danau-biru']
     ];
 }
-$list_wisata = array_slice($list_wisata, 0, 4); // Ambil 4 teratas
+$list_wisata = array_slice($list_wisata, 0, 4);
 
 // --- C. Produk Data ---
 $endpoint_produk = '/wp-json/dw/v1/produk?per_page=10';
 $raw_produk = function_exists('dw_fetch_api_data') ? dw_fetch_api_data($endpoint_produk) : [];
-$list_produk = $raw_produk['data'] ?? ($raw_produk['error'] ? [] : $raw_produk);
+$list_produk = [];
 
-// Fallback Produk jika API Kosong
-if (empty($list_produk)) {
+if (isset($raw_produk['error']) && $raw_produk['error']) {
+    $debug_messages[] = "Produk Error: " . $raw_produk['message'];
+} else {
+    $list_produk = $raw_produk['data'] ?? $raw_produk;
+}
+
+// Fallback Produk
+$using_dummy_produk = false;
+if (empty($list_produk) || !is_array($list_produk)) {
+    $using_dummy_produk = true;
     $list_produk = [
         ['id' => 1, 'nama_produk' => 'Kopi Robusta Asli', 'nama_toko' => 'Kopi Desa', 'harga_dasar' => 25000, 'thumbnail' => 'https://images.unsplash.com/photo-1559056199-641a0ac8b55e?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&q=80'],
         ['id' => 2, 'nama_produk' => 'Keripik Singkong', 'nama_toko' => 'Snack Maknyus', 'harga_dasar' => 12000, 'thumbnail' => 'https://images.unsplash.com/photo-1599490659213-e2b9527bd087?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&q=80'],
@@ -69,14 +89,37 @@ if (empty($list_produk)) {
      2. VIEW SECTION (SADESA STYLE)
      ================================================================================= -->
 
-<!-- SECTION 1: HERO BANNERS (2 Kolom) -->
-<div class="mb-10">
+<!-- DEBUG ALERT (Only Admin) -->
+<?php if (current_user_can('administrator') && !empty($debug_messages)): ?>
+    <div class="bg-red-50 border-l-4 border-red-500 p-4 m-4 rounded-lg shadow-sm">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <i class="fas fa-exclamation-circle text-red-500"></i>
+            </div>
+            <div class="ml-3">
+                <h3 class="text-sm font-medium text-red-800">Debug Mode: Gagal Mengambil API</h3>
+                <div class="mt-2 text-sm text-red-700">
+                    <ul class="list-disc pl-5 space-y-1">
+                        <?php foreach ($debug_messages as $msg): ?>
+                            <li><?php echo esc_html($msg); ?></li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <p class="mt-2 font-bold">Menampilkan data dummy untuk sementara.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
+
+<!-- SECTION 1: HERO BANNERS -->
+<div class="mb-10 mt-4">
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
         <?php foreach ($banners as $index => $banner) : 
             $img = $banner['gambar'] ?? $banner['image_url'] ?? '';
             $title = $banner['judul'] ?? 'Promo Desa';
             $label = $banner['label'] ?? (($index == 0) ? 'Terbaru' : 'Info Desa');
             $label_bg = $banner['label_color'] ?? (($index == 0) ? 'bg-orange-500' : 'bg-blue-600');
+            $link_url = $banner['link'] ?? '#';
         ?>
         <div class="relative h-48 md:h-64 rounded-2xl overflow-hidden group shadow-md cursor-pointer">
             <img src="<?php echo esc_url($img); ?>" class="w-full h-full object-cover transition duration-700 group-hover:scale-110">
@@ -89,51 +132,42 @@ if (empty($list_produk)) {
                 <h2 class="font-bold text-2xl md:text-3xl leading-tight mb-4 drop-shadow-md">
                     <?php echo esc_html($title); ?>
                 </h2>
-                <button class="bg-white text-gray-800 text-xs md:text-sm font-bold px-5 py-2.5 rounded-lg hover:bg-gray-100 transition shadow-lg transform hover:-translate-y-0.5">
+                <a href="<?php echo esc_url($link_url); ?>" class="inline-block bg-white text-gray-800 text-xs md:text-sm font-bold px-5 py-2.5 rounded-lg hover:bg-gray-100 transition shadow-lg transform hover:-translate-y-0.5">
                     Lihat Detail
-                </button>
+                </a>
             </div>
         </div>
         <?php endforeach; ?>
     </div>
 </div>
 
-<!-- SECTION 2: MENU KATEGORI (Lingkaran Pastel) -->
+<!-- SECTION 2: MENU KATEGORI -->
 <div class="mb-12">
     <div class="grid grid-cols-4 md:flex md:justify-center md:gap-16 gap-4">
-        
-        <!-- Item: Wisata -->
         <a href="<?php echo home_url('/wisata'); ?>" class="flex flex-col items-center gap-3 group">
             <div class="cat-icon-wrapper w-14 h-14 md:w-16 md:h-16 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center shadow-sm group-hover:bg-green-600 group-hover:text-white">
                 <i class="fas fa-map-marked-alt text-2xl md:text-3xl"></i>
             </div>
             <span class="text-xs md:text-sm font-bold text-gray-600 group-hover:text-green-600 transition-colors">Wisata</span>
         </a>
-
-        <!-- Item: Produk -->
         <a href="<?php echo home_url('/produk'); ?>" class="flex flex-col items-center gap-3 group">
             <div class="cat-icon-wrapper w-14 h-14 md:w-16 md:h-16 bg-orange-100 text-orange-500 rounded-2xl flex items-center justify-center shadow-sm group-hover:bg-orange-500 group-hover:text-white">
                 <i class="fas fa-box-open text-2xl md:text-3xl"></i>
             </div>
             <span class="text-xs md:text-sm font-bold text-gray-600 group-hover:text-orange-500 transition-colors">Produk</span>
         </a>
-
-        <!-- Item: Homestay -->
         <a href="#" class="flex flex-col items-center gap-3 group">
             <div class="cat-icon-wrapper w-14 h-14 md:w-16 md:h-16 bg-blue-100 text-blue-500 rounded-2xl flex items-center justify-center shadow-sm group-hover:bg-blue-500 group-hover:text-white">
                 <i class="fas fa-bed text-2xl md:text-3xl"></i>
             </div>
             <span class="text-xs md:text-sm font-bold text-gray-600 group-hover:text-blue-500 transition-colors">Homestay</span>
         </a>
-
-        <!-- Item: Kuliner -->
         <a href="#" class="flex flex-col items-center gap-3 group">
             <div class="cat-icon-wrapper w-14 h-14 md:w-16 md:h-16 bg-purple-100 text-purple-500 rounded-2xl flex items-center justify-center shadow-sm group-hover:bg-purple-500 group-hover:text-white">
                 <i class="fas fa-utensils text-2xl md:text-3xl"></i>
             </div>
             <span class="text-xs md:text-sm font-bold text-gray-600 group-hover:text-purple-500 transition-colors">Kuliner</span>
         </a>
-
     </div>
 </div>
 
@@ -149,10 +183,9 @@ if (empty($list_produk)) {
         </a>
     </div>
 
-    <!-- Grid Card Wisata (Desain Card Sadesa) -->
+    <!-- Grid Card Wisata -->
     <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
         <?php foreach($list_wisata as $wisata): 
-            // Handle Data (Array/Object)
             $wisata = (array)$wisata;
             $id = $wisata['id'];
             $img = $wisata['thumbnail'] ?? 'https://via.placeholder.com/400x300';
@@ -161,13 +194,19 @@ if (empty($list_produk)) {
             $price = isset($wisata['harga_tiket']) && $wisata['harga_tiket'] > 0 ? 'Rp '.number_format($wisata['harga_tiket'],0,',','.') : 'Gratis';
             $rating = $wisata['rating'] ?? 4.8;
             
-            // LINK LOGIC (Fix: Gunakan get_permalink jika post nyata, atau custom link jika dari API)
-            $link = get_permalink($id);
-            if (!$link || strpos($link, 'page_id') !== false) {
-                $link = home_url('/?p=' . $id . '&post_type=dw_wisata');
+            // LINK LOGIC (Fix Link Detail)
+            if ($using_dummy_wisata) {
+                $link = '#'; // Dummy link
+            } else {
+                // Coba ambil permalink post asli
+                $link = get_permalink($id);
+                // Jika tidak valid (karena post type mungkin belum di flush), gunakan custom link parameter
+                if (!$link || strpos($link, 'page_id') !== false) {
+                    $link = home_url('/?p=' . $id . '&post_type=dw_wisata');
+                }
             }
         ?>
-        <div class="card-sadesa group"> <!-- Class dari assets/css/main.css -->
+        <div class="card-sadesa group">
             <div class="card-img-wrap">
                 <img src="<?php echo esc_url($img); ?>" alt="<?php echo esc_attr($title); ?>">
                 <div class="badge-rating"><i class="fas fa-star text-yellow-400"></i> <?php echo $rating; ?></div>
@@ -186,7 +225,6 @@ if (empty($list_produk)) {
                         <p class="price-label">Tiket Masuk</p>
                         <p class="price-tag"><?php echo $price; ?></p>
                     </div>
-                    <!-- FIX: Link Detail -->
                     <a href="<?php echo esc_url($link); ?>" class="btn-detail">Lihat Detail <i class="fas fa-arrow-right ml-1"></i></a>
                 </div>
             </div>
@@ -207,7 +245,7 @@ if (empty($list_produk)) {
         </a>
     </div>
 
-    <!-- Grid Produk (2 Col Mobile, 5 Col Desktop) -->
+    <!-- Grid Produk -->
     <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
         <?php foreach($list_produk as $produk): 
             $produk = (array)$produk;
@@ -218,13 +256,16 @@ if (empty($list_produk)) {
             $price = number_format($produk['harga_dasar'] ?? 0, 0, ',', '.');
             
             // LINK LOGIC
-            $link = get_permalink($id);
-            if (!$link || strpos($link, 'page_id') !== false) {
-                $link = home_url('/?p=' . $id . '&post_type=dw_produk');
+            if ($using_dummy_produk) {
+                $link = '#';
+            } else {
+                $link = get_permalink($id);
+                if (!$link || strpos($link, 'page_id') !== false) {
+                    $link = home_url('/?p=' . $id . '&post_type=dw_produk');
+                }
             }
         ?>
         <div class="card-sadesa group relative">
-            <!-- Link Pembungkus Utama ke Detail -->
             <a href="<?php echo esc_url($link); ?>" class="block h-full flex flex-col">
                 <div class="card-img-wrap aspect-square bg-gray-100">
                     <img src="<?php echo esc_url($img); ?>" alt="<?php echo esc_attr($title); ?>">
