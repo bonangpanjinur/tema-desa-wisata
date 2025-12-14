@@ -141,7 +141,7 @@ while (have_posts()) : the_post();
                 <hr class="border-gray-200">
                 <?php endif; ?>
 
-                <!-- Section: Lokasi (Map Embed Placeholder) -->
+                <!-- Section: Lokasi (Updated: Clean Design) -->
                 <div id="lokasi" class="scroll-mt-32">
                     <h2 class="text-xl font-bold text-gray-900 mb-4">Lokasi & Peta</h2>
                     <p class="text-gray-600 mb-4 flex items-start gap-2">
@@ -149,21 +149,22 @@ while (have_posts()) : the_post();
                         <?php echo esc_html($lokasi); ?>
                     </p>
                     
-                    <div class="relative w-full h-[300px] bg-gray-200 rounded-2xl overflow-hidden group">
-                        <!-- Static Map Image Background -->
-                        <div class="absolute inset-0 bg-[url('https://maps.googleapis.com/maps/api/staticmap?center=-6.200000,106.816666&zoom=13&size=800x400&sensor=false&key=YOUR_API_KEY_HERE')] bg-cover bg-center grayscale group-hover:grayscale-0 transition duration-500 opacity-50"></div>
-                        <div class="absolute inset-0 bg-gray-100/50"></div>
+                    <div class="relative w-full h-[250px] bg-gray-50 rounded-2xl overflow-hidden group border border-gray-200">
+                        <!-- Generic Map Pattern Background (No API Key needed) -->
+                        <div class="absolute inset-0 opacity-10 bg-[url('https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/World_map_blank_without_borders.svg/2000px-World_map_blank_without_borders.svg.png')] bg-cover bg-center"></div>
                         
-                        <div class="absolute inset-0 flex flex-col items-center justify-center">
-                            <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg text-red-500 mb-3 animate-bounce">
-                                <i class="fas fa-map-marker-alt text-3xl"></i>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-10">
+                            <div class="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-sm text-red-500 mb-3 animate-bounce-slow">
+                                <i class="fas fa-map-marked-alt text-2xl"></i>
                             </div>
+                            
                             <?php if ($gmaps_url) : ?>
-                                <a href="<?php echo esc_url($gmaps_url); ?>" target="_blank" class="bg-primary hover:bg-green-700 text-white px-6 py-3 rounded-full font-bold shadow-lg transition transform hover:scale-105 flex items-center gap-2">
+                                <a href="<?php echo esc_url($gmaps_url); ?>" target="_blank" class="bg-primary hover:bg-green-700 text-white px-8 py-3 rounded-full font-bold shadow-lg transition transform hover:-translate-y-1 flex items-center gap-2">
                                     <i class="fas fa-location-arrow"></i> Buka Google Maps
                                 </a>
+                                <p class="text-xs text-gray-500 mt-2">Klik tombol di atas untuk navigasi langsung</p>
                             <?php else : ?>
-                                <span class="text-gray-500 font-medium">Koordinat peta belum diatur</span>
+                                <span class="text-gray-400 font-medium bg-white/60 px-4 py-2 rounded-lg border border-gray-200 text-sm">Link peta belum diatur oleh admin</span>
                             <?php endif; ?>
                         </div>
                     </div>
