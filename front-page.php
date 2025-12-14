@@ -129,32 +129,37 @@ $list_produk = $raw_produk['data'] ?? ($raw_produk['error'] ? [] : $raw_produk);
         </a>
     </div>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5">
+    <!-- Grid Card Wisata -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
         <?php if($list_wisata): foreach($list_wisata as $wisata): 
+            $id = $wisata['id'];
             $img = $wisata['thumbnail'] ?? 'https://via.placeholder.com/400x300';
             $title = $wisata['nama_wisata'] ?? 'Wisata';
             $loc = $wisata['lokasi'] ?? 'Desa Wisata';
             $price = isset($wisata['harga_tiket']) && $wisata['harga_tiket'] > 0 ? 'Rp '.number_format($wisata['harga_tiket'],0,',','.') : 'Gratis';
+            $rating = $wisata['rating'] ?? 4.8;
+            $link = get_permalink($id) ?: home_url('/?p='.$id.'&post_type=dw_wisata');
         ?>
-        <div class="card-sadesa group"> <!-- class card-sadesa ada di main.css -->
-            <div class="relative h-48 overflow-hidden">
-                <img src="<?php echo esc_url($img); ?>" class="w-full h-full object-cover transition duration-700 group-hover:scale-110">
-                <div class="absolute top-3 right-3 rating-badge"> <!-- class rating-badge ada di main.css -->
-                    <i class="fas fa-star text-yellow-400 text-xs"></i> 4.8
-                </div>
+        <div class="card-sadesa group"> <!-- Style from main.css -->
+            <div class="card-img-wrap">
+                <img src="<?php echo esc_url($img); ?>" alt="<?php echo esc_attr($title); ?>">
+                <div class="badge-rating"><i class="fas fa-star text-yellow-400"></i> <?php echo $rating; ?></div>
+                <div class="badge-category">Wisata</div>
             </div>
-            <div class="p-4 flex flex-col flex-1">
-                <h4 class="font-bold text-gray-800 text-lg mb-1 truncate"><?php echo esc_html($title); ?></h4>
-                <div class="flex items-center text-xs text-gray-500 mb-4">
-                    <i class="fas fa-map-marker-alt text-red-400 mr-1.5"></i> <?php echo esc_html($loc); ?>
+            
+            <div class="card-body">
+                <h3 class="card-title group-hover:text-primary transition"><?php echo esc_html($title); ?></h3>
+                <div class="card-meta">
+                    <i class="fas fa-map-marker-alt text-red-400"></i>
+                    <span class="truncate"><?php echo esc_html($loc); ?></span>
                 </div>
                 
-                <div class="mt-auto pt-3 border-t border-dashed border-gray-100 flex justify-between items-center">
+                <div class="card-footer">
                     <div>
-                        <p class="text-[10px] text-gray-400 font-medium">Tiket Masuk</p>
-                        <p class="text-primary font-bold text-sm"><?php echo $price; ?></p>
+                        <p class="price-label">Tiket Masuk</p>
+                        <p class="price-tag"><?php echo $price; ?></p>
                     </div>
-                    <a href="<?php echo home_url('/?wisata_id='.$wisata['id']); ?>" class="btn-detail-soft">Detail</a>
+                    <a href="<?php echo esc_url($link); ?>" class="btn-detail">Lihat Detail <i class="fas fa-arrow-right ml-1"></i></a>
                 </div>
             </div>
         </div>
@@ -179,38 +184,39 @@ $list_produk = $raw_produk['data'] ?? ($raw_produk['error'] ? [] : $raw_produk);
     <!-- Grid Produk (2 Col Mobile, 5 Col Desktop) -->
     <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
         <?php if($list_produk): foreach($list_produk as $produk): 
+            $id = $produk['id'];
             $img = $produk['thumbnail'] ?? 'https://via.placeholder.com/300x300';
             $title = $produk['nama_produk'] ?? 'Produk';
             $shop = $produk['nama_toko'] ?? 'UMKM Desa';
             $price = number_format($produk['harga_dasar'] ?? 0, 0, ',', '.');
+            $link = get_permalink($id) ?: home_url('/?p='.$id.'&post_type=dw_produk');
         ?>
-        <div class="card-sadesa group">
-            <div class="aspect-square relative overflow-hidden bg-gray-100">
-                <img src="<?php echo esc_url($img); ?>" class="w-full h-full object-cover transition duration-500 group-hover:scale-105">
-            </div>
-            <div class="p-3 flex flex-col flex-1">
-                <h4 class="font-semibold text-gray-800 text-sm leading-snug mb-1 line-clamp-2 min-h-[2.5em]"><?php echo esc_html($title); ?></h4>
-                
-                <div class="flex items-center gap-1 mb-3">
-                    <i class="fas fa-store text-[10px] text-gray-400"></i>
-                    <p class="text-[10px] text-gray-500 truncate max-w-[100px]"><?php echo esc_html($shop); ?></p>
+        <div class="card-sadesa group relative">
+            <a href="<?php echo esc_url($link); ?>" class="block h-full flex flex-col">
+                <div class="card-img-wrap aspect-square bg-gray-100">
+                    <img src="<?php echo esc_url($img); ?>" alt="<?php echo esc_attr($title); ?>">
                 </div>
-
-                <div class="mt-auto flex items-end justify-between">
-                    <div>
-                        <p class="text-primary font-bold text-sm">Rp <?php echo $price; ?></p>
-                        <p class="text-[10px] text-gray-400">Terjual 0</p>
+                <div class="card-body p-3 flex-1">
+                    <h4 class="text-sm font-bold text-gray-800 leading-snug mb-1 line-clamp-2 min-h-[2.5em] group-hover:text-primary transition"><?php echo esc_html($title); ?></h4>
+                    <div class="flex items-center gap-1 mb-2 text-[10px] text-gray-500">
+                        <i class="fas fa-store"></i> <span class="truncate"><?php echo esc_html($shop); ?></span>
                     </div>
-                    <!-- Cart Button (AJAX Class di main.js) -->
-                    <button class="add-to-cart-btn btn-cart-circle" 
-                            data-id="<?php echo $produk['id']; ?>" 
-                            data-title="<?php echo esc_attr($title); ?>" 
-                            data-price="<?php echo $produk['harga_dasar']; ?>" 
-                            data-thumb="<?php echo esc_url($img); ?>">
-                        <i class="fas fa-cart-plus text-xs"></i>
-                    </button>
+                    <div class="mt-auto pt-2 border-t border-dashed border-gray-100 flex justify-between items-end">
+                        <div>
+                            <p class="text-primary font-bold text-sm">Rp <?php echo $price; ?></p>
+                            <p class="text-[9px] text-gray-400">Terjual 0</p>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            </a>
+            <!-- Add to Cart Button (Overlay) -->
+            <button class="btn-add-cart absolute bottom-3 right-3 shadow-sm z-10 add-to-cart-btn"
+                    data-id="<?php echo $id; ?>" 
+                    data-title="<?php echo esc_attr($title); ?>" 
+                    data-price="<?php echo $produk['harga_dasar']; ?>" 
+                    data-thumb="<?php echo esc_url($img); ?>">
+                <i class="fas fa-cart-plus text-xs"></i>
+            </button>
         </div>
         <?php endforeach; else: ?>
             <p class="col-span-full text-center text-gray-400 py-10">Belum ada produk.</p>
