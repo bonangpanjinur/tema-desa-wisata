@@ -20,7 +20,7 @@ $list_wisata = $data_api['data'] ?? [];
 $total_pages = $data_api['total_pages'] ?? 1;
 
 // --- 2. FETCH DATA KATEGORI (DINAMIS) ---
-$categories = ['' => 'Semua']; // Opsi default
+$categories = []; // Array untuk menampung kategori
 
 if (function_exists('dw_fetch_api_data')) {
     // Mengambil data dari endpoint kategori
@@ -30,12 +30,19 @@ if (function_exists('dw_fetch_api_data')) {
     if (!empty($api_cats) && !isset($api_cats['error']) && is_array($api_cats)) {
         foreach ($api_cats as $cat) {
             // API mengembalikan array: ['id' => 1, 'nama' => 'Alam', 'slug' => 'alam']
+            // Kita perlu menangani jika $cat berupa object atau array
             $slug = is_array($cat) ? $cat['slug'] : $cat->slug;
             $name = is_array($cat) ? $cat['nama'] : $cat->nama;
             $categories[$slug] = $name;
         }
     }
 }
+
+// Tambahkan opsi 'Semua' di awal array jika belum ada
+if (!array_key_exists('', $categories)) {
+    $categories = array_merge(['' => 'Semua'], $categories);
+}
+
 ?>
 
 <div class="bg-gray-50 min-h-screen pb-20">
