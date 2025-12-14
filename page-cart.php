@@ -1,51 +1,97 @@
 <?php
 /**
- * Template Name: Halaman Cart
+ * Template Name: Halaman Keranjang (Cart)
  */
-get_header(); ?>
 
-<div class="bg-gray-50 py-10 min-h-screen">
-    <div class="container mx-auto px-4">
-        <h1 class="text-2xl font-bold mb-6 text-gray-800">Keranjang Belanja</h1>
+get_header(); 
+$cart_items = dw_get_cart_items(); // Mengambil data session dari helper di functions.php
+?>
 
-        <div class="flex flex-col lg:flex-row gap-8">
-            <!-- Cart Items List -->
-            <div class="lg:w-2/3">
-                <div class="bg-white rounded-lg shadow-sm overflow-hidden" id="cart-container">
-                    <!-- Javascript will render items here -->
-                    <div class="p-8 text-center text-gray-500" id="cart-empty-state">
-                        <i class="fas fa-shopping-basket text-4xl mb-4 text-gray-300"></i>
-                        <p>Keranjang belanja Anda kosong.</p>
-                        <a href="<?php echo home_url('/produk'); ?>" class="text-primary font-semibold hover:underline mt-2 inline-block">Mulai Belanja</a>
+<div class="dw-cart-section section-padding">
+    <div class="container">
+        <h1 class="page-title mb-5 text-center">Keranjang Belanja</h1>
+
+        <?php if (empty($cart_items)) : ?>
+            <div class="empty-cart text-center py-5">
+                <div class="mb-4">
+                    <i class="fas fa-shopping-basket fa-4x text-muted"></i>
+                </div>
+                <h3>Keranjang Anda Kosong</h3>
+                <p class="text-muted mb-4">Ayo jelajahi produk desa wisata kami!</p>
+                <a href="<?php echo home_url('/produk'); ?>" class="btn btn-primary">Belanja Sekarang</a>
+            </div>
+        <?php else : ?>
+            <div class="row">
+                <!-- List Produk -->
+                <div class="col-lg-8">
+                    <div class="card shadow-sm border-0 mb-4">
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Produk</th>
+                                            <th>Harga</th>
+                                            <th>Jumlah</th>
+                                            <th>Subtotal</th>
+                                            <th>Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($cart_items as $key => $item) : 
+                                            $subtotal = $item['price'] * $item['quantity'];
+                                        ?>
+                                        <tr data-cart-item-key="<?php echo esc_attr($key); ?>">
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <?php if(!empty($item['image'])): ?>
+                                                        <img src="<?php echo esc_url($item['image']); ?>" alt="<?php echo esc_attr($item['name']); ?>" class="rounded me-3" style="width: 50px; height: 50px; object-fit: cover;">
+                                                    <?php endif; ?>
+                                                    <div>
+                                                        <h6 class="mb-0"><a href="<?php echo get_permalink($item['product_id']); ?>" class="text-decoration-none text-dark"><?php echo esc_html($item['name']); ?></a></h6>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td><?php echo dw_format_rupiah($item['price']); ?></td>
+                                            <td>
+                                                <input type="number" class="form-control form-control-sm dw-cart-qty" style="width: 70px;" value="<?php echo esc_attr($item['quantity']); ?>" min="1">
+                                            </td>
+                                            <td class="fw-bold"><?php echo dw_format_rupiah($subtotal); ?></td>
+                                            <td>
+                                                <button class="btn btn-sm btn-outline-danger remove-cart-item" data-key="<?php echo esc_attr($key); ?>"><i class="fas fa-trash"></i></button>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ringkasan Pesanan -->
+                <div class="col-lg-4">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-body">
+                            <h5 class="card-title mb-4">Ringkasan Pesanan</h5>
+                            <div class="d-flex justify-content-between mb-3">
+                                <span>Total Item</span>
+                                <span><?php echo count($cart_items); ?></span>
+                            </div>
+                            <hr>
+                            <div class="d-flex justify-content-between mb-4">
+                                <span class="fw-bold">Total Belanja</span>
+                                <span class="fw-bold text-primary fs-5"><?php echo dw_format_rupiah(dw_get_cart_total()); ?></span>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <a href="<?php echo home_url('/checkout'); ?>" class="btn btn-primary btn-lg">Lanjut Pembayaran</a>
+                                <a href="<?php echo home_url('/produk'); ?>" class="btn btn-outline-secondary">Lanjut Belanja</a>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-
-            <!-- Summary -->
-            <div class="lg:w-1/3">
-                <div class="bg-white p-6 rounded-lg shadow-sm sticky top-24">
-                    <h3 class="font-bold text-lg mb-4 text-gray-800">Ringkasan Belanja</h3>
-                    
-                    <div class="flex justify-between mb-2 text-gray-600">
-                        <span>Total Item</span>
-                        <span id="summary-count">0 barang</span>
-                    </div>
-                    <div class="border-t border-gray-100 my-4"></div>
-                    <div class="flex justify-between mb-6 text-lg font-bold text-gray-900">
-                        <span>Total Harga</span>
-                        <span id="summary-total">Rp 0</span>
-                    </div>
-
-                    <a href="<?php echo home_url('/checkout'); ?>" id="btn-checkout" class="block w-full bg-primary text-white text-center font-bold py-3 rounded-md hover:bg-secondary transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed">
-                        Lanjut ke Pembayaran
-                    </a>
-                    
-                    <button onclick="clearCart()" class="block w-full text-gray-400 text-sm mt-4 hover:text-red-500">
-                        Kosongkan Keranjang
-                    </button>
-                </div>
-            </div>
-        </div>
+        <?php endif; ?>
     </div>
 </div>
 

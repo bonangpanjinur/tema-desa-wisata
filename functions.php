@@ -1,133 +1,233 @@
 <?php
 /**
- * Functions and definitions for Desa Wisata API Theme
- * Version: 2.1.0 (With Debugger)
+ * Functions and definitions for Tema Desa Wisata
  */
 
-// 1. Konfigurasi API
-function dw_api_customize_register( $wp_customize ) {
-    $wp_customize->add_section( 'dw_api_settings', array(
-        'title'    => __( 'Konfigurasi API Desa Wisata', 'dw-api-theme' ),
-        'priority' => 30,
-    ) );
-
-    $wp_customize->add_setting( 'dw_api_base_url', array(
-        'default'   => 'https://admin.bonang.my.id', // Pastikan tanpa trailing slash
-        'transport' => 'refresh',
-    ) );
-
-    $wp_customize->add_control( 'dw_api_base_url', array(
-        'label'    => __( 'URL Website Server (Core)', 'dw-api-theme' ),
-        'description' => 'Masukkan URL utama website server (contoh: https://admin.bonang.my.id)',
-        'section'  => 'dw_api_settings',
-        'type'     => 'url',
-    ) );
-}
-add_action( 'customize_register', 'dw_api_customize_register' );
-
-/**
- * 2. Fungsi Fetching Data Utama (Updated)
- */
-function dw_fetch_api_data( $endpoint, $cache_time = 300 ) { // Cache dikurangi jadi 5 menit utk dev
-    // Ambil Base URL
-    $base_url = get_theme_mod( 'dw_api_base_url', 'https://admin.bonang.my.id' );
-    $base_url = untrailingslashit( $base_url );
-
-    // Bersihkan endpoint agar tidak double slash
-    $endpoint = '/' . ltrim( $endpoint, '/' );
-    
-    // Susun URL Lengkap
-    $full_url = $base_url . $endpoint;
-
-    // Cek apakah URL valid
-    if ( filter_var( $full_url, FILTER_VALIDATE_URL ) === false ) {
-        return array( 'error' => true, 'message' => 'URL API tidak valid: ' . $full_url );
-    }
-
-    // Cache Check (Skip jika user admin agar data selalu fresh)
-    $cache_key = 'dw_api_' . md5( $full_url );
-    if ( ! current_user_can( 'administrator' ) ) {
-        $cached_data = get_transient( $cache_key );
-        if ( false !== $cached_data ) return $cached_data;
-    }
-
-    // Request ke Server
-    $response = wp_remote_get( $full_url, array(
-        'timeout'   => 20, 
-        'sslverify' => false, // Penting untuk dev environment/self-signed SSL
-        'headers'   => array( 
-            'Accept' => 'application/json',
-            'User-Agent' => 'DesaWisataTheme/2.0'
-        )
-    ) );
-
-    // Debugging untuk Admin (Akan muncul di inspect element -> console)
-    if ( current_user_can( 'administrator' ) ) {
-        $status = is_wp_error( $response ) ? $response->get_error_message() : wp_remote_retrieve_response_code( $response );
-        echo "<script>console.log('API Fetch [$endpoint]:', " . json_encode(['url' => $full_url, 'status' => $status]) . ");</script>";
-    }
-
-    // Handle Error Koneksi (WP Error)
-    if ( is_wp_error( $response ) ) {
-        return array( 'error' => true, 'message' => 'Koneksi Gagal: ' . $response->get_error_message() );
-    }
-
-    $response_code = wp_remote_retrieve_response_code( $response );
-    $body = wp_remote_retrieve_body( $response );
-
-    // Handle HTTP Error (404, 500, dll)
-    if ( $response_code !== 200 ) {
-        return array( 
-            'error'   => true, 
-            'message' => "HTTP Error $response_code",
-            'debug'   => "URL: $full_url | Response: " . substr($body, 0, 200) . "..."
-        );
-    }
-
-    $data = json_decode( $body, true );
-
-    // Handle JSON Error
-    if ( json_last_error() !== JSON_ERROR_NONE ) {
-        return array( 
-            'error'   => true, 
-            'message' => 'Format JSON Salah',
-            'debug'   => "Error: " . json_last_error_msg() . " | Body: " . substr($body, 0, 100)
-        );
-    }
-
-    // Simpan Cache jika sukses
-    if ( ! isset( $data['error'] ) && ! isset( $data['code'] ) ) {
-        set_transient( $cache_key, $data, $cache_time );
-    }
-
-    return $data;
+if (!defined('ABSPATH')) {
+    exit; // Exit if accessed directly.
 }
 
-/**
- * 3. Script Loader (Data untuk JS)
- */
-function dw_theme_scripts() {
-    // CSS
-    wp_enqueue_style( 'dw-style', get_stylesheet_uri(), array(), '2.1.0' );
-    wp_enqueue_style( 'dw-main', get_template_directory_uri() . '/assets/css/main.css', array(), '2.1.0' );
+// 1. Setup Dasar Theme
+function tema_desa_wisata_setup() {
+    add_theme_support('title-tag');
+    add_theme_support('post-thumbnails');
+    add_theme_support('custom-logo');
+    add_theme_support('html5', array('search-form', 'comment-form', 'comment-list', 'gallery', 'caption'));
     
-    // JS
-    wp_enqueue_script( 'dw-main-js', get_template_directory_uri() . '/assets/js/main.js', array('jquery'), '2.1.0', true );
-
-    // Localize Script (Agar JS tahu URL API)
-    $api_base = get_theme_mod( 'dw_api_base_url', 'https://admin.bonang.my.id' );
-    wp_localize_script( 'dw-main-js', 'dwData', array(
-        'api_url' => untrailingslashit($api_base) . '/wp-json/dw/v1/',
-        'site_url' => home_url(),
-        'nonce' => wp_create_nonce('dw_nonce')
+    // Register Menus
+    register_nav_menus(array(
+        'primary' => __('Primary Menu', 'tema-desa-wisata'),
+        'footer'  => __('Footer Menu', 'tema-desa-wisata'),
     ));
 }
-add_action( 'wp_enqueue_scripts', 'dw_theme_scripts' );
+add_action('after_setup_theme', 'tema_desa_wisata_setup');
+
+// 2. Enqueue Scripts & Styles
+function tema_desa_wisata_scripts() {
+    // Load CSS Utama
+    wp_enqueue_style('main-style', get_template_directory_uri() . '/assets/css/main.css', array(), '1.0.0');
+    wp_enqueue_style('theme-style', get_stylesheet_uri()); // style.css
+
+    // Load JS Utama
+    wp_enqueue_script('main-script', get_template_directory_uri() . '/assets/js/main.js', array('jquery'), '1.0.0', true);
+
+    // Load Ajax Cart Script (Wajib untuk integrasi Plugin)
+    wp_enqueue_script('ajax-cart', get_template_directory_uri() . '/assets/js/ajax-cart.js', array('jquery'), '1.0.0', true);
+
+    // Localize Script untuk AJAX
+    wp_localize_script('ajax-cart', 'dw_ajax', array(
+        'ajax_url' => admin_url('admin-ajax.php'),
+        'nonce'    => wp_create_nonce('dw_cart_nonce'),
+        'cart_url' => home_url('/cart'), // Pastikan slug page-cart.php adalah 'cart'
+        'checkout_url' => home_url('/checkout')
+    ));
+}
+add_action('wp_enqueue_scripts', 'tema_desa_wisata_scripts');
+
+// 3. Helper Functions Integrasi Plugin
 
 /**
- * 4. Helper: Format Harga
+ * Cek apakah Plugin Desa Wisata Core aktif
  */
-function dw_format_price($price) {
-    return 'Rp ' . number_format((float)$price, 0, ',', '.');
+function is_dw_core_active() {
+    return class_exists('Desa_Wisata_Core');
 }
+
+/**
+ * Format Rupiah
+ */
+function dw_format_rupiah($angka) {
+    return 'Rp ' . number_format($angka, 0, ',', '.');
+}
+
+/**
+ * Get Harga Produk (Mengambil dari Meta Box Plugin)
+ */
+function dw_get_product_price($post_id) {
+    // Asumsi meta key di plugin adalah 'dw_harga' atau '_price'
+    // Sesuaikan dengan logic di includes/meta-boxes.php plugin Anda
+    $price = get_post_meta($post_id, 'dw_harga', true);
+    return $price ? $price : 0;
+}
+
+/**
+ * Redirect User setelah Login berdasarkan Role
+ */
+function dw_login_redirect($redirect_to, $request, $user) {
+    if (isset($user->roles) && is_array($user->roles)) {
+        if (in_array('administrator', $user->roles)) {
+            return admin_url();
+        } elseif (in_array('dw_admin_desa', $user->roles)) {
+            return home_url('/dashboard-desa'); // Sesuai page-dashboard-desa.php
+        } elseif (in_array('dw_pedagang', $user->roles)) {
+            return home_url('/dashboard-toko'); // Sesuai page-dashboard-toko.php
+        } else {
+            return home_url('/akun-saya'); // User biasa/pembeli
+        }
+    }
+    return $redirect_to;
+}
+add_filter('login_redirect', 'dw_login_redirect', 10, 3);
+
+/**
+ * Start Session jika belum ada (Untuk Cart)
+ */
+function dw_start_session() {
+    if (!session_id()) {
+        session_start();
+    }
+}
+add_action('init', 'dw_start_session', 1);
+
+/**
+ * Mendapatkan item di keranjang (Helper sederhana)
+ */
+function dw_get_cart_items() {
+    if (isset($_SESSION['dw_cart']) && !empty($_SESSION['dw_cart'])) {
+        return $_SESSION['dw_cart'];
+    }
+    return array();
+}
+
+/**
+ * Hitung Total Keranjang
+ */
+function dw_get_cart_total() {
+    $items = dw_get_cart_items();
+    $total = 0;
+    foreach ($items as $item) {
+        $total += $item['price'] * $item['quantity'];
+    }
+    return $total;
+}
+
+/**
+ * [BARU] Fungsi Helper untuk Menyimpan Transaksi ke Database Plugin
+ * Fungsi ini akan dipanggil oleh handler checkout.
+ */
+function dw_create_transaction($user_id, $items, $billing_data, $total_amount, $payment_method) {
+    global $wpdb;
+    
+    // Nama tabel sesuai dengan prefix WP dan nama tabel di activation.php plugin
+    $table_transaksi = $wpdb->prefix . 'dw_transaksi'; // Pastikan nama ini sama dengan di activation.php
+    $table_detail = $wpdb->prefix . 'dw_detail_transaksi';
+
+    // 1. Insert ke Tabel Transaksi Utama
+    $result = $wpdb->insert(
+        $table_transaksi,
+        array(
+            'user_id' => $user_id,
+            'total_amount' => $total_amount,
+            'status' => 'pending', // Status awal
+            'payment_method' => $payment_method,
+            'billing_name' => $billing_data['name'],
+            'billing_email' => $billing_data['email'],
+            'billing_phone' => $billing_data['phone'],
+            'billing_address' => $billing_data['address'],
+            'order_note' => $billing_data['note'],
+            'created_at' => current_time('mysql')
+        ),
+        array('%d', '%f', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
+    );
+
+    if ($result === false) {
+        return false; // Gagal insert
+    }
+
+    $transaction_id = $wpdb->insert_id;
+
+    // 2. Insert ke Tabel Detail Transaksi (Looping item)
+    foreach ($items as $item) {
+        $wpdb->insert(
+            $table_detail,
+            array(
+                'transaction_id' => $transaction_id,
+                'product_id' => $item['product_id'],
+                'quantity' => $item['quantity'],
+                'price' => $item['price'],
+                'subtotal' => $item['price'] * $item['quantity']
+            ),
+            array('%d', '%d', '%d', '%f', '%f')
+        );
+    }
+
+    return $transaction_id;
+}
+
+/**
+ * [BARU] Handler Form Checkout
+ * Menangani POST request dari page-checkout.php
+ */
+function dw_handle_checkout_process() {
+    if (isset($_POST['action']) && $_POST['action'] === 'dw_process_checkout') {
+        
+        // Verifikasi Nonce
+        if (!isset($_POST['dw_checkout_nonce']) || !wp_verify_nonce($_POST['dw_checkout_nonce'], 'dw_checkout_action')) {
+            wp_die('Security check failed');
+        }
+
+        // Cek Login
+        if (!is_user_logged_in()) {
+            wp_die('Anda harus login untuk melakukan checkout.');
+        }
+
+        $user_id = get_current_user_id();
+        $cart_items = dw_get_cart_items();
+        
+        if (empty($cart_items)) {
+            wp_redirect(home_url('/cart'));
+            exit;
+        }
+
+        // Ambil Data Billing
+        $billing_data = array(
+            'name' => sanitize_text_field($_POST['billing_name']),
+            'email' => sanitize_email($_POST['billing_email']),
+            'phone' => sanitize_text_field($_POST['billing_phone']),
+            'address' => sanitize_textarea_field($_POST['billing_address']),
+            'note' => sanitize_textarea_field($_POST['order_note']),
+        );
+        
+        $payment_method = sanitize_text_field($_POST['payment_method']);
+        $total_amount = dw_get_cart_total();
+
+        // Simpan Transaksi
+        $transaction_id = dw_create_transaction($user_id, $cart_items, $billing_data, $total_amount, $payment_method);
+
+        if ($transaction_id) {
+            // Kosongkan Keranjang
+            unset($_SESSION['dw_cart']);
+            
+            // Redirect ke Halaman Sukses / Detail Transaksi
+            // Anda bisa buat page khusus atau redirect ke akun saya
+            $redirect_url = home_url('/transaksi?id=' . $transaction_id . '&status=success');
+            wp_redirect($redirect_url);
+            exit;
+        } else {
+            wp_die('Terjadi kesalahan saat memproses pesanan. Silakan coba lagi.');
+        }
+    }
+}
+add_action('admin_post_dw_process_checkout', 'dw_handle_checkout_process'); // Untuk User Login
+add_action('admin_post_nopriv_dw_process_checkout', 'dw_handle_checkout_process'); // (Opsional) Jika guest checkout diizinkan
 ?>

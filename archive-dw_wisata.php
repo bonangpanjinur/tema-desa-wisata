@@ -1,167 +1,121 @@
 <?php
 /**
- * Template Name: Arsip Wisata Sadesa
- * Description: Menampilkan daftar wisata dengan kategori dinamis dari API.
+ * Template Name: Archive Wisata
+ * Description: Template untuk menampilkan arsip post type dw_wisata
  */
-get_header();
 
-// --- 1. FETCH DATA UTAMA (WISATA) ---
-$search   = get_query_var('s') ?: (isset($_GET['s']) ? $_GET['s'] : '');
-$kategori = isset($_GET['kategori']) ? sanitize_text_field($_GET['kategori']) : '';
-$page     = get_query_var('paged') ?: 1;
+get_header(); ?>
 
-// Siapkan parameter API Wisata
-$endpoint_wisata = '/wisata?per_page=9&page=' . $page;
-if ($search) $endpoint_wisata .= '&search=' . urlencode($search);
-if ($kategori) $endpoint_wisata .= '&kategori=' . urlencode($kategori);
-
-$data_api = function_exists('dw_fetch_api_data') ? dw_fetch_api_data('/wp-json/dw/v1' . $endpoint_wisata) : [];
-$list_wisata = $data_api['data'] ?? [];
-$total_pages = $data_api['total_pages'] ?? 1;
-
-// --- 2. FETCH DATA KATEGORI (DINAMIS) ---
-$categories = []; // Array untuk menampung kategori
-
-if (function_exists('dw_fetch_api_data')) {
-    // Mengambil data dari endpoint kategori
-    $api_cats = dw_fetch_api_data('/wp-json/dw/v1/kategori/wisata');
-    
-    // Validasi dan masukkan ke array dropdown/filter
-    if (!empty($api_cats) && !isset($api_cats['error']) && is_array($api_cats)) {
-        foreach ($api_cats as $cat) {
-            // API mengembalikan array: ['id' => 1, 'nama' => 'Alam', 'slug' => 'alam']
-            // Kita perlu menangani jika $cat berupa object atau array
-            $slug = is_array($cat) ? $cat['slug'] : $cat->slug;
-            $name = is_array($cat) ? $cat['nama'] : $cat->nama;
-            $categories[$slug] = $name;
-        }
-    }
-}
-
-// Tambahkan opsi 'Semua' di awal array jika belum ada
-if (!array_key_exists('', $categories)) {
-    $categories = array_merge(['' => 'Semua'], $categories);
-}
-
-?>
-
-<div class="bg-gray-50 min-h-screen pb-20">
-    
-    <!-- HEADER FILTER SECTION -->
-    <div class="bg-white pt-4 pb-6 rounded-b-3xl shadow-sm border-b border-gray-100 sticky top-[60px] z-30">
-        <div class="container mx-auto px-4">
-            
-            <!-- Pencarian -->
-            <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
-                <div class="w-full md:w-auto">
-                    <h1 class="text-2xl font-bold text-gray-800">Jelajah Wisata</h1>
-                    <p class="text-sm text-gray-500 mt-1">Temukan destinasi favoritmu</p>
-                </div>
-                <div class="flex-1 w-full md:w-auto md:max-w-md relative">
-                    <form action="" method="get">
-                        <?php if($kategori): ?>
-                            <input type="hidden" name="kategori" value="<?php echo esc_attr($kategori); ?>">
-                        <?php endif; ?>
-                        <input type="text" name="s" value="<?php echo esc_attr($search); ?>" placeholder="Cari destinasi..." class="w-full pl-10 pr-4 py-3 bg-gray-100 border-none rounded-xl text-sm focus:ring-2 focus:ring-primary focus:bg-white transition">
-                        <i class="fas fa-search absolute left-3.5 top-3.5 text-gray-400"></i>
-                    </form>
-                </div>
-            </div>
-
-            <!-- Kategori Pills (Dinamis) -->
-            <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-                <?php foreach($categories as $slug => $label): 
-                    $isActive = ($kategori === (string)$slug);
-                    $cls = $isActive 
-                        ? 'bg-primary text-white border-primary shadow-lg shadow-green-100' 
-                        : 'bg-white text-gray-500 border-gray-200 hover:border-primary hover:text-primary';
-                    
-                    // Buat Link Filter (Pertahankan query search jika ada)
-                    $filter_link = '?kategori=' . $slug . ($search ? '&s=' . urlencode($search) : '');
-                ?>
-                <a href="<?php echo esc_url($filter_link); ?>" class="px-5 py-2 rounded-full border text-xs font-bold whitespace-nowrap transition-all <?php echo $cls; ?>">
-                    <?php echo esc_html($label); ?>
-                </a>
-                <?php endforeach; ?>
+<!-- Header Section (Sama dengan Page Wisata) -->
+<div class="dw-page-header bg-light py-5 mb-5">
+    <div class="container text-center">
+        <!-- Judul diambil dari nama Post Type Archive -->
+        <h1 class="display-4 fw-bold"><?php post_type_archive_title(); ?></h1>
+        <p class="lead text-muted">Temukan keindahan alam dan budaya yang memukau</p>
+        
+        <!-- Search Form -->
+        <div class="row justify-content-center mt-4">
+            <div class="col-md-6">
+                <form role="search" method="get" action="<?php echo home_url('/'); ?>" class="d-flex shadow-sm">
+                    <input type="hidden" name="post_type" value="dw_wisata">
+                    <input type="search" class="form-control form-control-lg border-0" placeholder="Cari destinasi wisata..." value="<?php echo get_search_query(); ?>" name="s">
+                    <button class="btn btn-primary px-4" type="submit"><i class="fas fa-search"></i></button>
+                </form>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- LIST CONTENT -->
-    <div class="container mx-auto px-4 py-8">
-        <?php if (!empty($list_wisata)): ?>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                <?php foreach ($list_wisata as $wisata): 
-                    // Mapping Data
-                    $id = $wisata['id'];
-                    $img = $wisata['thumbnail'] ?? 'https://via.placeholder.com/600x400';
-                    $title = $wisata['nama_wisata'] ?? 'Wisata';
-                    $loc = $wisata['lokasi'] ?? 'Desa Wisata';
-                    $price = isset($wisata['harga_tiket']) && $wisata['harga_tiket'] > 0 ? 'Rp '.number_format($wisata['harga_tiket'],0,',','.') : 'Gratis';
-                    $rating = $wisata['rating'] ?? 4.8;
-                    
-                    // Link Detail (Fallback ke parameter post_type)
-                    $link = get_permalink($id);
-                    if (!$link || strpos($link, 'page_id') !== false) {
-                        $link = home_url('/?p='.$id.'&post_type=dw_wisata');
-                    }
-                ?>
-                <!-- Card Style Sadesa -->
-                <div class="card-sadesa group">
-                    <div class="card-img-wrap">
-                        <img src="<?php echo esc_url($img); ?>" alt="<?php echo esc_attr($title); ?>">
-                        <div class="badge-rating"><i class="fas fa-star text-yellow-400"></i> <?php echo $rating; ?></div>
-                        <div class="badge-category">Wisata</div>
-                    </div>
-                    
-                    <div class="card-body">
-                        <h3 class="card-title group-hover:text-primary transition"><?php echo esc_html($title); ?></h3>
-                        <div class="card-meta">
-                            <i class="fas fa-map-marker-alt text-red-400"></i>
-                            <span class="truncate"><?php echo esc_html($loc); ?></span>
-                        </div>
-                        
-                        <div class="card-footer">
-                            <div>
-                                <p class="price-label">Tiket Masuk</p>
-                                <p class="price-tag"><?php echo $price; ?></p>
+<!-- Main Content -->
+<div class="dw-wisata-list section-padding pb-5">
+    <div class="container">
+        <div class="row g-4">
+            <?php
+            // Di file Archive, kita TIDAK perlu 'new WP_Query'. 
+            // Kita gunakan Loop standar WordPress karena WordPress sudah otomatis mengambil data yang benar.
+            
+            if (have_posts()) :
+                while (have_posts()) : the_post();
+                    // Ambil Meta Data
+                    $lokasi = get_post_meta(get_the_ID(), 'dw_lokasi', true);
+                    $harga_tiket = get_post_meta(get_the_ID(), 'dw_harga_tiket', true);
+                    ?>
+                    <div class="col-md-4">
+                        <div class="card h-100 shadow-sm border-0 hover-lift">
+                            <div class="card-img-wrapper position-relative overflow-hidden" style="height: 200px;">
+                                <a href="<?php the_permalink(); ?>">
+                                    <?php if (has_post_thumbnail()) : ?>
+                                        <?php the_post_thumbnail('medium_large', ['class' => 'img-fluid w-100 h-100 object-fit-cover']); ?>
+                                    <?php else : ?>
+                                        <img src="<?php echo get_template_directory_uri(); ?>/assets/img/placeholder-wisata.jpg" class="img-fluid w-100 h-100 object-fit-cover" alt="<?php the_title(); ?>">
+                                    <?php endif; ?>
+                                </a>
+                                <div class="category-badge position-absolute top-0 start-0 m-3">
+                                    <span class="badge bg-success"><i class="fas fa-tree"></i> Wisata</span>
+                                </div>
                             </div>
-                            <a href="<?php echo esc_url($link); ?>" class="btn-detail">Lihat Detail <i class="fas fa-arrow-right ml-1"></i></a>
+                            
+                            <div class="card-body d-flex flex-column">
+                                <div class="mb-2 text-muted small">
+                                    <i class="fas fa-map-marker-alt text-danger me-1"></i> 
+                                    <?php echo esc_html($lokasi ? $lokasi : 'Desa Wisata'); ?>
+                                </div>
+                                <h5 class="card-title fw-bold mb-3">
+                                    <a href="<?php the_permalink(); ?>" class="text-dark text-decoration-none"><?php the_title(); ?></a>
+                                </h5>
+                                <p class="card-text text-muted small flex-grow-1">
+                                    <?php echo wp_trim_words(get_the_excerpt(), 15); ?>
+                                </p>
+                                
+                                <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top">
+                                    <div>
+                                        <small class="text-muted d-block">Harga Tiket</small>
+                                        <span class="fw-bold text-primary">
+                                            <?php echo ($harga_tiket) ? dw_format_rupiah($harga_tiket) : 'Gratis'; ?>
+                                        </span>
+                                    </div>
+                                    <a href="<?php the_permalink(); ?>" class="btn btn-outline-primary btn-sm rounded-pill px-3">Detail</a>
+                                </div>
+                            </div>
                         </div>
                     </div>
+                <?php endwhile; ?>
+                
+                <!-- Pagination -->
+                <div class="col-12 mt-5">
+                    <nav aria-label="Page navigation">
+                        <?php
+                        // Pagination standar untuk Archive
+                        the_posts_pagination(array(
+                            'mid_size'  => 2,
+                            'prev_text' => '<i class="fas fa-chevron-left"></i>',
+                            'next_text' => '<i class="fas fa-chevron-right"></i>',
+                            'screen_reader_text' => ' '
+                        ));
+                        ?>
+                    </nav>
                 </div>
-                <?php endforeach; ?>
-            </div>
 
-            <!-- Pagination -->
-            <?php if ($total_pages > 1): ?>
-                <div class="flex justify-center mt-10 gap-2">
-                    <?php if($page > 1): ?>
-                        <a href="?paged=<?php echo $page-1; ?>&kategori=<?php echo $kategori; ?>&s=<?php echo $search; ?>" class="w-10 h-10 flex items-center justify-center bg-white rounded-lg border hover:border-primary hover:text-primary transition"><i class="fas fa-chevron-left"></i></a>
-                    <?php endif; ?>
-                    
-                    <span class="px-4 h-10 flex items-center justify-center bg-primary text-white rounded-lg font-bold text-sm">
-                        <?php echo $page; ?>
-                    </span>
-
-                    <?php if($page < $total_pages): ?>
-                        <a href="?paged=<?php echo $page+1; ?>&kategori=<?php echo $kategori; ?>&s=<?php echo $search; ?>" class="w-10 h-10 flex items-center justify-center bg-white rounded-lg border hover:border-primary hover:text-primary transition"><i class="fas fa-chevron-right"></i></a>
-                    <?php endif; ?>
+            <?php else : ?>
+                <div class="col-12 text-center py-5">
+                    <img src="<?php echo get_template_directory_uri(); ?>/assets/img/empty-state.svg" alt="Tidak ditemukan" style="max-width: 200px;" class="mb-3">
+                    <h3>Belum ada destinasi wisata</h3>
+                    <p class="text-muted">Coba cari dengan kata kunci lain atau kembali nanti.</p>
                 </div>
             <?php endif; ?>
-
-        <?php else: ?>
-            <!-- Empty State -->
-            <div class="flex flex-col items-center justify-center py-20 text-center">
-                <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4 text-gray-300">
-                    <i class="fas fa-map-signs text-4xl"></i>
-                </div>
-                <h3 class="font-bold text-gray-800 text-lg">Tidak Ditemukan</h3>
-                <p class="text-gray-500 text-sm mt-1 max-w-xs mx-auto">Wisata untuk kategori atau pencarian ini belum tersedia.</p>
-                <a href="<?php echo home_url('/wisata'); ?>" class="mt-4 text-primary font-bold text-sm hover:underline">Reset Filter</a>
-            </div>
-        <?php endif; ?>
+        </div>
     </div>
 </div>
+
+<style>
+/* Copy CSS dari page-wisata.php agar tampilan konsisten */
+.hover-lift { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.hover-lift:hover { transform: translateY(-5px); box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important; }
+.object-fit-cover { object-fit: cover; }
+/* Styling pagination bawaan WP agar mirip dengan custom pagination */
+.pagination .page-numbers { display: inline-block; padding: 8px 16px; border: 1px solid #dee2e6; border-radius: 4px; color: #0d6efd; text-decoration: none; margin: 0 2px; }
+.pagination .page-numbers.current { background-color: #0d6efd; color: white; border-color: #0d6efd; }
+.pagination { display: flex; justify-content: center; }
+</style>
 
 <?php get_footer(); ?>
