@@ -5,10 +5,10 @@
 get_header();
 
 // =================================================================================
-// 1. DATA FETCHING (API)
+// 1. DATA FETCHING (API) & FALLBACK
 // =================================================================================
 
-// --- Banner Data ---
+// --- A. Banner Data ---
 $endpoint_banner = '/wp-json/dw/v1/banner';
 $data_banner = function_exists('dw_fetch_api_data') ? dw_fetch_api_data($endpoint_banner) : [];
 $banners = [];
@@ -19,7 +19,7 @@ if (isset($data_banner['data']) && is_array($data_banner['data'])) {
     $banners = $data_banner;
 }
 
-// Fallback Dummy jika API kosong
+// Fallback Banner jika API Kosong
 if (empty($banners)) {
     $banners = [
         [
@@ -33,20 +33,40 @@ if (empty($banners)) {
     ];
 }
 
-// --- Wisata Data ---
+// --- B. Wisata Data ---
 $endpoint_wisata = '/wp-json/dw/v1/wisata';
 $raw_wisata = function_exists('dw_fetch_api_data') ? dw_fetch_api_data($endpoint_wisata) : [];
 $list_wisata = $raw_wisata['data'] ?? ($raw_wisata['error'] ? [] : $raw_wisata);
-$list_wisata = array_slice($list_wisata, 0, 4); // Limit 4
 
-// --- Produk Data ---
+// Fallback Wisata jika API Kosong (Agar Card tidak hilang)
+if (empty($list_wisata)) {
+    $list_wisata = [
+        ['id' => 1, 'nama_wisata' => 'Bukit Senja Indah', 'lokasi' => 'Desa Wisata', 'harga_tiket' => 15000, 'rating' => 4.8, 'thumbnail' => 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?ixlib=rb-1.2.1&auto=format&fit=crop&w=400&q=80', 'slug' => 'bukit-senja'],
+        ['id' => 2, 'nama_wisata' => 'Air Terjun Segar', 'lokasi' => 'Desa Wisata', 'harga_tiket' => 10000, 'rating' => 4.5, 'thumbnail' => 'https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?ixlib=rb-1.2.1&auto=format&fit=crop&w=400&q=80', 'slug' => 'air-terjun'],
+        ['id' => 3, 'nama_wisata' => 'Kampung Budaya', 'lokasi' => 'Desa Wisata', 'harga_tiket' => 20000, 'rating' => 4.9, 'thumbnail' => 'https://images.unsplash.com/photo-1518182170546-07661d42a560?ixlib=rb-1.2.1&auto=format&fit=crop&w=400&q=80', 'slug' => 'kampung-budaya'],
+        ['id' => 4, 'nama_wisata' => 'Danau Biru', 'lokasi' => 'Desa Wisata', 'harga_tiket' => 5000, 'rating' => 4.7, 'thumbnail' => 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?ixlib=rb-1.2.1&auto=format&fit=crop&w=400&q=80', 'slug' => 'danau-biru']
+    ];
+}
+$list_wisata = array_slice($list_wisata, 0, 4); // Ambil 4 teratas
+
+// --- C. Produk Data ---
 $endpoint_produk = '/wp-json/dw/v1/produk?per_page=10';
 $raw_produk = function_exists('dw_fetch_api_data') ? dw_fetch_api_data($endpoint_produk) : [];
 $list_produk = $raw_produk['data'] ?? ($raw_produk['error'] ? [] : $raw_produk);
+
+// Fallback Produk jika API Kosong
+if (empty($list_produk)) {
+    $list_produk = [
+        ['id' => 1, 'nama_produk' => 'Kopi Robusta Asli', 'nama_toko' => 'Kopi Desa', 'harga_dasar' => 25000, 'thumbnail' => 'https://images.unsplash.com/photo-1559056199-641a0ac8b55e?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&q=80'],
+        ['id' => 2, 'nama_produk' => 'Keripik Singkong', 'nama_toko' => 'Snack Maknyus', 'harga_dasar' => 12000, 'thumbnail' => 'https://images.unsplash.com/photo-1599490659213-e2b9527bd087?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&q=80'],
+        ['id' => 3, 'nama_produk' => 'Anyaman Bambu', 'nama_toko' => 'Kerajinan Tangan', 'harga_dasar' => 45000, 'thumbnail' => 'https://images.unsplash.com/photo-1589366623678-ebf984e7233c?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&q=80'],
+        ['id' => 4, 'nama_produk' => 'Madu Hutan Murni', 'nama_toko' => 'Madu Alami', 'harga_dasar' => 80000, 'thumbnail' => 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&q=80']
+    ];
+}
 ?>
 
 <!-- =================================================================================
-     2. VIEW SECTION
+     2. VIEW SECTION (SADESA STYLE)
      ================================================================================= -->
 
 <!-- SECTION 1: HERO BANNERS (2 Kolom) -->
@@ -131,18 +151,19 @@ $list_produk = $raw_produk['data'] ?? ($raw_produk['error'] ? [] : $raw_produk);
 
     <!-- Grid Card Wisata (Desain Card Sadesa) -->
     <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-        <?php if(!empty($list_wisata)): foreach($list_wisata as $wisata): 
+        <?php foreach($list_wisata as $wisata): 
+            // Handle Data (Array/Object)
+            $wisata = (array)$wisata;
             $id = $wisata['id'];
             $img = $wisata['thumbnail'] ?? 'https://via.placeholder.com/400x300';
-            $title = $wisata['nama_wisata'] ?? 'Wisata';
+            $title = $wisata['nama_wisata'] ?? $wisata['title'] ?? 'Wisata';
             $loc = $wisata['lokasi'] ?? 'Desa Wisata';
             $price = isset($wisata['harga_tiket']) && $wisata['harga_tiket'] > 0 ? 'Rp '.number_format($wisata['harga_tiket'],0,',','.') : 'Gratis';
             $rating = $wisata['rating'] ?? 4.8;
             
-            // FIX: LINK KE DETAIL YANG BENAR
+            // LINK LOGIC (Fix: Gunakan get_permalink jika post nyata, atau custom link jika dari API)
             $link = get_permalink($id);
             if (!$link || strpos($link, 'page_id') !== false) {
-                // Fallback kuat ke parameter post_type jika permalink belum di-flush
                 $link = home_url('/?p=' . $id . '&post_type=dw_wisata');
             }
         ?>
@@ -165,17 +186,12 @@ $list_produk = $raw_produk['data'] ?? ($raw_produk['error'] ? [] : $raw_produk);
                         <p class="price-label">Tiket Masuk</p>
                         <p class="price-tag"><?php echo $price; ?></p>
                     </div>
-                    <!-- FIX: Link Detail menggunakan $link yang sudah diperbaiki -->
+                    <!-- FIX: Link Detail -->
                     <a href="<?php echo esc_url($link); ?>" class="btn-detail">Lihat Detail <i class="fas fa-arrow-right ml-1"></i></a>
                 </div>
             </div>
         </div>
-        <?php endforeach; else: ?>
-            <div class="col-span-4 py-10 text-center text-gray-400">
-                <i class="fas fa-map-signs text-4xl mb-3 opacity-30"></i>
-                <p>Belum ada data wisata.</p>
-            </div>
-        <?php endif; ?>
+        <?php endforeach; ?>
     </div>
 </div>
 
@@ -193,14 +209,15 @@ $list_produk = $raw_produk['data'] ?? ($raw_produk['error'] ? [] : $raw_produk);
 
     <!-- Grid Produk (2 Col Mobile, 5 Col Desktop) -->
     <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
-        <?php if(!empty($list_produk)): foreach($list_produk as $produk): 
+        <?php foreach($list_produk as $produk): 
+            $produk = (array)$produk;
             $id = $produk['id'];
             $img = $produk['thumbnail'] ?? 'https://via.placeholder.com/300x300';
             $title = $produk['nama_produk'] ?? 'Produk';
             $shop = $produk['nama_toko'] ?? 'UMKM Desa';
             $price = number_format($produk['harga_dasar'] ?? 0, 0, ',', '.');
             
-            // FIX: LINK DETAIL PRODUK
+            // LINK LOGIC
             $link = get_permalink($id);
             if (!$link || strpos($link, 'page_id') !== false) {
                 $link = home_url('/?p=' . $id . '&post_type=dw_produk');
@@ -225,7 +242,7 @@ $list_produk = $raw_produk['data'] ?? ($raw_produk['error'] ? [] : $raw_produk);
                     </div>
                 </div>
             </a>
-            <!-- Add to Cart Button (Overlay - Jangan di dalam tag <a>) -->
+            <!-- Add to Cart Button (Overlay) -->
             <button class="btn-add-cart absolute bottom-3 right-3 shadow-sm z-10 add-to-cart-btn"
                     data-id="<?php echo $id; ?>" 
                     data-title="<?php echo esc_attr($title); ?>" 
@@ -234,12 +251,7 @@ $list_produk = $raw_produk['data'] ?? ($raw_produk['error'] ? [] : $raw_produk);
                 <i class="fas fa-cart-plus text-xs"></i>
             </button>
         </div>
-        <?php endforeach; else: ?>
-            <div class="col-span-full py-10 text-center text-gray-400">
-                <i class="fas fa-box-open text-4xl mb-3 opacity-30"></i>
-                <p>Belum ada produk.</p>
-            </div>
-        <?php endif; ?>
+        <?php endforeach; ?>
     </div>
 </div>
 

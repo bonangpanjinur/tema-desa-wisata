@@ -5,40 +5,46 @@
     --text-dark: #1F2937;
     --text-grey: #6B7280;
     --bg-card: #FFFFFF;
-    --radius-card: 20px; /* Sudut lebih bulat */
+    --radius-card: 20px;
 }
 
-/* --- SADESA CARD STYLE --- */
+/* --- GLOBAL CARD STYLES (SADESA) --- */
 .card-sadesa {
     background: var(--bg-card);
     border-radius: var(--radius-card);
     overflow: hidden;
     border: 1px solid #F3F4F6;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     flex-direction: column;
-    height: 100%;
+    height: 100%; /* Memaksa tinggi penuh container */
     position: relative;
+    width: 100%;
 }
 
 .card-sadesa:hover {
     transform: translateY(-5px);
-    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
     border-color: var(--primary-light);
 }
 
+/* Image Wrapper dengan Rasio Tetap */
 .card-img-wrap {
     position: relative;
-    overflow: hidden;
+    width: 100%;
+    padding-top: 66.67%; /* Aspect Ratio 3:2 (Lebih landscape & rapi) */
     background-color: #F3F4F6;
-    aspect-ratio: 4/3; /* Rasio gambar standar */
+    overflow: hidden;
 }
 
 .card-img-wrap img {
+    position: absolute;
+    top: 0;
+    left: 0;
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: cover; /* Mencegah gambar gepeng */
     transition: transform 0.6s ease;
 }
 
@@ -49,12 +55,12 @@
 /* Badges */
 .badge-rating {
     position: absolute;
-    top: 12px;
-    right: 12px;
+    top: 10px;
+    right: 10px;
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(4px);
     padding: 4px 10px;
-    border-radius: 12px;
+    border-radius: 10px;
     font-size: 0.7rem;
     font-weight: 700;
     color: var(--text-dark);
@@ -81,12 +87,12 @@
     letter-spacing: 0.5px;
 }
 
-/* Content */
+/* Content Area */
 .card-body {
     padding: 16px;
     display: flex;
     flex-direction: column;
-    flex-grow: 1;
+    flex-grow: 1; /* Isi ruang kosong agar footer rata bawah */
 }
 
 .card-title {
@@ -96,9 +102,10 @@
     margin-bottom: 6px;
     line-height: 1.4;
     display: -webkit-box;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 2; /* Batasi 2 baris judul */
     -webkit-box-orient: vertical;
     overflow: hidden;
+    min-height: 2.8em; /* Menjaga tinggi judul konsisten */
 }
 
 .card-meta {
@@ -110,19 +117,21 @@
     margin-bottom: 12px;
 }
 
+/* Card Footer (Harga & Tombol) */
 .card-footer {
-    margin-top: auto;
+    margin-top: auto; /* Dorong ke bawah */
     padding-top: 12px;
     border-top: 1px dashed #E5E7EB;
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-end;
 }
 
 .price-tag {
     font-size: 1rem;
     font-weight: 700;
     color: var(--primary);
+    line-height: 1;
 }
 
 .price-label {
@@ -130,6 +139,8 @@
     color: #9CA3AF;
     text-transform: uppercase;
     font-weight: 600;
+    margin-bottom: 2px;
+    display: block;
 }
 
 /* Buttons */
@@ -184,7 +195,7 @@
     transform: translateY(-5px) scale(1.05);
 }
 
-/* Hide Scrollbar */
+/* Utils */
 .no-scrollbar::-webkit-scrollbar {
     display: none;
 }
