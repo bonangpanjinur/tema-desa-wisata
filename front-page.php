@@ -129,18 +129,24 @@ $list_produk = $raw_produk['data'] ?? ($raw_produk['error'] ? [] : $raw_produk);
         </a>
     </div>
 
-    <!-- Grid Card Wisata -->
+    <!-- Grid Card Wisata (Desain Card Sadesa) -->
     <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-        <?php if($list_wisata): foreach($list_wisata as $wisata): 
+        <?php if(!empty($list_wisata)): foreach($list_wisata as $wisata): 
             $id = $wisata['id'];
             $img = $wisata['thumbnail'] ?? 'https://via.placeholder.com/400x300';
             $title = $wisata['nama_wisata'] ?? 'Wisata';
             $loc = $wisata['lokasi'] ?? 'Desa Wisata';
             $price = isset($wisata['harga_tiket']) && $wisata['harga_tiket'] > 0 ? 'Rp '.number_format($wisata['harga_tiket'],0,',','.') : 'Gratis';
             $rating = $wisata['rating'] ?? 4.8;
-            $link = get_permalink($id) ?: home_url('/?p='.$id.'&post_type=dw_wisata');
+            
+            // FIX: LINK KE DETAIL YANG BENAR
+            $link = get_permalink($id);
+            if (!$link || strpos($link, 'page_id') !== false) {
+                // Fallback kuat ke parameter post_type jika permalink belum di-flush
+                $link = home_url('/?p=' . $id . '&post_type=dw_wisata');
+            }
         ?>
-        <div class="card-sadesa group"> <!-- Style from main.css -->
+        <div class="card-sadesa group"> <!-- Class dari assets/css/main.css -->
             <div class="card-img-wrap">
                 <img src="<?php echo esc_url($img); ?>" alt="<?php echo esc_attr($title); ?>">
                 <div class="badge-rating"><i class="fas fa-star text-yellow-400"></i> <?php echo $rating; ?></div>
@@ -159,12 +165,16 @@ $list_produk = $raw_produk['data'] ?? ($raw_produk['error'] ? [] : $raw_produk);
                         <p class="price-label">Tiket Masuk</p>
                         <p class="price-tag"><?php echo $price; ?></p>
                     </div>
+                    <!-- FIX: Link Detail menggunakan $link yang sudah diperbaiki -->
                     <a href="<?php echo esc_url($link); ?>" class="btn-detail">Lihat Detail <i class="fas fa-arrow-right ml-1"></i></a>
                 </div>
             </div>
         </div>
         <?php endforeach; else: ?>
-            <p class="col-span-4 text-center text-gray-400 py-10">Belum ada data wisata.</p>
+            <div class="col-span-4 py-10 text-center text-gray-400">
+                <i class="fas fa-map-signs text-4xl mb-3 opacity-30"></i>
+                <p>Belum ada data wisata.</p>
+            </div>
         <?php endif; ?>
     </div>
 </div>
@@ -183,15 +193,21 @@ $list_produk = $raw_produk['data'] ?? ($raw_produk['error'] ? [] : $raw_produk);
 
     <!-- Grid Produk (2 Col Mobile, 5 Col Desktop) -->
     <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
-        <?php if($list_produk): foreach($list_produk as $produk): 
+        <?php if(!empty($list_produk)): foreach($list_produk as $produk): 
             $id = $produk['id'];
             $img = $produk['thumbnail'] ?? 'https://via.placeholder.com/300x300';
             $title = $produk['nama_produk'] ?? 'Produk';
             $shop = $produk['nama_toko'] ?? 'UMKM Desa';
             $price = number_format($produk['harga_dasar'] ?? 0, 0, ',', '.');
-            $link = get_permalink($id) ?: home_url('/?p='.$id.'&post_type=dw_produk');
+            
+            // FIX: LINK DETAIL PRODUK
+            $link = get_permalink($id);
+            if (!$link || strpos($link, 'page_id') !== false) {
+                $link = home_url('/?p=' . $id . '&post_type=dw_produk');
+            }
         ?>
         <div class="card-sadesa group relative">
+            <!-- Link Pembungkus Utama ke Detail -->
             <a href="<?php echo esc_url($link); ?>" class="block h-full flex flex-col">
                 <div class="card-img-wrap aspect-square bg-gray-100">
                     <img src="<?php echo esc_url($img); ?>" alt="<?php echo esc_attr($title); ?>">
@@ -209,7 +225,7 @@ $list_produk = $raw_produk['data'] ?? ($raw_produk['error'] ? [] : $raw_produk);
                     </div>
                 </div>
             </a>
-            <!-- Add to Cart Button (Overlay) -->
+            <!-- Add to Cart Button (Overlay - Jangan di dalam tag <a>) -->
             <button class="btn-add-cart absolute bottom-3 right-3 shadow-sm z-10 add-to-cart-btn"
                     data-id="<?php echo $id; ?>" 
                     data-title="<?php echo esc_attr($title); ?>" 
@@ -219,7 +235,10 @@ $list_produk = $raw_produk['data'] ?? ($raw_produk['error'] ? [] : $raw_produk);
             </button>
         </div>
         <?php endforeach; else: ?>
-            <p class="col-span-full text-center text-gray-400 py-10">Belum ada produk.</p>
+            <div class="col-span-full py-10 text-center text-gray-400">
+                <i class="fas fa-box-open text-4xl mb-3 opacity-30"></i>
+                <p>Belum ada produk.</p>
+            </div>
         <?php endif; ?>
     </div>
 </div>
