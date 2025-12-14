@@ -1,80 +1,91 @@
-<?php get_header(); ?>
+<?php
+/**
+ * Template Name: Arsip Produk Sadesa
+ */
+get_header();
 
-<!-- Page Header -->
-<div class="mt-4 mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-    <div>
-        <h1 class="font-bold text-2xl text-gray-800">Produk Desa</h1>
-        <p class="text-sm text-gray-500">Temukan kerajinan dan kuliner unik dari desa wisata</p>
-    </div>
-    
-    <!-- Filter & Sort -->
-    <div class="flex gap-3 overflow-x-auto no-scrollbar pb-1">
-        <select class="bg-white border border-gray-200 text-sm rounded-lg px-4 py-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none">
-            <option>Urutkan Terbaru</option>
-            <option>Harga Terendah</option>
-            <option>Harga Tertinggi</option>
-            <option>Paling Laris</option>
-        </select>
-        <button class="bg-white border border-gray-200 text-gray-600 px-4 py-2 rounded-lg text-sm flex items-center gap-2 hover:bg-gray-50 whitespace-nowrap">
-            <i class="fas fa-filter"></i> Filter
-        </button>
-    </div>
-</div>
+$search = get_query_var('s') ?: '';
+$page = get_query_var('paged') ?: 1;
+$endpoint = '/produk?per_page=10&page=' . $page . ($search ? '&s='.urlencode($search) : '');
 
-<div class="pb-10">
-    <?php if ( have_posts() ) : ?>
-        <!-- Grid: 2 Col Mobile, 3 Col Tablet, 4 Col Desktop, 5 Col Large -->
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-6">
-            <?php while ( have_posts() ) : the_post(); 
-                $harga = get_post_meta(get_the_ID(), 'harga', true) ?: 0;
-                $penjual = get_post_meta(get_the_ID(), 'nama_toko', true) ?: 'UMKM Desa';
-                $terjual = get_post_meta(get_the_ID(), 'terjual', true) ?: 0;
-                $image_url = has_post_thumbnail() ? get_the_post_thumbnail_url(get_the_ID(), 'medium_large') : 'https://via.placeholder.com/500x500?text=No+Image';
-            ?>
-                <!-- Product Card -->
-                <div class="bg-white p-2.5 md:p-3 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between h-full hover:shadow-xl hover:-translate-y-1 transition duration-300 group">
-                    <a href="<?php the_permalink(); ?>">
-                        <div class="aspect-square rounded-lg bg-gray-100 overflow-hidden mb-3 relative">
-                            <img src="<?php echo esc_url($image_url); ?>" class="w-full h-full object-cover group-hover:scale-110 transition duration-500">
+$api_data = function_exists('dw_fetch_api_data') ? dw_fetch_api_data('/wp-json/dw/v1'.$endpoint) : [];
+$products = $api_data['data'] ?? [];
+$total_pages = $api_data['total_pages'] ?? 1;
+?>
+
+<div class="bg-gray-50 min-h-screen pb-20">
+    <!-- Header -->
+    <div class="bg-white pt-4 pb-6 rounded-b-3xl shadow-sm sticky top-[60px] z-30">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800">Oleh-Oleh Desa</h1>
+                    <p class="text-sm text-gray-500">Produk UMKM asli buatan warga</p>
+                </div>
+                <form class="relative w-full md:w-64">
+                    <input type="text" name="s" value="<?php echo esc_attr($search); ?>" placeholder="Cari produk..." class="w-full pl-10 pr-4 py-2.5 bg-gray-100 border-none rounded-xl text-sm focus:ring-2 focus:ring-primary focus:bg-white transition">
+                    <i class="fas fa-search absolute left-3.5 top-3 text-gray-400"></i>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grid -->
+    <div class="container mx-auto px-4 py-6">
+        <?php if(!empty($products)): ?>
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                <?php foreach($products as $p): 
+                    $id = $p['id'];
+                    $img = $p['thumbnail'] ?? 'https://via.placeholder.com/300';
+                    $title = $p['nama_produk'] ?? 'Produk';
+                    $shop = $p['nama_toko'] ?? 'UMKM';
+                    $price = number_format($p['harga_dasar'] ?? 0, 0, ',', '.');
+                    // Fallback link detail
+                    $link = get_permalink($id) ?: home_url('/?p='.$id.'&post_type=dw_produk');
+                ?>
+                <div class="card-sadesa group relative">
+                    <a href="<?php echo esc_url($link); ?>" class="flex flex-col h-full">
+                        <div class="card-img-wrap aspect-square bg-gray-100">
+                            <img src="<?php echo esc_url($img); ?>" alt="<?php echo esc_attr($title); ?>">
                         </div>
-                        <h4 class="font-medium text-gray-800 text-sm line-clamp-2 leading-snug mb-1 group-hover:text-emerald-600 transition"><?php the_title(); ?></h4>
-                        <div class="flex items-center gap-1 mb-2">
-                            <i class="fas fa-store text-[10px] text-gray-400"></i>
-                            <p class="text-[10px] text-gray-500 truncate"><?php echo esc_html($penjual); ?></p>
+                        <div class="card-body p-3">
+                            <h4 class="text-sm font-bold text-gray-800 leading-snug mb-1 line-clamp-2 min-h-[2.5em] group-hover:text-primary transition"><?php echo esc_html($title); ?></h4>
+                            <div class="flex items-center gap-1 mb-2 text-[10px] text-gray-500">
+                                <i class="fas fa-store"></i> <span class="truncate"><?php echo esc_html($shop); ?></span>
+                            </div>
+                            <div class="mt-auto pt-2 border-t border-dashed border-gray-100 flex justify-between items-end">
+                                <div>
+                                    <p class="text-primary font-bold text-sm">Rp <?php echo $price; ?></p>
+                                    <p class="text-[9px] text-gray-400">Terjual 0</p>
+                                </div>
+                            </div>
                         </div>
                     </a>
-                    <div class="mt-auto flex justify-between items-end">
-                        <div class="flex flex-col">
-                            <span class="text-emerald-700 font-bold text-sm">Rp <?php echo number_format($harga, 0, ',', '.'); ?></span>
-                            <span class="text-[10px] text-gray-400">Terjual <?php echo $terjual; ?></span>
-                        </div>
-                        <button class="bg-emerald-50 text-emerald-600 w-8 h-8 rounded-full flex items-center justify-center hover:bg-emerald-600 hover:text-white transition shadow-sm">
-                            <i class="fas fa-cart-plus text-xs"></i>
-                        </button>
-                    </div>
+                    <!-- Add to Cart -->
+                    <button class="btn-add-cart absolute bottom-3 right-3 shadow-sm z-10"
+                            data-id="<?php echo $id; ?>" data-title="<?php echo esc_attr($title); ?>" data-price="<?php echo $p['harga_dasar']; ?>" data-thumb="<?php echo esc_url($img); ?>">
+                        <i class="fas fa-cart-plus text-xs"></i>
+                    </button>
                 </div>
-            <?php endwhile; ?>
-        </div>
-        
-        <!-- Pagination -->
-        <div class="flex justify-center mt-10">
-             <?php
-            the_posts_pagination(array(
-                'prev_text' => '<span class="px-3 py-1 border rounded bg-white hover:bg-gray-50">Prev</span>',
-                'next_text' => '<span class="px-3 py-1 border rounded bg-white hover:bg-gray-50">Next</span>',
-                'screen_reader_text' => ' ',
-                'mid_size' => 2,
-            ));
-            ?>
-        </div>
+                <?php endforeach; ?>
+            </div>
+            
+            <!-- Pagination -->
+            <?php if ($total_pages > 1): ?>
+                <div class="flex justify-center mt-8 gap-2">
+                    <?php if($page > 1): ?><a href="?paged=<?php echo $page-1; ?>" class="w-10 h-10 flex items-center justify-center bg-white rounded-lg border hover:border-primary"><i class="fas fa-chevron-left"></i></a><?php endif; ?>
+                    <span class="px-4 h-10 flex items-center justify-center bg-primary text-white rounded-lg font-bold text-sm"><?php echo $page; ?></span>
+                    <?php if($page < $total_pages): ?><a href="?paged=<?php echo $page+1; ?>" class="w-10 h-10 flex items-center justify-center bg-white rounded-lg border hover:border-primary"><i class="fas fa-chevron-right"></i></a><?php endif; ?>
+                </div>
+            <?php endif; ?>
 
-    <?php else : ?>
-        <div class="text-center py-20 bg-gray-50 rounded-xl">
-            <i class="fas fa-box-open text-4xl text-gray-300 mb-3"></i>
-            <p class="text-gray-500 font-medium">Produk tidak ditemukan.</p>
-            <p class="text-gray-400 text-sm">Coba kata kunci lain atau reset filter.</p>
-        </div>
-    <?php endif; ?>
+        <?php else: ?>
+            <div class="text-center py-20 text-gray-400">
+                <i class="fas fa-box-open text-5xl mb-4 opacity-30"></i>
+                <p>Belum ada produk ditemukan.</p>
+            </div>
+        <?php endif; ?>
+    </div>
 </div>
 
 <?php get_footer(); ?>
