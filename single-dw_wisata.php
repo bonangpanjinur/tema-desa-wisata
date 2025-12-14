@@ -2,6 +2,7 @@
 /**
  * Template Name: Single Detail Wisata
  * Post Type: dw_wisata
+ * Description: Desain Sadesa Style dengan Hero Image dan Sidebar Info
  */
 
 get_header();
@@ -22,12 +23,13 @@ while (have_posts()) : the_post();
     // Format Harga
     $price_display = ($harga_tiket > 0) ? 'Rp ' . number_format($harga_tiket, 0, ',', '.') : 'Gratis';
 
-    // Gambar Utama
+    // Gambar Utama (Hero)
     $hero_img = get_the_post_thumbnail_url($post_id, 'full') ?: 'https://via.placeholder.com/1200x600?text=Wisata+Desa';
 
-    // Kategori
-    $kategori = 'Wisata Alam'; // Default
-    $terms = get_the_terms($post_id, 'dw_kategori_wisata'); // Sesuaikan taxonomy plugin
+    // Kategori (Taxonomy)
+    $kategori = 'Wisata Alam'; // Default fallback
+    // Cek apakah taxonomy khusus ada, jika tidak pakai default
+    $terms = get_the_terms($post_id, 'dw_kategori_wisata'); 
     if (!empty($terms) && !is_wp_error($terms)) {
         $kategori = $terms[0]->name;
     }
@@ -39,12 +41,16 @@ while (have_posts()) : the_post();
 
 <!-- HERO SECTION -->
 <div class="relative w-full h-[400px] md:h-[500px] bg-gray-900 overflow-hidden">
+    <!-- Background Image -->
     <img src="<?php echo esc_url($hero_img); ?>" alt="<?php the_title(); ?>" class="w-full h-full object-cover opacity-60">
+    
+    <!-- Gradient Overlay -->
     <div class="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent"></div>
     
+    <!-- Content Overlay -->
     <div class="absolute bottom-0 left-0 w-full p-6 md:p-12">
         <div class="container mx-auto">
-            <span class="bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider mb-3 inline-block">
+            <span class="bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider mb-3 inline-block shadow-sm">
                 <?php echo esc_html($kategori); ?>
             </span>
             <h1 class="text-3xl md:text-5xl font-bold text-white mb-2 leading-tight drop-shadow-md">
@@ -64,21 +70,21 @@ while (have_posts()) : the_post();
     </div>
 </div>
 
-<!-- MAIN CONTENT -->
+<!-- MAIN CONTENT WRAPPER -->
 <div class="container mx-auto px-4 py-10 -mt-8 relative z-10">
     <div class="flex flex-col lg:flex-row gap-8">
         
-        <!-- LEFT COLUMN: Content & Gallery -->
+        <!-- LEFT COLUMN: Content Description & Facilities -->
         <div class="w-full lg:w-2/3">
             <div class="bg-white rounded-2xl shadow-sm p-6 md:p-8 mb-8">
                 <h2 class="text-2xl font-bold text-gray-800 mb-4 border-b border-gray-100 pb-3">Deskripsi</h2>
-                <div class="prose max-w-none text-gray-600 leading-relaxed">
+                <div class="prose max-w-none text-gray-600 leading-relaxed text-justify">
                     <?php the_content(); ?>
                 </div>
 
-                <!-- Fasilitas -->
+                <!-- Fasilitas Section -->
                 <?php if (!empty($fasilitas)) : ?>
-                <div class="mt-8">
+                <div class="mt-8 pt-6 border-t border-gray-100">
                     <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
                         <i class="fas fa-concierge-bell text-primary"></i> Fasilitas Tersedia
                     </h3>
@@ -97,22 +103,15 @@ while (have_posts()) : the_post();
                 </div>
                 <?php endif; ?>
             </div>
-
-            <!-- Bagian Galeri (Optional / Placeholder jika plugin support) -->
-            <!-- <div class="bg-white rounded-2xl shadow-sm p-6 md:p-8">
-                <h2 class="text-xl font-bold mb-4">Galeri Foto</h2>
-                <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
-                     Insert looping gallery images here 
-                </div>
-            </div> -->
         </div>
 
-        <!-- RIGHT COLUMN: Sidebar Info -->
+        <!-- RIGHT COLUMN: Sidebar Info (Sticky) -->
         <div class="w-full lg:w-1/3">
             <div class="sticky top-24 space-y-6">
                 
                 <!-- Card Info Utama -->
                 <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+                    <!-- Pricing Header -->
                     <div class="bg-blue-600 p-4 text-white text-center">
                         <p class="text-sm font-medium opacity-90 mb-1">Harga Tiket Masuk</p>
                         <h3 class="text-3xl font-bold"><?php echo $price_display; ?></h3>
@@ -120,7 +119,7 @@ while (have_posts()) : the_post();
                     </div>
                     
                     <div class="p-6 space-y-5">
-                        <!-- Jam Buka Mobile (biar muncul juga disini) -->
+                        <!-- Jam Buka (Detail) -->
                         <div class="flex items-start gap-3">
                             <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 flex-shrink-0">
                                 <i class="far fa-clock"></i>
@@ -131,7 +130,7 @@ while (have_posts()) : the_post();
                             </div>
                         </div>
 
-                        <!-- Lokasi -->
+                        <!-- Lokasi (Detail) -->
                         <div class="flex items-start gap-3">
                             <div class="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center text-red-500 flex-shrink-0">
                                 <i class="fas fa-map-marked-alt"></i>
@@ -142,10 +141,10 @@ while (have_posts()) : the_post();
                             </div>
                         </div>
 
-                        <!-- Tombol Aksi -->
+                        <!-- Tombol Aksi (CTA) -->
                         <div class="pt-4 space-y-3">
                             <?php 
-                            // Format WA Link
+                            // Logic WA Link
                             $wa_link = '#';
                             if ($kontak) {
                                 $wa_num = preg_replace('/^0/', '62', preg_replace('/[^0-9]/', '', $kontak));
@@ -155,7 +154,7 @@ while (have_posts()) : the_post();
                             ?>
                             
                             <?php if ($kontak) : ?>
-                            <a href="<?php echo esc_url($wa_link); ?>" target="_blank" class="block w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-xl text-center transition shadow-md flex items-center justify-center gap-2">
+                            <a href="<?php echo esc_url($wa_link); ?>" target="_blank" class="block w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-xl text-center transition shadow-md flex items-center justify-center gap-2 hover:-translate-y-0.5">
                                 <i class="fab fa-whatsapp text-lg"></i> Hubungi Pengelola
                             </a>
                             <?php endif; ?>
@@ -169,7 +168,7 @@ while (have_posts()) : the_post();
                     </div>
                 </div>
 
-                <!-- Card Share (Optional) -->
+                <!-- Card Share Social Media -->
                 <div class="bg-white rounded-2xl shadow-sm p-6 text-center border border-gray-100">
                     <h4 class="text-sm font-bold text-gray-400 uppercase tracking-wide mb-3">Bagikan Wisata Ini</h4>
                     <div class="flex justify-center gap-3">
@@ -199,11 +198,12 @@ while (have_posts()) : the_post();
         <h3 class="text-2xl font-bold text-gray-800 mb-6">Wisata Lainnya</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
             <?php
+            // Query Wisata Lain (Random)
             $related = new WP_Query(array(
                 'post_type' => 'dw_wisata',
                 'posts_per_page' => 4,
                 'post__not_in' => array($post_id),
-                'orderby' => 'rand' // Acak biar variatif
+                'orderby' => 'rand'
             ));
 
             if ($related->have_posts()) :
@@ -211,7 +211,7 @@ while (have_posts()) : the_post();
                     $r_img = get_the_post_thumbnail_url(get_the_ID(), 'medium') ?: 'https://via.placeholder.com/300x200';
                     $r_loc = get_post_meta(get_the_ID(), 'dw_lokasi', true) ?: 'Desa Wisata';
             ?>
-            <a href="<?php the_permalink(); ?>" class="group bg-white rounded-xl shadow-sm hover:shadow-md transition overflow-hidden">
+            <a href="<?php the_permalink(); ?>" class="group bg-white rounded-xl shadow-sm hover:shadow-md transition overflow-hidden block">
                 <div class="aspect-video relative overflow-hidden">
                     <img src="<?php echo esc_url($r_img); ?>" alt="<?php the_title(); ?>" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
                 </div>
