@@ -49,25 +49,32 @@ add_action('wp_enqueue_scripts', 'tema_desa_wisata_scripts');
 /**
  * Cek apakah Plugin Desa Wisata Core aktif
  */
-function is_dw_core_active() {
-    return class_exists('Desa_Wisata_Core');
+if ( ! function_exists( 'is_dw_core_active' ) ) {
+    function is_dw_core_active() {
+        return class_exists('Desa_Wisata_Core');
+    }
 }
 
 /**
  * Format Rupiah
+ * Pengecekan function_exists ditambahkan untuk menghindari bentrok dengan plugin
  */
-function dw_format_rupiah($angka) {
-    return 'Rp ' . number_format($angka, 0, ',', '.');
+if ( ! function_exists( 'dw_format_rupiah' ) ) {
+    function dw_format_rupiah($angka) {
+        return 'Rp ' . number_format($angka, 0, ',', '.');
+    }
 }
 
 /**
  * Get Harga Produk (Mengambil dari Meta Box Plugin)
  */
-function dw_get_product_price($post_id) {
-    // Asumsi meta key di plugin adalah 'dw_harga' atau '_price'
-    // Sesuaikan dengan logic di includes/meta-boxes.php plugin Anda
-    $price = get_post_meta($post_id, 'dw_harga', true);
-    return $price ? $price : 0;
+if ( ! function_exists( 'dw_get_product_price' ) ) {
+    function dw_get_product_price($post_id) {
+        // Asumsi meta key di plugin adalah 'dw_harga' atau '_price'
+        // Sesuaikan dengan logic di includes/meta-boxes.php plugin Anda
+        $price = get_post_meta($post_id, 'dw_harga', true);
+        return $price ? $price : 0;
+    }
 }
 
 /**
@@ -102,76 +109,82 @@ add_action('init', 'dw_start_session', 1);
 /**
  * Mendapatkan item di keranjang (Helper sederhana)
  */
-function dw_get_cart_items() {
-    if (isset($_SESSION['dw_cart']) && !empty($_SESSION['dw_cart'])) {
-        return $_SESSION['dw_cart'];
+if ( ! function_exists( 'dw_get_cart_items' ) ) {
+    function dw_get_cart_items() {
+        if (isset($_SESSION['dw_cart']) && !empty($_SESSION['dw_cart'])) {
+            return $_SESSION['dw_cart'];
+        }
+        return array();
     }
-    return array();
 }
 
 /**
  * Hitung Total Keranjang
  */
-function dw_get_cart_total() {
-    $items = dw_get_cart_items();
-    $total = 0;
-    foreach ($items as $item) {
-        $total += $item['price'] * $item['quantity'];
+if ( ! function_exists( 'dw_get_cart_total' ) ) {
+    function dw_get_cart_total() {
+        $items = dw_get_cart_items();
+        $total = 0;
+        foreach ($items as $item) {
+            $total += $item['price'] * $item['quantity'];
+        }
+        return $total;
     }
-    return $total;
 }
 
 /**
  * [BARU] Fungsi Helper untuk Menyimpan Transaksi ke Database Plugin
  * Fungsi ini akan dipanggil oleh handler checkout.
  */
-function dw_create_transaction($user_id, $items, $billing_data, $total_amount, $payment_method) {
-    global $wpdb;
-    
-    // Nama tabel sesuai dengan prefix WP dan nama tabel di activation.php plugin
-    $table_transaksi = $wpdb->prefix . 'dw_transaksi'; // Pastikan nama ini sama dengan di activation.php
-    $table_detail = $wpdb->prefix . 'dw_detail_transaksi';
+if ( ! function_exists( 'dw_create_transaction' ) ) {
+    function dw_create_transaction($user_id, $items, $billing_data, $total_amount, $payment_method) {
+        global $wpdb;
+        
+        // Nama tabel sesuai dengan prefix WP dan nama tabel di activation.php plugin
+        $table_transaksi = $wpdb->prefix . 'dw_transaksi'; // Pastikan nama ini sama dengan di activation.php
+        $table_detail = $wpdb->prefix . 'dw_detail_transaksi';
 
-    // 1. Insert ke Tabel Transaksi Utama
-    $result = $wpdb->insert(
-        $table_transaksi,
-        array(
-            'user_id' => $user_id,
-            'total_amount' => $total_amount,
-            'status' => 'pending', // Status awal
-            'payment_method' => $payment_method,
-            'billing_name' => $billing_data['name'],
-            'billing_email' => $billing_data['email'],
-            'billing_phone' => $billing_data['phone'],
-            'billing_address' => $billing_data['address'],
-            'order_note' => $billing_data['note'],
-            'created_at' => current_time('mysql')
-        ),
-        array('%d', '%f', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
-    );
-
-    if ($result === false) {
-        return false; // Gagal insert
-    }
-
-    $transaction_id = $wpdb->insert_id;
-
-    // 2. Insert ke Tabel Detail Transaksi (Looping item)
-    foreach ($items as $item) {
-        $wpdb->insert(
-            $table_detail,
+        // 1. Insert ke Tabel Transaksi Utama
+        $result = $wpdb->insert(
+            $table_transaksi,
             array(
-                'transaction_id' => $transaction_id,
-                'product_id' => $item['product_id'],
-                'quantity' => $item['quantity'],
-                'price' => $item['price'],
-                'subtotal' => $item['price'] * $item['quantity']
+                'user_id' => $user_id,
+                'total_amount' => $total_amount,
+                'status' => 'pending', // Status awal
+                'payment_method' => $payment_method,
+                'billing_name' => $billing_data['name'],
+                'billing_email' => $billing_data['email'],
+                'billing_phone' => $billing_data['phone'],
+                'billing_address' => $billing_data['address'],
+                'order_note' => $billing_data['note'],
+                'created_at' => current_time('mysql')
             ),
-            array('%d', '%d', '%d', '%f', '%f')
+            array('%d', '%f', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')
         );
-    }
 
-    return $transaction_id;
+        if ($result === false) {
+            return false; // Gagal insert
+        }
+
+        $transaction_id = $wpdb->insert_id;
+
+        // 2. Insert ke Tabel Detail Transaksi (Looping item)
+        foreach ($items as $item) {
+            $wpdb->insert(
+                $table_detail,
+                array(
+                    'transaction_id' => $transaction_id,
+                    'product_id' => $item['product_id'],
+                    'quantity' => $item['quantity'],
+                    'price' => $item['price'],
+                    'subtotal' => $item['price'] * $item['quantity']
+                ),
+                array('%d', '%d', '%d', '%f', '%f')
+            );
+        }
+
+        return $transaction_id;
+    }
 }
 
 /**
