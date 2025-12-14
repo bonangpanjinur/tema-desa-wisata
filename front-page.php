@@ -10,27 +10,32 @@ get_header();
 
 global $wpdb;
 
-// --- A. Banner Data (Dari Tabel Database Plugin: dw_banner) ---
-$table_banner = $wpdb->prefix . 'dw_banner'; // Sesuaikan nama tabel prefix
+// --- A. Banner Data (Dari Tabel Database: dw_banner) ---
+// Pastikan nama tabel sesuai dengan prefix database WordPress Anda
+$table_banner = $wpdb->prefix . 'dw_banner'; 
 $banners = [];
 
-// Cek apakah tabel ada di database
+// Cek apakah tabel ada di database untuk menghindari error jika plugin belum aktif
 if ($wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table_banner)) == $table_banner) {
-    // Ambil banner yang statusnya aktif
-    $db_banners = $wpdb->get_results("SELECT * FROM $table_banner WHERE status = 'aktif' ORDER BY prioritas ASC LIMIT 5");
+    // Ambil banner yang statusnya 'aktif', urutkan berdasarkan prioritas (misal: angka kecil tampil duluan)
+    // LIMIT 5 untuk membatasi jumlah slide
+    $db_banners = $wpdb->get_results("SELECT * FROM $table_banner WHERE status = 'aktif' ORDER BY prioritas ASC, created_at DESC LIMIT 5");
     
     if (!empty($db_banners)) {
         foreach ($db_banners as $index => $b) {
-            // Label Logic (Styling asli)
+            // Label Logic (Styling asli untuk variasi warna label)
+            // Kita bisa rotasi warna atau set default
             $label = 'Info Desa';
             $label_color = 'bg-blue-600';
-            if ($index === 0) {
+            
+            // Contoh logika sederhana: Banner prioritas 1 atau pertama dapat label 'Terbaru' warna oranye
+            if ($index === 0 || $b->prioritas == 1) {
                 $label = 'Terbaru';
                 $label_color = 'bg-orange-500';
             }
 
             $banners[] = [
-                'gambar'      => !empty($b->gambar) ? $b->gambar : 'https://via.placeholder.com/1200x600?text=Banner',
+                'gambar'      => !empty($b->gambar) ? $b->gambar : 'https://via.placeholder.com/1200x600?text=Banner+Image',
                 'judul'       => $b->judul,
                 'label'       => $label, 
                 'label_color' => $label_color,
@@ -40,7 +45,7 @@ if ($wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table_banner)) == $tab
     }
 }
 
-// Fallback Banner (Jika Database Kosong)
+// Fallback Banner (Jika Database Kosong atau Tabel Belum Ada)
 if (empty($banners)) {
     $banners = [
         [
@@ -238,7 +243,9 @@ if ($query_produk->have_posts()) {
                 </div>
                 
                 <div class="card-body">
-                    <h3 class="card-title group-hover:text-primary transition"><?php echo esc_html($title); ?></h3>
+                    <h3 class="card-title group-hover:text-primary transition">
+                        <a href="<?php echo esc_url($link); ?>"><?php echo esc_html($title); ?></a>
+                    </h3>
                     <div class="card-meta">
                         <i class="fas fa-map-marker-alt text-red-400"></i>
                         <span class="truncate"><?php echo esc_html($loc); ?></span>
