@@ -15,21 +15,22 @@ global $wpdb;
 $table_banner = $wpdb->prefix . 'dw_banners';
 $banners = [];
 
-// Cek apakah tabel ada
-if ($wpdb->get_var("SHOW TABLES LIKE '$table_banner'") == $table_banner) {
+// Cek apakah tabel ada di database
+if ($wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $table_banner)) == $table_banner) {
+    // Ambil banner yang statusnya active
     $db_banners = $wpdb->get_results("SELECT * FROM $table_banner WHERE status = 'active' ORDER BY id DESC LIMIT 5");
     
     if (!empty($db_banners)) {
         foreach ($db_banners as $b) {
             $banners[] = [
-                'gambar'      => $b->image_url,
+                'gambar'      => !empty($b->image_url) ? $b->image_url : get_template_directory_uri() . '/assets/img/banner-placeholder.jpg',
                 'judul'       => $b->title,
-                'label'       => 'Info Desa', // Default label
-                'label_color' => 'bg-blue-600', // Default color
-                'link'        => $b->link
+                'label'       => 'Info Desa', 
+                'label_color' => 'bg-blue-600',
+                'link'        => !empty($b->link) ? $b->link : '#'
             ];
         }
-        // Set banner pertama jadi 'Terbaru' & Orange (sesuai style desain awal)
+        // Set banner pertama jadi 'Terbaru' (Styling)
         if (isset($banners[0])) {
             $banners[0]['label'] = 'Terbaru';
             $banners[0]['label_color'] = 'bg-orange-500';
@@ -37,7 +38,7 @@ if ($wpdb->get_var("SHOW TABLES LIKE '$table_banner'") == $table_banner) {
     }
 }
 
-// Fallback Banner (Jika Database Kosong)
+// Fallback Banner (Jika Database Kosong / Tabel Tidak Ada)
 if (empty($banners)) {
     $banners = [
         [
@@ -51,51 +52,76 @@ if (empty($banners)) {
     ];
 }
 
-// --- B. Wisata Data (Dari Post Type: dw_wisata) ---
+// --- FUNGSI HELPER KATEGORI ---
+function get_first_category_name($post_id, $post_type) {
+    // Tentukan nama taxonomy berdasarkan post type
+    $taxonomy = 'category'; // Default WP
+    if ($post_type === 'dw_wisata') {
+        $taxonomy = 'dw_kategori_wisata'; // Sesuaikan dengan register_taxonomy di plugin
+    } elseif ($post_type === 'dw_produk') {
+        $taxonomy = 'dw_kategori_produk'; // Sesuaikan dengan register_taxonomy di plugin
+    }
+
+    // Cek apakah taxonomy tersebut ada, jika tidak, cari taxonomy pertama yang tersedia untuk post type ini
+    if (!taxonomy_exists($taxonomy)) {
+        $taxonomies = get_object_taxonomies($post_type);
+        if (!empty($taxonomies)) {
+            $taxonomy = $taxonomies[0];
+        }
+    }
+
+    $terms = get_the_terms($post_id, $taxonomy);
+    if (!empty($terms) && !is_wp_error($terms)) {
+        return $terms[0]->name;
+    }
+    
+    // Fallback jika tidak ada kategori
+    return ($post_type === 'dw_wisata') ? 'Wisata' : 'Produk';
+}
+
+// --- B. Wisata Data ---
 $list_wisata = [];
 $args_wisata = array(
     'post_type'      => 'dw_wisata',
     'posts_per_page' => 4,
     'orderby'        => 'date',
-    'order'          => 'DESC'
+    'order'          => 'DESC',
+    'post_status'    => 'publish'
 );
 $query_wisata = new WP_Query($args_wisata);
 
 if ($query_wisata->have_posts()) {
     while ($query_wisata->have_posts()) {
         $query_wisata->the_post();
+        
+        // Ambil Gambar dengan Fallback
+        $thumb_url = get_the_post_thumbnail_url(get_the_ID(), 'medium_large');
+        if (empty($thumb_url)) {
+            $thumb_url = 'https://via.placeholder.com/400x300?text=No+Image'; // Gambar placeholder default
+        }
+
         $list_wisata[] = [
             'id'          => get_the_ID(),
             'nama_wisata' => get_the_title(),
             'lokasi'      => get_post_meta(get_the_ID(), 'dw_lokasi', true) ?: 'Desa Wisata',
             'harga_tiket' => get_post_meta(get_the_ID(), 'dw_harga_tiket', true) ?: 0,
-            'rating'      => 4.8, // Default rating (karena belum ada sistem rating real)
-            'thumbnail'   => get_the_post_thumbnail_url(get_the_ID(), 'medium_large') ?: 'https://via.placeholder.com/400x300',
-            'slug'        => get_post_field('post_name')
+            'rating'      => 4.8, 
+            'thumbnail'   => $thumb_url,
+            'slug'        => get_post_field('post_name'),
+            'kategori'    => get_first_category_name(get_the_ID(), 'dw_wisata') // Dinamis
         ];
     }
     wp_reset_postdata();
 }
 
-// Fallback Wisata
-$using_dummy_wisata = false;
-if (empty($list_wisata)) {
-    $using_dummy_wisata = true;
-    $list_wisata = [
-        ['id' => 1, 'nama_wisata' => 'Bukit Senja Indah', 'lokasi' => 'Desa Wisata', 'harga_tiket' => 15000, 'rating' => 4.8, 'thumbnail' => 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?ixlib=rb-1.2.1&auto=format&fit=crop&w=400&q=80', 'slug' => 'bukit-senja'],
-        ['id' => 2, 'nama_wisata' => 'Air Terjun Segar', 'lokasi' => 'Desa Wisata', 'harga_tiket' => 10000, 'rating' => 4.5, 'thumbnail' => 'https://images.unsplash.com/photo-1432405972618-c60b0225b8f9?ixlib=rb-1.2.1&auto=format&fit=crop&w=400&q=80', 'slug' => 'air-terjun'],
-        ['id' => 3, 'nama_wisata' => 'Kampung Budaya', 'lokasi' => 'Desa Wisata', 'harga_tiket' => 20000, 'rating' => 4.9, 'thumbnail' => 'https://images.unsplash.com/photo-1518182170546-07661d42a560?ixlib=rb-1.2.1&auto=format&fit=crop&w=400&q=80', 'slug' => 'kampung-budaya'],
-        ['id' => 4, 'nama_wisata' => 'Danau Biru', 'lokasi' => 'Desa Wisata', 'harga_tiket' => 5000, 'rating' => 4.7, 'thumbnail' => 'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?ixlib=rb-1.2.1&auto=format&fit=crop&w=400&q=80', 'slug' => 'danau-biru']
-    ];
-}
-
-// --- C. Produk Data (Dari Post Type: dw_produk) ---
+// --- C. Produk Data ---
 $list_produk = [];
 $args_produk = array(
     'post_type'      => 'dw_produk',
     'posts_per_page' => 10,
     'orderby'        => 'date',
-    'order'          => 'DESC'
+    'order'          => 'DESC',
+    'post_status'    => 'publish'
 );
 $query_produk = new WP_Query($args_produk);
 
@@ -103,34 +129,26 @@ if ($query_produk->have_posts()) {
     while ($query_produk->have_posts()) {
         $query_produk->the_post();
         
-        // Ambil nama toko dari author atau meta
         $seller_id = get_post_field('post_author');
         $nama_toko = get_the_author_meta('display_name', $seller_id);
-
-        // Gunakan helper harga yang sudah dibuat sebelumnya (jika ada), kalau tidak manual
         $harga = function_exists('dw_get_product_price') ? dw_get_product_price(get_the_ID()) : get_post_meta(get_the_ID(), 'dw_harga', true);
+
+        // Ambil Gambar dengan Fallback
+        $thumb_url = get_the_post_thumbnail_url(get_the_ID(), 'medium');
+        if (empty($thumb_url)) {
+            $thumb_url = 'https://via.placeholder.com/300x300?text=Produk'; 
+        }
 
         $list_produk[] = [
             'id'          => get_the_ID(),
             'nama_produk' => get_the_title(),
             'nama_toko'   => $nama_toko ?: 'UMKM Desa',
             'harga_dasar' => $harga ?: 0,
-            'thumbnail'   => get_the_post_thumbnail_url(get_the_ID(), 'medium') ?: 'https://via.placeholder.com/300x300'
+            'thumbnail'   => $thumb_url,
+            'kategori'    => get_first_category_name(get_the_ID(), 'dw_produk') // Dinamis
         ];
     }
     wp_reset_postdata();
-}
-
-// Fallback Produk
-$using_dummy_produk = false;
-if (empty($list_produk)) {
-    $using_dummy_produk = true;
-    $list_produk = [
-        ['id' => 1, 'nama_produk' => 'Kopi Robusta Asli', 'nama_toko' => 'Kopi Desa', 'harga_dasar' => 25000, 'thumbnail' => 'https://images.unsplash.com/photo-1559056199-641a0ac8b55e?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&q=80'],
-        ['id' => 2, 'nama_produk' => 'Keripik Singkong', 'nama_toko' => 'Snack Maknyus', 'harga_dasar' => 12000, 'thumbnail' => 'https://images.unsplash.com/photo-1599490659213-e2b9527bd087?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&q=80'],
-        ['id' => 3, 'nama_produk' => 'Anyaman Bambu', 'nama_toko' => 'Kerajinan Tangan', 'harga_dasar' => 45000, 'thumbnail' => 'https://images.unsplash.com/photo-1589366623678-ebf984e7233c?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&q=80'],
-        ['id' => 4, 'nama_produk' => 'Madu Hutan Murni', 'nama_toko' => 'Madu Alami', 'harga_dasar' => 80000, 'thumbnail' => 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&q=80']
-    ];
 }
 ?>
 
@@ -138,40 +156,18 @@ if (empty($list_produk)) {
      2. VIEW SECTION (SADESA STYLE) - 100% ORIGINAL DESIGN
      ================================================================================= -->
 
-<!-- DEBUG ALERT (Only Admin) -->
-<?php if (current_user_can('administrator') && !empty($debug_messages)): ?>
-    <div class="bg-red-50 border-l-4 border-red-500 p-4 m-4 rounded-lg shadow-sm">
-        <div class="flex">
-            <div class="flex-shrink-0">
-                <i class="fas fa-exclamation-circle text-red-500"></i>
-            </div>
-            <div class="ml-3">
-                <h3 class="text-sm font-medium text-red-800">Debug Mode: Gagal Mengambil Data</h3>
-                <div class="mt-2 text-sm text-red-700">
-                    <ul class="list-disc pl-5 space-y-1">
-                        <?php foreach ($debug_messages as $msg): ?>
-                            <li><?php echo esc_html($msg); ?></li>
-                        <?php endforeach; ?>
-                    </ul>
-                    <p class="mt-2 font-bold">Menampilkan data dummy untuk sementara.</p>
-                </div>
-            </div>
-        </div>
-    </div>
-<?php endif; ?>
-
 <!-- SECTION 1: HERO BANNERS -->
 <div class="mb-10 mt-4">
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
         <?php foreach ($banners as $index => $banner) : 
-            $img = $banner['gambar'] ?? $banner['image_url'] ?? '';
-            $title = $banner['judul'] ?? 'Promo Desa';
-            $label = $banner['label'] ?? (($index == 0) ? 'Terbaru' : 'Info Desa');
-            $label_bg = $banner['label_color'] ?? (($index == 0) ? 'bg-orange-500' : 'bg-blue-600');
-            $link_url = $banner['link'] ?? '#';
+            $img = $banner['gambar'];
+            $title = $banner['judul'];
+            $label = $banner['label'];
+            $label_bg = $banner['label_color'];
+            $link_url = $banner['link'];
         ?>
         <div class="relative h-48 md:h-64 rounded-2xl overflow-hidden group shadow-md cursor-pointer">
-            <img src="<?php echo esc_url($img); ?>" class="w-full h-full object-cover transition duration-700 group-hover:scale-110">
+            <img src="<?php echo esc_url($img); ?>" class="w-full h-full object-cover transition duration-700 group-hover:scale-110" onerror="this.src='https://via.placeholder.com/800x400?text=Banner+Image'">
             <div class="banner-overlay absolute inset-0"></div> <!-- CSS di main.css -->
             
             <div class="absolute bottom-6 left-6 max-w-xs z-10 text-white">
@@ -234,51 +230,48 @@ if (empty($list_produk)) {
 
     <!-- Grid Card Wisata -->
     <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-        <?php foreach($list_wisata as $wisata): 
-            $wisata = (array)$wisata;
-            $id = $wisata['id'];
-            $img = $wisata['thumbnail'] ?? 'https://via.placeholder.com/400x300';
-            $title = $wisata['nama_wisata'] ?? $wisata['title'] ?? 'Wisata';
-            $loc = $wisata['lokasi'] ?? 'Desa Wisata';
-            $price = isset($wisata['harga_tiket']) && $wisata['harga_tiket'] > 0 ? 'Rp '.number_format($wisata['harga_tiket'],0,',','.') : 'Gratis';
-            $rating = $wisata['rating'] ?? 4.8;
-            
-            // LINK LOGIC (Fix Link Detail)
-            if ($using_dummy_wisata) {
-                $link = '#'; // Dummy link
-            } else {
-                // Coba ambil permalink post asli
+        <?php if (!empty($list_wisata)) : ?>
+            <?php foreach($list_wisata as $wisata): 
+                $wisata = (array)$wisata;
+                $id = $wisata['id'];
+                $img = $wisata['thumbnail'];
+                $title = $wisata['nama_wisata'];
+                $loc = $wisata['lokasi'];
+                $price = ($wisata['harga_tiket'] > 0) ? 'Rp '.number_format($wisata['harga_tiket'],0,',','.') : 'Gratis';
+                $rating = $wisata['rating'];
+                $kategori_label = $wisata['kategori']; // Kategori Dinamis
+                
                 $link = get_permalink($id);
-                // Jika tidak valid (karena post type mungkin belum di flush), gunakan custom link parameter
-                if (!$link || strpos($link, 'page_id') !== false) {
-                    $link = home_url('/?p=' . $id . '&post_type=dw_wisata');
-                }
-            }
-        ?>
-        <div class="card-sadesa group">
-            <div class="card-img-wrap">
-                <img src="<?php echo esc_url($img); ?>" alt="<?php echo esc_attr($title); ?>">
-                <div class="badge-rating"><i class="fas fa-star text-yellow-400"></i> <?php echo $rating; ?></div>
-                <div class="badge-category">Wisata</div>
-            </div>
-            
-            <div class="card-body">
-                <h3 class="card-title group-hover:text-primary transition"><?php echo esc_html($title); ?></h3>
-                <div class="card-meta">
-                    <i class="fas fa-map-marker-alt text-red-400"></i>
-                    <span class="truncate"><?php echo esc_html($loc); ?></span>
+            ?>
+            <div class="card-sadesa group">
+                <div class="card-img-wrap">
+                    <img src="<?php echo esc_url($img); ?>" alt="<?php echo esc_attr($title); ?>" onerror="this.src='https://via.placeholder.com/400x300?text=Wisata'">
+                    <div class="badge-rating"><i class="fas fa-star text-yellow-400"></i> <?php echo $rating; ?></div>
+                    
+                    <!-- DINAMIS: Label Kategori -->
+                    <div class="badge-category"><?php echo esc_html($kategori_label); ?></div>
                 </div>
                 
-                <div class="card-footer">
-                    <div>
-                        <p class="price-label">Tiket Masuk</p>
-                        <p class="price-tag"><?php echo $price; ?></p>
+                <div class="card-body">
+                    <h3 class="card-title group-hover:text-primary transition"><?php echo esc_html($title); ?></h3>
+                    <div class="card-meta">
+                        <i class="fas fa-map-marker-alt text-red-400"></i>
+                        <span class="truncate"><?php echo esc_html($loc); ?></span>
                     </div>
-                    <a href="<?php echo esc_url($link); ?>" class="btn-detail">Lihat Detail <i class="fas fa-arrow-right ml-1"></i></a>
+                    
+                    <div class="card-footer">
+                        <div>
+                            <p class="price-label">Tiket Masuk</p>
+                            <p class="price-tag"><?php echo $price; ?></p>
+                        </div>
+                        <a href="<?php echo esc_url($link); ?>" class="btn-detail">Lihat Detail <i class="fas fa-arrow-right ml-1"></i></a>
+                    </div>
                 </div>
             </div>
-        </div>
-        <?php endforeach; ?>
+            <?php endforeach; ?>
+        <?php else: ?>
+            <div class="col-span-4 text-center text-gray-500 py-10">Belum ada data wisata.</div>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -296,52 +289,54 @@ if (empty($list_produk)) {
 
     <!-- Grid Produk -->
     <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
-        <?php foreach($list_produk as $produk): 
-            $produk = (array)$produk;
-            $id = $produk['id'];
-            $img = $produk['thumbnail'] ?? 'https://via.placeholder.com/300x300';
-            $title = $produk['nama_produk'] ?? 'Produk';
-            $shop = $produk['nama_toko'] ?? 'UMKM Desa';
-            $price = number_format($produk['harga_dasar'] ?? 0, 0, ',', '.');
-            
-            // LINK LOGIC
-            if ($using_dummy_produk) {
-                $link = '#';
-            } else {
+        <?php if (!empty($list_produk)) : ?>
+            <?php foreach($list_produk as $produk): 
+                $produk = (array)$produk;
+                $id = $produk['id'];
+                $img = $produk['thumbnail'];
+                $title = $produk['nama_produk'];
+                $shop = $produk['nama_toko'];
+                $price = number_format($produk['harga_dasar'], 0, ',', '.');
+                $kategori_label = $produk['kategori']; // Kategori Dinamis
+                
                 $link = get_permalink($id);
-                if (!$link || strpos($link, 'page_id') !== false) {
-                    $link = home_url('/?p=' . $id . '&post_type=dw_produk');
-                }
-            }
-        ?>
-        <div class="card-sadesa group relative">
-            <a href="<?php echo esc_url($link); ?>" class="block h-full flex flex-col">
-                <div class="card-img-wrap aspect-square bg-gray-100">
-                    <img src="<?php echo esc_url($img); ?>" alt="<?php echo esc_attr($title); ?>">
-                </div>
-                <div class="card-body p-3 flex-1">
-                    <h4 class="text-sm font-bold text-gray-800 leading-snug mb-1 line-clamp-2 min-h-[2.5em] group-hover:text-primary transition"><?php echo esc_html($title); ?></h4>
-                    <div class="flex items-center gap-1 mb-2 text-[10px] text-gray-500">
-                        <i class="fas fa-store"></i> <span class="truncate"><?php echo esc_html($shop); ?></span>
+            ?>
+            <div class="card-sadesa group relative">
+                <a href="<?php echo esc_url($link); ?>" class="block h-full flex flex-col">
+                    <div class="card-img-wrap aspect-square bg-gray-100 relative">
+                        <img src="<?php echo esc_url($img); ?>" alt="<?php echo esc_attr($title); ?>" onerror="this.src='https://via.placeholder.com/300x300?text=Produk'">
+                        
+                        <!-- DINAMIS: Label Kategori (Opsional: ditampilkan kecil di atas gambar) -->
+                        <span class="absolute top-2 left-2 bg-white/90 backdrop-blur text-[9px] px-2 py-1 rounded text-gray-600 font-bold shadow-sm">
+                            <?php echo esc_html($kategori_label); ?>
+                        </span>
                     </div>
-                    <div class="mt-auto pt-2 border-t border-dashed border-gray-100 flex justify-between items-end">
-                        <div>
-                            <p class="text-primary font-bold text-sm">Rp <?php echo $price; ?></p>
-                            <p class="text-[9px] text-gray-400">Terjual 0</p>
+                    <div class="card-body p-3 flex-1">
+                        <h4 class="text-sm font-bold text-gray-800 leading-snug mb-1 line-clamp-2 min-h-[2.5em] group-hover:text-primary transition"><?php echo esc_html($title); ?></h4>
+                        <div class="flex items-center gap-1 mb-2 text-[10px] text-gray-500">
+                            <i class="fas fa-store"></i> <span class="truncate"><?php echo esc_html($shop); ?></span>
+                        </div>
+                        <div class="mt-auto pt-2 border-t border-dashed border-gray-100 flex justify-between items-end">
+                            <div>
+                                <p class="text-primary font-bold text-sm">Rp <?php echo $price; ?></p>
+                                <p class="text-[9px] text-gray-400">Terjual 0</p>
+                            </div>
                         </div>
                     </div>
-                </div>
-            </a>
-            <!-- Add to Cart Button (Overlay) -->
-            <button class="btn-add-cart absolute bottom-3 right-3 shadow-sm z-10 add-to-cart-btn"
-                    data-product-id="<?php echo $id; ?>" 
-                    data-product-name="<?php echo esc_attr($title); ?>" 
-                    data-product-price="<?php echo $produk['harga_dasar']; ?>" 
-                    data-product-image="<?php echo esc_url($img); ?>">
-                <i class="fas fa-cart-plus text-xs"></i>
-            </button>
-        </div>
-        <?php endforeach; ?>
+                </a>
+                <!-- Add to Cart Button (Overlay) -->
+                <button class="btn-add-cart absolute bottom-3 right-3 shadow-sm z-10 add-to-cart-btn"
+                        data-product-id="<?php echo $id; ?>" 
+                        data-product-name="<?php echo esc_attr($title); ?>" 
+                        data-product-price="<?php echo $produk['harga_dasar']; ?>" 
+                        data-product-image="<?php echo esc_url($img); ?>">
+                    <i class="fas fa-cart-plus text-xs"></i>
+                </button>
+            </div>
+            <?php endforeach; ?>
+        <?php else: ?>
+            <div class="col-span-5 text-center text-gray-500 py-10">Belum ada data produk.</div>
+        <?php endif; ?>
     </div>
 </div>
 
