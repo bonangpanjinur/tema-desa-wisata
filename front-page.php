@@ -7,7 +7,7 @@ get_header();
 global $wpdb;
 
 // =================================================================================
-// 1. DATA FETCHING
+// 1. DATA FETCHING (LANGSUNG KE DATABASE AGAR DATA MUNCUL)
 // =================================================================================
 
 $table_banner   = $wpdb->prefix . 'dw_banner';
@@ -51,7 +51,7 @@ $query_produk = "
 ";
 $list_produk = $wpdb->get_results($query_produk);
 
-// --- D. KATEGORI WISATA (Untuk Filter) ---
+// --- D. KATEGORI WISATA (Untuk Filter Pin) ---
 $kategori_wisata = get_terms([
     'taxonomy'   => 'dw_kategori_wisata',
     'hide_empty' => true,
@@ -93,7 +93,38 @@ $kategori_wisata = get_terms([
     </div>
 </div>
 
-<!-- SECTION 2: KATEGORI & WISATA (Pin Filter) -->
+<!-- SECTION 2: MENU UTAMA (Dikembalikan) -->
+<!-- Bagian ini sebelumnya hilang, saya kembalikan agar navigasi utama tetap ada -->
+<div class="mb-10 px-4 md:px-0">
+    <div class="grid grid-cols-4 md:flex md:justify-center md:gap-16 gap-4">
+        <a href="<?php echo home_url('/wisata'); ?>" class="flex flex-col items-center gap-3 group">
+            <div class="w-14 h-14 md:w-16 md:h-16 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center shadow-sm group-hover:bg-green-600 group-hover:text-white transition-all">
+                <i class="fas fa-map-marked-alt text-2xl md:text-3xl"></i>
+            </div>
+            <span class="text-xs md:text-sm font-bold text-gray-600 group-hover:text-green-600 transition-colors">Wisata</span>
+        </a>
+        <a href="<?php echo home_url('/produk'); ?>" class="flex flex-col items-center gap-3 group">
+            <div class="w-14 h-14 md:w-16 md:h-16 bg-orange-100 text-orange-500 rounded-2xl flex items-center justify-center shadow-sm group-hover:bg-orange-500 group-hover:text-white transition-all">
+                <i class="fas fa-box-open text-2xl md:text-3xl"></i>
+            </div>
+            <span class="text-xs md:text-sm font-bold text-gray-600 group-hover:text-orange-500 transition-colors">Produk</span>
+        </a>
+        <a href="#" class="flex flex-col items-center gap-3 group">
+            <div class="w-14 h-14 md:w-16 md:h-16 bg-blue-100 text-blue-500 rounded-2xl flex items-center justify-center shadow-sm group-hover:bg-blue-500 group-hover:text-white transition-all">
+                <i class="fas fa-bed text-2xl md:text-3xl"></i>
+            </div>
+            <span class="text-xs md:text-sm font-bold text-gray-600 group-hover:text-blue-500 transition-colors">Homestay</span>
+        </a>
+        <a href="#" class="flex flex-col items-center gap-3 group">
+            <div class="w-14 h-14 md:w-16 md:h-16 bg-purple-100 text-purple-500 rounded-2xl flex items-center justify-center shadow-sm group-hover:bg-purple-500 group-hover:text-white transition-all">
+                <i class="fas fa-utensils text-2xl md:text-3xl"></i>
+            </div>
+            <span class="text-xs md:text-sm font-bold text-gray-600 group-hover:text-purple-500 transition-colors">Kuliner</span>
+        </a>
+    </div>
+</div>
+
+<!-- SECTION 3: JELAJAH WISATA (Dengan Pin Filter) -->
 <div class="mb-10 px-0 md:px-0">
     
     <div class="px-4 md:px-0 mb-4 flex justify-between items-end">
@@ -134,13 +165,13 @@ $kategori_wisata = get_terms([
                 $rating = $wisata->rating_avg > 0 ? $wisata->rating_avg : '4.5';
                 $link = home_url('/wisata/?id=' . $wisata->id);
 
-                // Ambil Kategori Dinamis
+                // Ambil Kategori Dinamis untuk Label di Foto & Filter
                 $terms = get_the_terms($wisata->id, 'dw_kategori_wisata');
                 $cat_name = !empty($terms) && !is_wp_error($terms) ? $terms[0]->name : 'Wisata';
                 $cat_slug = !empty($terms) && !is_wp_error($terms) ? $terms[0]->slug : 'all';
             ?>
             <!-- Item Card -->
-            <!-- Mobile Width: min-w-[75vw] (1.5 card view) -->
+            <!-- Mobile Width: min-w-[75vw] (1.5 card view) agar swipe nyaman -->
             <div class="wisata-item min-w-[75vw] md:min-w-0 md:w-auto flex-shrink-0 snap-center group relative bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden transition-all hover:shadow-md" data-category="<?php echo esc_attr($cat_slug); ?>">
                 
                 <!-- Image Wrapper -->
@@ -152,7 +183,7 @@ $kategori_wisata = get_terms([
                         <i class="fas fa-star text-yellow-400"></i> <?php echo $rating; ?>
                     </div>
                     
-                    <!-- Dynamic Category Badge -->
+                    <!-- Dynamic Category Badge (Menggantikan text statis 'Wisata') -->
                     <div class="absolute bottom-2 left-2 bg-black/60 backdrop-blur text-white text-[10px] px-2 py-0.5 rounded-md font-medium">
                         <?php echo esc_html($cat_name); ?>
                     </div>
@@ -188,7 +219,7 @@ $kategori_wisata = get_terms([
     </div>
 </div>
 
-<!-- SECTION 3: PRODUK UMKM (Grid Standard) -->
+<!-- SECTION 4: PRODUK UMKM (Grid Standard) -->
 <div class="mb-10 px-4 md:px-0">
     <div class="flex justify-between items-end mb-4">
         <div>
@@ -261,7 +292,7 @@ function filterWisata(category, btn) {
     const items = document.querySelectorAll('.wisata-item');
     items.forEach(item => {
         if (category === 'all' || item.dataset.category === category) {
-            item.style.display = 'block'; // Atau 'flex' tergantung layout parent, tapi block aman untuk flex child
+            item.style.display = 'block'; 
         } else {
             item.style.display = 'none';
         }
