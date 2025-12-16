@@ -175,7 +175,9 @@ if (!empty($wisata->kontak_pengelola)) {
         <h3 class="text-xl font-bold text-gray-800 mb-6">Wisata Lainnya</h3>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <?php
+            // Ambil wisata lain secara acak
             $related = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_wisata WHERE status='aktif' AND id != %d ORDER BY RAND() LIMIT 4", $wisata_id));
+            
             if($related): foreach($related as $r):
                 $r_img = !empty($r->foto_utama) ? $r->foto_utama : 'https://via.placeholder.com/300';
                 $r_price = ($r->harga_tiket > 0) ? 'Rp '.number_format($r->harga_tiket,0,',','.') : 'Gratis';

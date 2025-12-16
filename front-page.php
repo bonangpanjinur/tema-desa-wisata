@@ -18,16 +18,13 @@ $table_pedagang = $wpdb->prefix . 'dw_pedagang';
 
 // --- A. BANNER ---
 $banners = [];
-// Cek tabel ada dulu untuk menghindari error
 if ($wpdb->get_var("SHOW TABLES LIKE '$table_banner'") == $table_banner) {
     $banners = $wpdb->get_results("SELECT * FROM $table_banner WHERE status = 'aktif' ORDER BY prioritas ASC, created_at DESC LIMIT 5");
 }
-
-// Fallback Banner
 if (empty($banners)) {
     $banners = [
-        (object)['gambar' => 'https://images.unsplash.com/photo-1596423736798-75b43694f540?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80', 'judul' => 'Pesona Alam Desa', 'link' => '#'],
-        (object)['gambar' => 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80', 'judul' => 'Kuliner Tradisional', 'link' => '#']
+        (object)['gambar' => 'https://images.unsplash.com/photo-1596423736798-75b43694f540', 'judul' => 'Pesona Alam Desa', 'link' => '#'],
+        (object)['gambar' => 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5', 'judul' => 'Kuliner Tradisional', 'link' => '#']
     ];
 }
 
@@ -42,7 +39,7 @@ $query_wisata = "
 ";
 $list_wisata = $wpdb->get_results($query_wisata);
 
-// --- C. PRODUK (JOIN PEDAGANG) ---
+// --- C. PRODUK ---
 $query_produk = "
     SELECT p.*, ped.nama_toko 
     FROM $table_produk p
@@ -53,24 +50,19 @@ $query_produk = "
 ";
 $list_produk = $wpdb->get_results($query_produk);
 
-// --- D. KATEGORI WISATA (Untuk Filter Pin) ---
+// --- D. KATEGORI (Untuk Filter) ---
 $kategori_wisata_db = $wpdb->get_col("SELECT DISTINCT kategori FROM $table_wisata WHERE kategori IS NOT NULL AND kategori != ''");
 $kategori_wisata_clean = [];
 foreach($kategori_wisata_db as $kat) {
     $kategori_wisata_clean[sanitize_title($kat)] = ucfirst($kat);
 }
 
-// --- E. KATEGORI PRODUK (Untuk Filter Pin) ---
 $kategori_produk_db = $wpdb->get_col("SELECT DISTINCT kategori FROM $table_produk WHERE kategori IS NOT NULL AND kategori != ''");
 $kategori_produk_clean = [];
 foreach($kategori_produk_db as $kat) {
     $kategori_produk_clean[sanitize_title($kat)] = ucfirst($kat);
 }
 ?>
-
-<!-- =================================================================================
-     2. VIEW SECTION
-     ================================================================================= -->
 
 <!-- SECTION 1: HERO CAROUSEL -->
 <div class="mb-8 mt-0 md:mt-4 relative group px-4 md:px-0">
@@ -93,7 +85,6 @@ foreach($kategori_produk_db as $kat) {
             </div>
             <?php endforeach; ?>
         </div>
-        <!-- Indicators -->
         <div class="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
             <?php foreach ($banners as $i => $b) : ?>
                 <button class="carousel-dot w-1.5 h-1.5 rounded-full bg-white/50 transition-all <?php echo $i === 0 ? 'bg-white w-4' : ''; ?>" data-index="<?php echo $i; ?>"></button>
@@ -132,9 +123,8 @@ foreach($kategori_produk_db as $kat) {
     </div>
 </div>
 
-<!-- SECTION 3: JELAJAH WISATA (Horizontal Swipe) -->
+<!-- SECTION 3: JELAJAH WISATA -->
 <div class="mb-10 px-0 md:px-0">
-    
     <div class="px-4 md:px-0 mb-4 flex justify-between items-end">
         <div>
             <h3 class="font-bold text-lg md:text-2xl text-gray-800">Jelajahi Wisata</h3>
@@ -146,9 +136,7 @@ foreach($kategori_produk_db as $kat) {
     <!-- Filter Pin Wisata -->
     <div class="sticky top-16 z-30 bg-gray-50/95 backdrop-blur-sm py-2 mb-4">
         <div class="flex gap-2 overflow-x-auto hide-scroll px-4 md:px-0 pb-2 snap-x">
-            <button onclick="filterContent('wisata', 'all', this)" class="cat-pin-wisata snap-start px-4 py-1.5 rounded-full text-xs font-bold bg-primary text-white shadow-sm border border-transparent whitespace-nowrap transition-all active-pin">
-                Semua
-            </button>
+            <button onclick="filterContent('wisata', 'all', this)" class="cat-pin-wisata snap-start px-4 py-1.5 rounded-full text-xs font-bold bg-primary text-white shadow-sm border border-transparent whitespace-nowrap transition-all active-pin">Semua</button>
             <?php foreach($kategori_wisata_clean as $slug => $label): ?>
             <button onclick="filterContent('wisata', '<?php echo $slug; ?>', this)" class="cat-pin-wisata snap-start px-4 py-1.5 rounded-full text-xs font-bold bg-white text-gray-600 border border-gray-200 hover:border-primary hover:text-primary whitespace-nowrap transition-all">
                 <?php echo esc_html($label); ?>
@@ -159,7 +147,6 @@ foreach($kategori_produk_db as $kat) {
 
     <!-- Grid / Scroll Wisata -->
     <div id="wisata-container" class="flex md:grid md:grid-cols-4 gap-4 overflow-x-auto md:overflow-visible px-4 md:px-0 pb-6 md:pb-0 hide-scroll snap-x snap-mandatory">
-        
         <?php if (!empty($list_wisata)) : ?>
             <?php foreach($list_wisata as $wisata): 
                 $img = !empty($wisata->foto_utama) ? $wisata->foto_utama : 'https://via.placeholder.com/400x300';
@@ -167,29 +154,24 @@ foreach($kategori_produk_db as $kat) {
                 $loc = !empty($wisata->nama_desa) ? $wisata->nama_desa : $wisata->kabupaten;
                 $price = ($wisata->harga_tiket > 0) ? 'Rp '.number_format($wisata->harga_tiket,0,',','.') : 'Gratis';
                 $rating = $wisata->rating_avg > 0 ? $wisata->rating_avg : '4.5';
-                $link = home_url('/wisata/?id=' . $wisata->id);
-
-                // Kategori
+                
+                // [FIX] LINK KE PAGE DETAIL KHUSUS
+                $link = home_url('/detail-wisata/?id=' . $wisata->id);
+                
                 $cat_label = !empty($wisata->kategori) ? $wisata->kategori : 'Umum';
                 $cat_slug = sanitize_title($cat_label);
             ?>
             <div class="wisata-item min-w-[75vw] md:min-w-0 md:w-auto flex-shrink-0 snap-center group relative bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden transition-all hover:shadow-md" data-category="<?php echo esc_attr($cat_slug); ?>">
-                
                 <!-- Image Wrapper -->
                 <div class="relative h-40 md:h-48 bg-gray-200 overflow-hidden">
                     <img src="<?php echo esc_url($img); ?>" class="w-full h-full object-cover transition duration-700 group-hover:scale-110">
-                    
-                    <!-- Rating Badge -->
                     <div class="absolute top-2 right-2 bg-white/90 backdrop-blur px-2 py-0.5 rounded-lg text-[10px] font-bold shadow-sm flex items-center gap-1">
                         <i class="fas fa-star text-yellow-400"></i> <?php echo $rating; ?>
                     </div>
-                    
-                    <!-- Kategori Badge -->
                     <div class="absolute bottom-2 left-2 bg-black/60 backdrop-blur text-white text-[10px] px-2 py-0.5 rounded-md font-medium uppercase tracking-wider">
                         <?php echo esc_html($cat_label); ?>
                     </div>
                 </div>
-
                 <!-- Body -->
                 <div class="p-3 md:p-4 flex flex-col h-[130px] md:h-auto">
                     <h3 class="font-bold text-sm md:text-base text-gray-800 line-clamp-1 mb-1 group-hover:text-primary transition">
@@ -199,7 +181,6 @@ foreach($kategori_produk_db as $kat) {
                         <i class="fas fa-map-marker-alt text-red-400"></i>
                         <span class="truncate"><?php echo esc_html($loc); ?></span>
                     </div>
-                    
                     <div class="mt-auto flex justify-between items-center border-t border-dashed border-gray-100 pt-2">
                         <div>
                             <p class="text-[10px] text-gray-400 uppercase font-bold">Tiket</p>
@@ -213,14 +194,12 @@ foreach($kategori_produk_db as $kat) {
             </div>
             <?php endforeach; ?>
         <?php else: ?>
-            <div class="col-span-full py-10 text-center text-gray-400 bg-white rounded-xl border border-dashed border-gray-200">
-                Belum ada data wisata.
-            </div>
+            <div class="col-span-full py-10 text-center text-gray-400 bg-white rounded-xl border border-dashed border-gray-200">Belum ada data wisata.</div>
         <?php endif; ?>
     </div>
 </div>
 
-<!-- SECTION 4: PRODUK UMKM (Grid) -->
+<!-- SECTION 4: PRODUK UMKM -->
 <div class="mb-10 px-4 md:px-0">
     <div class="flex justify-between items-end mb-4">
         <div>
@@ -233,9 +212,7 @@ foreach($kategori_produk_db as $kat) {
     <!-- Filter Pin Produk -->
     <div class="sticky top-16 z-30 bg-gray-50/95 backdrop-blur-sm py-2 mb-4">
         <div class="flex gap-2 overflow-x-auto hide-scroll pb-2 snap-x">
-            <button onclick="filterContent('produk', 'all', this)" class="cat-pin-produk snap-start px-4 py-1.5 rounded-full text-xs font-bold bg-primary text-white shadow-sm border border-transparent whitespace-nowrap transition-all active-pin">
-                Semua
-            </button>
+            <button onclick="filterContent('produk', 'all', this)" class="cat-pin-produk snap-start px-4 py-1.5 rounded-full text-xs font-bold bg-primary text-white shadow-sm border border-transparent whitespace-nowrap transition-all active-pin">Semua</button>
             <?php foreach($kategori_produk_clean as $slug => $label): ?>
             <button onclick="filterContent('produk', '<?php echo $slug; ?>', this)" class="cat-pin-produk snap-start px-4 py-1.5 rounded-full text-xs font-bold bg-white text-gray-600 border border-gray-200 hover:border-primary hover:text-primary whitespace-nowrap transition-all">
                 <?php echo esc_html($label); ?>
@@ -248,7 +225,10 @@ foreach($kategori_produk_db as $kat) {
         <?php foreach($list_produk as $produk): 
             $img = !empty($produk->foto_utama) ? $produk->foto_utama : 'https://via.placeholder.com/300';
             $price = number_format($produk->harga, 0, ',', '.');
-            $link = home_url('/produk/?id=' . $produk->id);
+            
+            // [FIX] LINK KE PAGE DETAIL KHUSUS
+            $link = home_url('/detail-produk/?id=' . $produk->id);
+            
             $cat_label = !empty($produk->kategori) ? $produk->kategori : 'Umum';
             $cat_slug = sanitize_title($cat_label);
         ?>
@@ -274,9 +254,7 @@ foreach($kategori_produk_db as $kat) {
     </div>
 </div>
 
-<!-- SCRIPTS -->
 <script>
-// Carousel Logic
 document.addEventListener('DOMContentLoaded', function() {
     const carousel = document.getElementById('hero-carousel');
     if(carousel) {
@@ -296,7 +274,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Filter Function
 function filterContent(type, category, btn) {
     const pinClass = type === 'wisata' ? '.cat-pin-wisata' : '.cat-pin-produk';
     const itemClass = type === 'wisata' ? '.wisata-item' : '.produk-item';
@@ -317,7 +294,6 @@ function filterContent(type, category, btn) {
     });
 }
 
-// Cart Logic
 jQuery(document).ready(function($) {
     $('.btn-add-to-cart').on('click', function(e) {
         e.preventDefault();
