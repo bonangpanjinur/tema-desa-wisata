@@ -61,10 +61,15 @@ if ($wpdb->get_var("SHOW TABLES LIKE '$table_ulasan'") == $table_ulasan) {
 // Data Formatting
 $harga_tiket = $wisata->harga_tiket;
 
-// === PERBAIKAN LINK DESA ===
-$link_desa = !empty($wisata->slug_desa) 
-    ? home_url('/profil/desa/' . $wisata->slug_desa) 
-    : home_url('/profil-desa/?id=' . $wisata->id_desa);
+// === PERBAIKAN LINK DESA (UPDATE) ===
+$link_desa = '#';
+if (!empty($wisata->slug_desa)) {
+    // Gunakan rawurlencode untuk menangani spasi (misal "Desa Taraju" -> "Desa%20Taraju")
+    $link_desa = home_url('/profil/desa/' . rawurlencode($wisata->slug_desa));
+} elseif (!empty($wisata->id_desa)) {
+    // Fallback ke ID jika slug kosong
+    $link_desa = home_url('/profil-desa/?id=' . $wisata->id_desa);
+}
 
 $lokasi_html = !empty($wisata->nama_desa) 
     ? '<a href="'.esc_url($link_desa).'" class="hover:text-primary hover:underline font-bold">Desa ' . esc_html($wisata->nama_desa) . '</a>, ' . esc_html($wisata->kabupaten) 
