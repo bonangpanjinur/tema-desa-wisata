@@ -93,8 +93,7 @@ $kategori_wisata = get_terms([
     </div>
 </div>
 
-<!-- SECTION 2: MENU UTAMA (Dikembalikan) -->
-<!-- Bagian ini sebelumnya hilang, saya kembalikan agar navigasi utama tetap ada -->
+<!-- SECTION 2: MENU UTAMA -->
 <div class="mb-10 px-4 md:px-0">
     <div class="grid grid-cols-4 md:flex md:justify-center md:gap-16 gap-4">
         <a href="<?php echo home_url('/wisata'); ?>" class="flex flex-col items-center gap-3 group">
@@ -153,7 +152,6 @@ $kategori_wisata = get_terms([
     </div>
 
     <!-- GRID / SCROLL WISATA -->
-    <!-- Mobile: Horizontal Scroll (Snap), Desktop: Grid -->
     <div id="wisata-container" class="flex md:grid md:grid-cols-4 gap-4 overflow-x-auto md:overflow-visible px-4 md:px-0 pb-6 md:pb-0 hide-scroll snap-x snap-mandatory">
         
         <?php if (!empty($list_wisata)) : ?>
@@ -171,7 +169,6 @@ $kategori_wisata = get_terms([
                 $cat_slug = !empty($terms) && !is_wp_error($terms) ? $terms[0]->slug : 'all';
             ?>
             <!-- Item Card -->
-            <!-- Mobile Width: min-w-[75vw] (1.5 card view) agar swipe nyaman -->
             <div class="wisata-item min-w-[75vw] md:min-w-0 md:w-auto flex-shrink-0 snap-center group relative bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden transition-all hover:shadow-md" data-category="<?php echo esc_attr($cat_slug); ?>">
                 
                 <!-- Image Wrapper -->
@@ -183,8 +180,8 @@ $kategori_wisata = get_terms([
                         <i class="fas fa-star text-yellow-400"></i> <?php echo $rating; ?>
                     </div>
                     
-                    <!-- Dynamic Category Badge (Menggantikan text statis 'Wisata') -->
-                    <div class="absolute bottom-2 left-2 bg-black/60 backdrop-blur text-white text-[10px] px-2 py-0.5 rounded-md font-medium">
+                    <!-- Dynamic Category Badge (Fix #2: Ganti "Wisata" jadi Kategori Asli) -->
+                    <div class="absolute bottom-2 left-2 bg-black/60 backdrop-blur text-white text-[10px] px-2 py-0.5 rounded-md font-medium uppercase tracking-wider">
                         <?php echo esc_html($cat_name); ?>
                     </div>
                 </div>
@@ -204,8 +201,9 @@ $kategori_wisata = get_terms([
                             <p class="text-[10px] text-gray-400 uppercase font-bold">Tiket</p>
                             <p class="text-sm font-bold text-primary"><?php echo $price; ?></p>
                         </div>
-                        <a href="<?php echo esc_url($link); ?>" class="w-8 h-8 rounded-full bg-gray-50 text-gray-600 flex items-center justify-center hover:bg-primary hover:text-white transition">
-                            <i class="fas fa-arrow-right text-xs"></i>
+                        <!-- Fix #3: Ganti Tombol Arrow dengan Teks Detail tapi tetap Compact -->
+                        <a href="<?php echo esc_url($link); ?>" class="px-3 py-1.5 rounded-lg bg-gray-50 text-gray-600 text-[10px] font-bold hover:bg-primary hover:text-white transition flex items-center gap-1">
+                            Detail <i class="fas fa-arrow-right text-[8px]"></i>
                         </a>
                     </div>
                 </div>
