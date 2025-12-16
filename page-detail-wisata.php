@@ -18,17 +18,17 @@ $slug = get_query_var('dw_slug');
 // 2. Coba Tangkap ID (Fallback)
 $id_param = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
-// 3. Query Data
+// 3. Query Data (Tambahkan d.slug_desa ke SELECT)
 if (!empty($slug)) {
     $wisata = $wpdb->get_row($wpdb->prepare("
-        SELECT w.*, d.nama_desa, d.kabupaten, d.id as id_desa
+        SELECT w.*, d.nama_desa, d.kabupaten, d.slug_desa, d.id as id_desa
         FROM $table_wisata w
         LEFT JOIN $table_desa d ON w.id_desa = d.id
         WHERE w.slug = %s AND w.status = 'aktif'
     ", $slug));
 } elseif ($id_param > 0) {
     $wisata = $wpdb->get_row($wpdb->prepare("
-        SELECT w.*, d.nama_desa, d.kabupaten, d.id as id_desa
+        SELECT w.*, d.nama_desa, d.kabupaten, d.slug_desa, d.id as id_desa
         FROM $table_wisata w
         LEFT JOIN $table_desa d ON w.id_desa = d.id
         WHERE w.id = %d AND w.status = 'aktif'
@@ -60,10 +60,12 @@ if ($wpdb->get_var("SHOW TABLES LIKE '$table_ulasan'") == $table_ulasan) {
 
 // Data Formatting
 $harga_tiket = $wisata->harga_tiket;
-$price_display = ($harga_tiket > 0) ? '<span class="text-xs text-gray-500 font-normal block mb-1">Mulai dari</span> <span class="text-primary font-bold text-2xl">Rp ' . number_format($harga_tiket, 0, ',', '.') . '</span>' : '<span class="text-primary font-bold text-2xl">Gratis</span>';
 
-// Link Desa (Profil Desa)
-$link_desa = home_url('/profil-desa/?id=' . $wisata->id_desa);
+// === PERBAIKAN LINK DESA ===
+$link_desa = !empty($wisata->slug_desa) 
+    ? home_url('/profil/desa/' . $wisata->slug_desa) 
+    : home_url('/profil-desa/?id=' . $wisata->id_desa);
+
 $lokasi_html = !empty($wisata->nama_desa) 
     ? '<a href="'.esc_url($link_desa).'" class="hover:text-primary hover:underline font-bold">Desa ' . esc_html($wisata->nama_desa) . '</a>, ' . esc_html($wisata->kabupaten) 
     : esc_html($wisata->kabupaten);
