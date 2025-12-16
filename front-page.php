@@ -53,14 +53,18 @@ $list_produk = $wpdb->get_results($query_produk);
 // --- D. KATEGORI (Untuk Filter) ---
 $kategori_wisata_db = $wpdb->get_col("SELECT DISTINCT kategori FROM $table_wisata WHERE kategori IS NOT NULL AND kategori != ''");
 $kategori_wisata_clean = [];
-foreach($kategori_wisata_db as $kat) {
-    $kategori_wisata_clean[sanitize_title($kat)] = ucfirst($kat);
+if($kategori_wisata_db) {
+    foreach($kategori_wisata_db as $kat) {
+        $kategori_wisata_clean[sanitize_title($kat)] = ucfirst($kat);
+    }
 }
 
 $kategori_produk_db = $wpdb->get_col("SELECT DISTINCT kategori FROM $table_produk WHERE kategori IS NOT NULL AND kategori != ''");
 $kategori_produk_clean = [];
-foreach($kategori_produk_db as $kat) {
-    $kategori_produk_clean[sanitize_title($kat)] = ucfirst($kat);
+if($kategori_produk_db) {
+    foreach($kategori_produk_db as $kat) {
+        $kategori_produk_clean[sanitize_title($kat)] = ucfirst($kat);
+    }
 }
 ?>
 
@@ -155,14 +159,13 @@ foreach($kategori_produk_db as $kat) {
                 $price = ($wisata->harga_tiket > 0) ? 'Rp '.number_format($wisata->harga_tiket,0,',','.') : 'Gratis';
                 $rating = $wisata->rating_avg > 0 ? $wisata->rating_avg : '4.5';
                 
-                // [FIX] LINK KE PAGE DETAIL KHUSUS
-                $link = home_url('/detail-wisata/?id=' . $wisata->id);
+                // [FIX] URL CANTIK
+                $link = home_url('/wisata/detail/' . $wisata->slug);
                 
                 $cat_label = !empty($wisata->kategori) ? $wisata->kategori : 'Umum';
                 $cat_slug = sanitize_title($cat_label);
             ?>
             <div class="wisata-item min-w-[75vw] md:min-w-0 md:w-auto flex-shrink-0 snap-center group relative bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden transition-all hover:shadow-md" data-category="<?php echo esc_attr($cat_slug); ?>">
-                <!-- Image Wrapper -->
                 <div class="relative h-40 md:h-48 bg-gray-200 overflow-hidden">
                     <img src="<?php echo esc_url($img); ?>" class="w-full h-full object-cover transition duration-700 group-hover:scale-110">
                     <div class="absolute top-2 right-2 bg-white/90 backdrop-blur px-2 py-0.5 rounded-lg text-[10px] font-bold shadow-sm flex items-center gap-1">
@@ -172,7 +175,6 @@ foreach($kategori_produk_db as $kat) {
                         <?php echo esc_html($cat_label); ?>
                     </div>
                 </div>
-                <!-- Body -->
                 <div class="p-3 md:p-4 flex flex-col h-[130px] md:h-auto">
                     <h3 class="font-bold text-sm md:text-base text-gray-800 line-clamp-1 mb-1 group-hover:text-primary transition">
                         <a href="<?php echo esc_url($link); ?>"><?php echo esc_html($title); ?></a>
@@ -226,8 +228,8 @@ foreach($kategori_produk_db as $kat) {
             $img = !empty($produk->foto_utama) ? $produk->foto_utama : 'https://via.placeholder.com/300';
             $price = number_format($produk->harga, 0, ',', '.');
             
-            // [FIX] LINK KE PAGE DETAIL KHUSUS
-            $link = home_url('/detail-produk/?id=' . $produk->id);
+            // [FIX] URL CANTIK
+            $link = home_url('/produk/detail/' . $produk->slug);
             
             $cat_label = !empty($produk->kategori) ? $produk->kategori : 'Umum';
             $cat_slug = sanitize_title($cat_label);
@@ -277,14 +279,12 @@ document.addEventListener('DOMContentLoaded', function() {
 function filterContent(type, category, btn) {
     const pinClass = type === 'wisata' ? '.cat-pin-wisata' : '.cat-pin-produk';
     const itemClass = type === 'wisata' ? '.wisata-item' : '.produk-item';
-    
     document.querySelectorAll(pinClass).forEach(b => {
         b.classList.remove('bg-primary', 'text-white', 'active-pin');
         b.classList.add('bg-white', 'text-gray-600', 'border-gray-200');
     });
     btn.classList.remove('bg-white', 'text-gray-600', 'border-gray-200');
     btn.classList.add('bg-primary', 'text-white', 'active-pin');
-
     document.querySelectorAll(itemClass).forEach(item => {
         if (category === 'all' || item.dataset.category === category) {
             item.style.display = 'block'; 
@@ -300,9 +300,7 @@ jQuery(document).ready(function($) {
         var btn = $(this);
         var originalIcon = btn.html();
         var isCustom = btn.data('is-custom') ? 1 : 0;
-        
         btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin text-xs"></i>');
-
         $.post(dw_ajax.ajax_url, {
             action: 'dw_theme_add_to_cart',
             nonce: dw_ajax.nonce,

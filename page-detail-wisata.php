@@ -1,8 +1,6 @@
 <?php
 /**
  * Template Name: Detail Wisata Custom
- * File ini menangani tampilan detail wisata dari tabel dw_wisata.
- * Buat halaman baru di WP dengan slug "detail-wisata" untuk menggunakan ini.
  */
 
 get_header();
@@ -11,21 +9,34 @@ global $wpdb;
 $table_wisata = $wpdb->prefix . 'dw_wisata';
 $table_desa   = $wpdb->prefix . 'dw_desa';
 
-// 1. Tangkap ID dari URL (contoh: /detail-wisata/?id=123)
-$wisata_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 $wisata = null;
 
-// 2. Query Data dari Custom DB
-if ($wisata_id > 0) {
+// 1. Coba Tangkap Slug dari URL (Rewrite Rule)
+$slug = get_query_var('dw_slug');
+
+// 2. Coba Tangkap ID (Fallback)
+$id_param = isset($_GET['id']) ? intval($_GET['id']) : 0;
+
+// 3. Query Data (AMAN DARI SQL INJECTION)
+if (!empty($slug)) {
+    // Cari berdasarkan Slug
+    $wisata = $wpdb->get_row($wpdb->prepare("
+        SELECT w.*, d.nama_desa, d.kabupaten 
+        FROM $table_wisata w
+        LEFT JOIN $table_desa d ON w.id_desa = d.id
+        WHERE w.slug = %s AND w.status = 'aktif'
+    ", $slug));
+} elseif ($id_param > 0) {
+    // Cari berdasarkan ID
     $wisata = $wpdb->get_row($wpdb->prepare("
         SELECT w.*, d.nama_desa, d.kabupaten 
         FROM $table_wisata w
         LEFT JOIN $table_desa d ON w.id_desa = d.id
         WHERE w.id = %d AND w.status = 'aktif'
-    ", $wisata_id));
+    ", $id_param));
 }
 
-// 3. Jika Data Tidak Ditemukan
+// 4. Jika Data Tidak Ditemukan
 if (!$wisata) {
     echo '<div class="min-h-[60vh] flex flex-col items-center justify-center text-center p-4">';
     echo '<div class="text-6xl text-gray-200 mb-4"><i class="fas fa-map-signs"></i></div>';
@@ -42,7 +53,6 @@ $harga_tiket = $wisata->harga_tiket;
 $price_display = ($harga_tiket > 0) ? '<span class="text-xs text-gray-500 font-normal">Tiket Masuk</span> <span class="text-primary font-bold text-xl block">Rp ' . number_format($harga_tiket, 0, ',', '.') . '</span>' : '<span class="text-primary font-bold text-xl">Gratis</span>';
 $lokasi = !empty($wisata->nama_desa) ? "Desa " . $wisata->nama_desa . ", " . $wisata->kabupaten : $wisata->kabupaten;
 
-// Handle Fasilitas (JSON or String)
 $fasilitas = [];
 if (!empty($wisata->fasilitas)) {
     $json_test = json_decode($wisata->fasilitas);
@@ -57,7 +67,6 @@ $jam_buka = !empty($wisata->jam_buka) ? $wisata->jam_buka : '08:00 - 17:00';
 $rating = $wisata->rating_avg > 0 ? $wisata->rating_avg : '4.5';
 $img_hero = !empty($wisata->foto_utama) ? $wisata->foto_utama : 'https://via.placeholder.com/800x400';
 
-// WA Link
 $wa_link = '#';
 if (!empty($wisata->kontak_pengelola)) {
     $wa_num = preg_replace('/^0/', '62', preg_replace('/[^0-9]/', '', $wisata->kontak_pengelola));
@@ -70,7 +79,6 @@ if (!empty($wisata->kontak_pengelola)) {
 <div class="relative bg-gray-900 h-[300px] md:h-[400px]">
     <img src="<?php echo esc_url($img_hero); ?>" class="w-full h-full object-cover opacity-60">
     <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
-    
     <div class="absolute bottom-0 left-0 w-full p-4 md:p-8">
         <div class="container mx-auto">
             <span class="bg-primary text-white text-xs font-bold px-2 py-1 rounded mb-2 inline-block uppercase tracking-wider">
@@ -89,26 +97,18 @@ if (!empty($wisata->kontak_pengelola)) {
 <!-- CONTENT & SIDEBAR -->
 <div class="container mx-auto px-4 py-8">
     <div class="flex flex-col lg:flex-row gap-8">
-        
-        <!-- KOLOM KIRI (Konten Utama) -->
         <div class="w-full lg:w-2/3">
-            
-            <!-- Deskripsi -->
             <div class="mb-8">
                 <h3 class="text-lg font-bold text-gray-800 mb-3">Tentang Wisata</h3>
                 <div class="prose max-w-none text-gray-600 text-sm leading-relaxed">
                     <?php echo wpautop(esc_html($wisata->deskripsi)); ?>
                 </div>
             </div>
-
-            <!-- Fasilitas -->
             <?php if(!empty($fasilitas)): ?>
             <div class="mb-8">
                 <h3 class="text-lg font-bold text-gray-800 mb-3">Fasilitas Tersedia</h3>
                 <div class="grid grid-cols-2 gap-3">
-                    <?php foreach($fasilitas as $f): 
-                        if(trim($f) == '') continue;
-                    ?>
+                    <?php foreach($fasilitas as $f): if(trim($f) == '') continue; ?>
                     <div class="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 p-2 rounded-lg border border-gray-100">
                         <i class="fas fa-check-circle text-green-500"></i>
                         <span><?php echo esc_html(trim($f)); ?></span>
@@ -117,8 +117,6 @@ if (!empty($wisata->kontak_pengelola)) {
                 </div>
             </div>
             <?php endif; ?>
-
-            <!-- Peta Lokasi -->
             <?php if(!empty($wisata->lokasi_maps)): ?>
             <div class="mb-8">
                 <h3 class="text-lg font-bold text-gray-800 mb-3">Lokasi</h3>
@@ -132,10 +130,7 @@ if (!empty($wisata->kontak_pengelola)) {
                 </div>
             </div>
             <?php endif; ?>
-
         </div>
-
-        <!-- KOLOM KANAN (Sidebar Sticky) -->
         <div class="w-full lg:w-1/3">
             <div class="bg-white rounded-xl shadow-lg border border-gray-100 p-6 sticky top-24">
                 <div class="flex justify-between items-center mb-4 pb-4 border-b border-gray-100">
@@ -147,7 +142,6 @@ if (!empty($wisata->kontak_pengelola)) {
                         <span class="text-xs text-gray-400">Rating Pengunjung</span>
                     </div>
                 </div>
-
                 <div class="space-y-4">
                     <div class="flex items-start gap-3">
                         <div class="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-500 flex-shrink-0">
@@ -158,14 +152,12 @@ if (!empty($wisata->kontak_pengelola)) {
                             <span class="text-sm font-semibold text-gray-700"><?php echo esc_html($jam_buka); ?> WIB</span>
                         </div>
                     </div>
-
                     <a href="<?php echo esc_url($wa_link); ?>" target="_blank" class="block w-full bg-green-600 text-white text-center py-3 rounded-xl font-bold hover:bg-green-700 transition shadow-md flex items-center justify-center gap-2">
                         <i class="fab fa-whatsapp text-lg"></i> Hubungi Pengelola
                     </a>
                 </div>
             </div>
         </div>
-
     </div>
 </div>
 
@@ -175,13 +167,11 @@ if (!empty($wisata->kontak_pengelola)) {
         <h3 class="text-xl font-bold text-gray-800 mb-6">Wisata Lainnya</h3>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <?php
-            // Ambil wisata lain secara acak
-            $related = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_wisata WHERE status='aktif' AND id != %d ORDER BY RAND() LIMIT 4", $wisata_id));
-            
+            $related = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_wisata WHERE status='aktif' AND id != %d ORDER BY RAND() LIMIT 4", $wisata ? $wisata->id : 0));
             if($related): foreach($related as $r):
                 $r_img = !empty($r->foto_utama) ? $r->foto_utama : 'https://via.placeholder.com/300';
                 $r_price = ($r->harga_tiket > 0) ? 'Rp '.number_format($r->harga_tiket,0,',','.') : 'Gratis';
-                $r_link = home_url('/detail-wisata/?id=' . $r->id);
+                $r_link = home_url('/wisata/detail/' . $r->slug);
             ?>
             <a href="<?php echo esc_url($r_link); ?>" class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden group hover:shadow-md transition block">
                 <div class="h-32 bg-gray-200 relative overflow-hidden">
