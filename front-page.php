@@ -57,6 +57,12 @@ $kategori_wisata = get_terms([
     'hide_empty' => true,
 ]);
 
+// --- E. KATEGORI PRODUK (Untuk Filter Pin) ---
+$kategori_produk = get_terms([
+    'taxonomy'   => 'dw_kategori_produk',
+    'hide_empty' => true,
+]);
+
 ?>
 
 <!-- =================================================================================
@@ -134,17 +140,17 @@ $kategori_wisata = get_terms([
         <a href="<?php echo home_url('/wisata'); ?>" class="text-primary text-xs font-bold hover:underline">Lihat Semua</a>
     </div>
 
-    <!-- Sticky Category Filter (PINS) -->
+    <!-- Sticky Category Filter (PINS WISATA) -->
     <div class="sticky top-16 z-30 bg-gray-50/95 backdrop-blur-sm py-2 mb-4">
         <div class="flex gap-2 overflow-x-auto hide-scroll px-4 md:px-0 pb-2 snap-x">
             <!-- Default All -->
-            <button onclick="filterWisata('all', this)" class="cat-pin snap-start px-4 py-1.5 rounded-full text-xs font-bold bg-primary text-white shadow-sm border border-transparent whitespace-nowrap transition-all active-pin">
+            <button onclick="filterContent('wisata', 'all', this)" class="cat-pin-wisata snap-start px-4 py-1.5 rounded-full text-xs font-bold bg-primary text-white shadow-sm border border-transparent whitespace-nowrap transition-all active-pin">
                 Semua
             </button>
             
             <!-- Dynamic Terms -->
             <?php foreach($kategori_wisata as $term): ?>
-            <button onclick="filterWisata('<?php echo $term->slug; ?>', this)" class="cat-pin snap-start px-4 py-1.5 rounded-full text-xs font-bold bg-white text-gray-600 border border-gray-200 hover:border-primary hover:text-primary whitespace-nowrap transition-all">
+            <button onclick="filterContent('wisata', '<?php echo $term->slug; ?>', this)" class="cat-pin-wisata snap-start px-4 py-1.5 rounded-full text-xs font-bold bg-white text-gray-600 border border-gray-200 hover:border-primary hover:text-primary whitespace-nowrap transition-all">
                 <?php echo esc_html($term->name); ?>
             </button>
             <?php endforeach; ?>
@@ -217,7 +223,7 @@ $kategori_wisata = get_terms([
     </div>
 </div>
 
-<!-- SECTION 4: PRODUK UMKM (Grid Standard) -->
+<!-- SECTION 4: PRODUK UMKM (Dengan Pin Filter) -->
 <div class="mb-10 px-4 md:px-0">
     <div class="flex justify-between items-end mb-4">
         <div>
@@ -227,13 +233,34 @@ $kategori_wisata = get_terms([
         <a href="<?php echo home_url('/produk'); ?>" class="text-primary text-xs font-bold hover:underline">Lihat Semua</a>
     </div>
 
-    <div class="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-6">
+    <!-- Sticky Category Filter (PINS PRODUK) -->
+    <div class="sticky top-16 z-30 bg-gray-50/95 backdrop-blur-sm py-2 mb-4">
+        <div class="flex gap-2 overflow-x-auto hide-scroll pb-2 snap-x">
+            <!-- Default All -->
+            <button onclick="filterContent('produk', 'all', this)" class="cat-pin-produk snap-start px-4 py-1.5 rounded-full text-xs font-bold bg-primary text-white shadow-sm border border-transparent whitespace-nowrap transition-all active-pin">
+                Semua
+            </button>
+            
+            <!-- Dynamic Terms -->
+            <?php foreach($kategori_produk as $term): ?>
+            <button onclick="filterContent('produk', '<?php echo $term->slug; ?>', this)" class="cat-pin-produk snap-start px-4 py-1.5 rounded-full text-xs font-bold bg-white text-gray-600 border border-gray-200 hover:border-primary hover:text-primary whitespace-nowrap transition-all">
+                <?php echo esc_html($term->name); ?>
+            </button>
+            <?php endforeach; ?>
+        </div>
+    </div>
+
+    <div id="produk-container" class="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-6">
         <?php foreach($list_produk as $produk): 
             $img = !empty($produk->foto_utama) ? $produk->foto_utama : 'https://via.placeholder.com/300';
             $price = number_format($produk->harga, 0, ',', '.');
             $link = home_url('/produk/?id=' . $produk->id);
+
+            // Ambil Kategori Dinamis untuk Filter
+            $terms = get_the_terms($produk->id, 'dw_kategori_produk');
+            $cat_slug = !empty($terms) && !is_wp_error($terms) ? $terms[0]->slug : 'all';
         ?>
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden group relative">
+        <div class="produk-item bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden group relative" data-category="<?php echo esc_attr($cat_slug); ?>">
             <a href="<?php echo esc_url($link); ?>">
                 <div class="aspect-square bg-gray-100 relative overflow-hidden">
                     <img src="<?php echo esc_url($img); ?>" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
@@ -276,10 +303,14 @@ document.addEventListener('DOMContentLoaded', function() {
     setInterval(() => showSlide(index + 1), 5000);
 });
 
-// 2. FILTER KATEGORI WISATA
-function filterWisata(category, btn) {
+// 2. FILTER KATEGORI (General Function)
+function filterContent(type, category, btn) {
+    // Determine Selector Class based on type (wisata or produk)
+    const pinClass = type === 'wisata' ? '.cat-pin-wisata' : '.cat-pin-produk';
+    const itemClass = type === 'wisata' ? '.wisata-item' : '.produk-item';
+    
     // Style Button
-    document.querySelectorAll('.cat-pin').forEach(b => {
+    document.querySelectorAll(pinClass).forEach(b => {
         b.classList.remove('bg-primary', 'text-white', 'active-pin');
         b.classList.add('bg-white', 'text-gray-600', 'border-gray-200');
     });
@@ -287,7 +318,7 @@ function filterWisata(category, btn) {
     btn.classList.add('bg-primary', 'text-white', 'active-pin');
 
     // Filter Logic
-    const items = document.querySelectorAll('.wisata-item');
+    const items = document.querySelectorAll(itemClass);
     items.forEach(item => {
         if (category === 'all' || item.dataset.category === category) {
             item.style.display = 'block'; 
