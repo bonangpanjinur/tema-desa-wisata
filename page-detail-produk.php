@@ -1,6 +1,7 @@
 <?php
 /**
- * Template Name: Detail Produk (Custom DB)
+ * Template Name: Detail Produk Custom
+ * Buat halaman baru di WP dengan slug "detail-produk"
  */
 
 get_header();
@@ -15,20 +16,18 @@ $produk = null;
 
 // 2. Query Data
 if ($produk_id > 0) {
-    $query = $wpdb->prepare("
+    $produk = $wpdb->get_row($wpdb->prepare("
         SELECT p.*, ped.nama_toko, ped.alamat_lengkap as alamat_toko, ped.nomor_wa 
         FROM $table_produk p
         LEFT JOIN $table_pedagang ped ON p.id_pedagang = ped.id
         WHERE p.id = %d AND p.status = 'aktif'
-    ", $produk_id);
-    
-    $produk = $wpdb->get_row($query);
+    ", $produk_id));
 }
 
 // 3. Not Found Handler
 if (!$produk) {
-    echo '<div class="container mx-auto py-20 px-4 text-center">';
-    echo '<div class="text-6xl text-gray-300 mb-4"><i class="fas fa-box-open"></i></div>';
+    echo '<div class="min-h-[60vh] flex flex-col items-center justify-center text-center p-4">';
+    echo '<div class="text-6xl text-gray-200 mb-4"><i class="fas fa-box-open"></i></div>';
     echo '<h1 class="text-2xl font-bold text-gray-800 mb-2">Produk Tidak Ditemukan</h1>';
     echo '<a href="'.home_url('/').'" class="text-primary font-bold hover:underline">Kembali ke Beranda</a>';
     echo '</div>';
@@ -45,14 +44,12 @@ $kategori = $produk->kategori ?: 'Umum';
 $nama_toko = $produk->nama_toko ?: 'Toko Desa';
 ?>
 
-<div class="bg-gray-50 min-h-screen py-4 md:py-8">
+<div class="bg-gray-50 min-h-screen py-4 md:py-8 pb-24">
     <div class="container mx-auto px-4">
         
         <!-- Breadcrumb -->
         <div class="text-xs text-gray-500 mb-4 flex items-center gap-2">
             <a href="<?php echo home_url('/'); ?>" class="hover:text-primary">Beranda</a>
-            <i class="fas fa-chevron-right text-[10px]"></i>
-            <a href="#" class="hover:text-primary">Produk</a>
             <i class="fas fa-chevron-right text-[10px]"></i>
             <span class="text-gray-800 font-bold truncate max-w-[200px]"><?php echo esc_html($produk->nama_produk); ?></span>
         </div>
@@ -68,7 +65,6 @@ $nama_toko = $produk->nama_toko ?: 'Toko Desa';
                             <span class="absolute top-2 right-2 bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded">Preloved</span>
                         <?php endif; ?>
                     </div>
-                    <!-- Thumbnails (Optional / Future Dev) -->
                 </div>
 
                 <!-- INFO PRODUK -->
@@ -88,16 +84,6 @@ $nama_toko = $produk->nama_toko ?: 'Toko Desa';
 
                     <div class="text-3xl font-bold text-primary mb-6">
                         Rp <?php echo number_format($harga, 0, ',', '.'); ?>
-                    </div>
-
-                    <!-- Deskripsi Singkat -->
-                    <div class="mb-6">
-                        <h3 class="font-bold text-gray-800 mb-2 text-sm">Detail Produk</h3>
-                        <div class="text-sm text-gray-600 space-y-1">
-                            <p><span class="w-24 inline-block text-gray-400">Kondisi:</span> <?php echo ucfirst($produk->kondisi); ?></p>
-                            <p><span class="w-24 inline-block text-gray-400">Berat:</span> <?php echo $produk->berat_gram; ?> gram</p>
-                            <p><span class="w-24 inline-block text-gray-400">Stok:</span> <?php echo $stok; ?> pcs</p>
-                        </div>
                     </div>
 
                     <!-- Info Penjual -->
@@ -137,11 +123,6 @@ $nama_toko = $produk->nama_toko ?: 'Toko Desa';
     </div>
 </div>
 
-<!-- DESKTOP ACTION (Sticky Sidebar Simulation) -->
-<!-- Note: Di desain ini, tombol aksi sudah terintegrasi di layout desktop jika ingin ditambahkan, 
-     tapi untuk kesederhanaan, tombol add to cart bisa ditaruh di dekat harga di atas. 
-     Berikut script cart handler sederhana. -->
-
 <script>
 jQuery(document).ready(function($) {
     $('.btn-add-cart-single').on('click', function(e) {
@@ -151,14 +132,12 @@ jQuery(document).ready(function($) {
         
         btn.prop('disabled', true).text('Memproses...');
         
-        // Panggil AJAX Add to Cart (Pastikan handler di functions.php sudah support ID dari tabel custom)
-        // Jika belum, Anda perlu menyesuaikan dw_ajax_add_to_cart di functions.php
         $.post(dw_ajax.ajax_url, {
             action: 'dw_theme_add_to_cart',
             nonce: dw_ajax.nonce,
             product_id: id,
             quantity: 1,
-            is_custom_db: 1 // Flag penanda ini dari tabel custom
+            is_custom_db: 1 
         }, function(res) {
             if(res.success) {
                 alert('Berhasil masuk keranjang!');
