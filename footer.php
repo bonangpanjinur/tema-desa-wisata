@@ -47,37 +47,37 @@
             </div>
         </footer>
 
-        <!-- MOBILE BOTTOM NAVIGATION (Hidden on Desktop) -->
-        <nav class="md:hidden bg-white border-t border-gray-200 px-4 py-3 flex justify-between items-end sticky bottom-0 z-50 w-full shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+        <!-- MOBILE BOTTOM NAVIGATION (Fixed) -->
+        <nav class="md:hidden bg-white border-t border-gray-200 px-4 py-2 flex justify-between items-end fixed bottom-0 left-0 right-0 z-50 w-full shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
             
             <!-- 1. Beranda -->
-            <a href="<?php echo home_url(); ?>" class="flex flex-col items-center gap-1 <?php echo is_front_page() ? 'text-emerald-600' : 'text-gray-400 hover:text-emerald-600'; ?> transition w-16">
+            <a href="<?php echo home_url(); ?>" class="flex flex-col items-center gap-1 <?php echo is_front_page() ? 'text-primary' : 'text-gray-400 hover:text-primary'; ?> transition w-16 p-1">
                 <i class="fas fa-home text-lg"></i>
                 <span class="text-[10px] font-medium">Beranda</span>
             </a>
             
-            <!-- 2. Jelajah (Link Fixed: /wisata) -->
-            <a href="<?php echo home_url('/wisata'); ?>" class="flex flex-col items-center gap-1 <?php echo is_post_type_archive('dw_wisata') ? 'text-emerald-600' : 'text-gray-400 hover:text-emerald-600'; ?> transition w-16">
+            <!-- 2. Jelajah -->
+            <a href="<?php echo home_url('/wisata'); ?>" class="flex flex-col items-center gap-1 <?php echo is_page('wisata') ? 'text-primary' : 'text-gray-400 hover:text-primary'; ?> transition w-16 p-1">
                 <i class="fas fa-compass text-lg"></i>
                 <span class="text-[10px] font-medium">Jelajah</span>
             </a>
             
             <!-- 3. Produk (Center Featured) -->
-            <div class="relative -top-5 w-16 flex flex-col items-center">
-                <a href="<?php echo home_url('/produk'); ?>" class="bg-emerald-600 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg border-4 border-gray-50 transform active:scale-95 transition">
-                    <i class="fas fa-box-open text-xl"></i>
+            <div class="relative -top-6 w-16 flex flex-col items-center">
+                <a href="<?php echo home_url('/produk'); ?>" class="bg-primary text-white w-12 h-12 rounded-full flex items-center justify-center shadow-lg border-4 border-gray-50 transform active:scale-95 transition">
+                    <i class="fas fa-box-open text-lg"></i>
                 </a>
-                <span class="text-[10px] font-medium text-emerald-700 mt-1">Produk</span>
+                <span class="text-[10px] font-medium text-primary mt-1">Produk</span>
             </div>
             
             <!-- 4. Transaksi -->
-            <a href="<?php echo home_url('/transaksi'); ?>" class="flex flex-col items-center gap-1 text-gray-400 hover:text-emerald-600 transition w-16">
+            <a href="<?php echo home_url('/transaksi'); ?>" class="flex flex-col items-center gap-1 <?php echo is_page('transaksi') ? 'text-primary' : 'text-gray-400 hover:text-primary'; ?> transition w-16 p-1">
                 <i class="fas fa-receipt text-lg"></i>
                 <span class="text-[10px] font-medium">Transaksi</span>
             </a>
             
             <!-- 5. Akun -->
-            <a href="<?php echo is_user_logged_in() ? home_url('/akun-saya') : home_url('/login'); ?>" class="flex flex-col items-center gap-1 <?php echo is_page('akun-saya') ? 'text-emerald-600' : 'text-gray-400 hover:text-emerald-600'; ?> transition w-16">
+            <a href="<?php echo is_user_logged_in() ? home_url('/akun-saya') : home_url('/login'); ?>" class="flex flex-col items-center gap-1 <?php echo is_page('akun-saya') ? 'text-primary' : 'text-gray-400 hover:text-primary'; ?> transition w-16 p-1">
                 <i class="fas fa-user text-lg"></i>
                 <span class="text-[10px] font-medium">Akun</span>
             </a>

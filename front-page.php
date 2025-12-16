@@ -7,7 +7,7 @@ get_header();
 global $wpdb;
 
 // =================================================================================
-// 1. DATA FETCHING (LANGSUNG KE DATABASE AGAR DATA MUNCUL)
+// 1. DATA FETCHING (DIRECT DB ACCESS)
 // =================================================================================
 
 $table_banner   = $wpdb->prefix . 'dw_banner';
@@ -18,14 +18,16 @@ $table_pedagang = $wpdb->prefix . 'dw_pedagang';
 
 // --- A. BANNER ---
 $banners = [];
+// Cek tabel ada dulu untuk menghindari error
 if ($wpdb->get_var("SHOW TABLES LIKE '$table_banner'") == $table_banner) {
     $banners = $wpdb->get_results("SELECT * FROM $table_banner WHERE status = 'aktif' ORDER BY prioritas ASC, created_at DESC LIMIT 5");
 }
 
+// Fallback Banner
 if (empty($banners)) {
     $banners = [
-        (object)['gambar' => 'https://images.unsplash.com/photo-1596423736798-75b43694f540', 'judul' => 'Pesona Alam Desa', 'link' => '#'],
-        (object)['gambar' => 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5', 'judul' => 'Kuliner Tradisional', 'link' => '#']
+        (object)['gambar' => 'https://images.unsplash.com/photo-1596423736798-75b43694f540?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80', 'judul' => 'Pesona Alam Desa', 'link' => '#'],
+        (object)['gambar' => 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80', 'judul' => 'Kuliner Tradisional', 'link' => '#']
     ];
 }
 
@@ -40,7 +42,7 @@ $query_wisata = "
 ";
 $list_wisata = $wpdb->get_results($query_wisata);
 
-// --- C. PRODUK ---
+// --- C. PRODUK (JOIN PEDAGANG) ---
 $query_produk = "
     SELECT p.*, ped.nama_toko 
     FROM $table_produk p
@@ -51,23 +53,19 @@ $query_produk = "
 ";
 $list_produk = $wpdb->get_results($query_produk);
 
-// --- D. KATEGORI WISATA (Untuk Filter Pin & Badge) ---
-// Mengambil unique value dari kolom 'kategori' di tabel dw_wisata
+// --- D. KATEGORI WISATA (Untuk Filter Pin) ---
 $kategori_wisata_db = $wpdb->get_col("SELECT DISTINCT kategori FROM $table_wisata WHERE kategori IS NOT NULL AND kategori != ''");
 $kategori_wisata_clean = [];
 foreach($kategori_wisata_db as $kat) {
-    // Bersihkan spasi atau format lain jika perlu
-    $kategori_wisata_clean[sanitize_title($kat)] = $kat;
+    $kategori_wisata_clean[sanitize_title($kat)] = ucfirst($kat);
 }
 
 // --- E. KATEGORI PRODUK (Untuk Filter Pin) ---
-// Mengambil unique value dari kolom 'kategori' di tabel dw_produk
 $kategori_produk_db = $wpdb->get_col("SELECT DISTINCT kategori FROM $table_produk WHERE kategori IS NOT NULL AND kategori != ''");
 $kategori_produk_clean = [];
 foreach($kategori_produk_db as $kat) {
-    $kategori_produk_clean[sanitize_title($kat)] = $kat;
+    $kategori_produk_clean[sanitize_title($kat)] = ucfirst($kat);
 }
-
 ?>
 
 <!-- =================================================================================
@@ -134,7 +132,7 @@ foreach($kategori_produk_db as $kat) {
     </div>
 </div>
 
-<!-- SECTION 3: JELAJAH WISATA (Dengan Pin Filter) -->
+<!-- SECTION 3: JELAJAH WISATA (Horizontal Swipe) -->
 <div class="mb-10 px-0 md:px-0">
     
     <div class="px-4 md:px-0 mb-4 flex justify-between items-end">
@@ -145,15 +143,12 @@ foreach($kategori_produk_db as $kat) {
         <a href="<?php echo home_url('/wisata'); ?>" class="text-primary text-xs font-bold hover:underline">Lihat Semua</a>
     </div>
 
-    <!-- Sticky Category Filter (PINS WISATA) -->
+    <!-- Filter Pin Wisata -->
     <div class="sticky top-16 z-30 bg-gray-50/95 backdrop-blur-sm py-2 mb-4">
         <div class="flex gap-2 overflow-x-auto hide-scroll px-4 md:px-0 pb-2 snap-x">
-            <!-- Default All -->
             <button onclick="filterContent('wisata', 'all', this)" class="cat-pin-wisata snap-start px-4 py-1.5 rounded-full text-xs font-bold bg-primary text-white shadow-sm border border-transparent whitespace-nowrap transition-all active-pin">
                 Semua
             </button>
-            
-            <!-- Dynamic Terms from DB -->
             <?php foreach($kategori_wisata_clean as $slug => $label): ?>
             <button onclick="filterContent('wisata', '<?php echo $slug; ?>', this)" class="cat-pin-wisata snap-start px-4 py-1.5 rounded-full text-xs font-bold bg-white text-gray-600 border border-gray-200 hover:border-primary hover:text-primary whitespace-nowrap transition-all">
                 <?php echo esc_html($label); ?>
@@ -162,7 +157,7 @@ foreach($kategori_produk_db as $kat) {
         </div>
     </div>
 
-    <!-- GRID / SCROLL WISATA -->
+    <!-- Grid / Scroll Wisata -->
     <div id="wisata-container" class="flex md:grid md:grid-cols-4 gap-4 overflow-x-auto md:overflow-visible px-4 md:px-0 pb-6 md:pb-0 hide-scroll snap-x snap-mandatory">
         
         <?php if (!empty($list_wisata)) : ?>
@@ -174,11 +169,10 @@ foreach($kategori_produk_db as $kat) {
                 $rating = $wisata->rating_avg > 0 ? $wisata->rating_avg : '4.5';
                 $link = home_url('/wisata/?id=' . $wisata->id);
 
-                // Ambil Kategori Asli dari Kolom Database
+                // Kategori
                 $cat_label = !empty($wisata->kategori) ? $wisata->kategori : 'Umum';
                 $cat_slug = sanitize_title($cat_label);
             ?>
-            <!-- Item Card -->
             <div class="wisata-item min-w-[75vw] md:min-w-0 md:w-auto flex-shrink-0 snap-center group relative bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden transition-all hover:shadow-md" data-category="<?php echo esc_attr($cat_slug); ?>">
                 
                 <!-- Image Wrapper -->
@@ -190,7 +184,7 @@ foreach($kategori_produk_db as $kat) {
                         <i class="fas fa-star text-yellow-400"></i> <?php echo $rating; ?>
                     </div>
                     
-                    <!-- Dynamic Category Badge (Fix #2: Ganti "Wisata" jadi Kategori Asli) -->
+                    <!-- Kategori Badge -->
                     <div class="absolute bottom-2 left-2 bg-black/60 backdrop-blur text-white text-[10px] px-2 py-0.5 rounded-md font-medium uppercase tracking-wider">
                         <?php echo esc_html($cat_label); ?>
                     </div>
@@ -211,9 +205,8 @@ foreach($kategori_produk_db as $kat) {
                             <p class="text-[10px] text-gray-400 uppercase font-bold">Tiket</p>
                             <p class="text-sm font-bold text-primary"><?php echo $price; ?></p>
                         </div>
-                        <!-- Fix #3: Ganti Tombol Arrow dengan Teks Detail tapi tetap Compact -->
                         <a href="<?php echo esc_url($link); ?>" class="px-3 py-1.5 rounded-lg bg-gray-50 text-gray-600 text-[10px] font-bold hover:bg-primary hover:text-white transition flex items-center gap-1">
-                            Detail 
+                            Detail <i class="fas fa-arrow-right text-[8px]"></i>
                         </a>
                     </div>
                 </div>
@@ -227,7 +220,7 @@ foreach($kategori_produk_db as $kat) {
     </div>
 </div>
 
-<!-- SECTION 4: PRODUK UMKM (Dengan Pin Filter) -->
+<!-- SECTION 4: PRODUK UMKM (Grid) -->
 <div class="mb-10 px-4 md:px-0">
     <div class="flex justify-between items-end mb-4">
         <div>
@@ -237,15 +230,12 @@ foreach($kategori_produk_db as $kat) {
         <a href="<?php echo home_url('/produk'); ?>" class="text-primary text-xs font-bold hover:underline">Lihat Semua</a>
     </div>
 
-    <!-- Sticky Category Filter (PINS PRODUK) -->
+    <!-- Filter Pin Produk -->
     <div class="sticky top-16 z-30 bg-gray-50/95 backdrop-blur-sm py-2 mb-4">
         <div class="flex gap-2 overflow-x-auto hide-scroll pb-2 snap-x">
-            <!-- Default All -->
             <button onclick="filterContent('produk', 'all', this)" class="cat-pin-produk snap-start px-4 py-1.5 rounded-full text-xs font-bold bg-primary text-white shadow-sm border border-transparent whitespace-nowrap transition-all active-pin">
                 Semua
             </button>
-            
-            <!-- Dynamic Terms from DB -->
             <?php foreach($kategori_produk_clean as $slug => $label): ?>
             <button onclick="filterContent('produk', '<?php echo $slug; ?>', this)" class="cat-pin-produk snap-start px-4 py-1.5 rounded-full text-xs font-bold bg-white text-gray-600 border border-gray-200 hover:border-primary hover:text-primary whitespace-nowrap transition-all">
                 <?php echo esc_html($label); ?>
@@ -259,8 +249,6 @@ foreach($kategori_produk_db as $kat) {
             $img = !empty($produk->foto_utama) ? $produk->foto_utama : 'https://via.placeholder.com/300';
             $price = number_format($produk->harga, 0, ',', '.');
             $link = home_url('/produk/?id=' . $produk->id);
-
-            // Ambil Kategori Asli
             $cat_label = !empty($produk->kategori) ? $produk->kategori : 'Umum';
             $cat_slug = sanitize_title($cat_label);
         ?>
@@ -268,7 +256,6 @@ foreach($kategori_produk_db as $kat) {
             <a href="<?php echo esc_url($link); ?>">
                 <div class="aspect-square bg-gray-100 relative overflow-hidden">
                     <img src="<?php echo esc_url($img); ?>" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
-                    <!-- Kategori Badge Produk -->
                     <div class="absolute top-2 left-2 bg-white/90 backdrop-blur text-[9px] px-2 py-1 rounded text-gray-600 font-bold shadow-sm uppercase tracking-wide">
                         <?php echo esc_html($cat_label); ?>
                     </div>
@@ -279,7 +266,7 @@ foreach($kategori_produk_db as $kat) {
                     <div class="font-bold text-primary text-sm">Rp <?php echo $price; ?></div>
                 </div>
             </a>
-            <button class="absolute bottom-3 right-3 w-7 h-7 bg-primary text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition btn-add-to-cart" data-product-id="<?php echo $produk->id; ?>">
+            <button class="absolute bottom-3 right-3 w-7 h-7 bg-primary text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition btn-add-to-cart" data-product-id="<?php echo $produk->id; ?>" data-is-custom="1">
                 <i class="fas fa-plus text-xs"></i>
             </button>
         </div>
@@ -287,37 +274,33 @@ foreach($kategori_produk_db as $kat) {
     </div>
 </div>
 
-<!-- SCRIPTS: Carousel & Filter Logic -->
+<!-- SCRIPTS -->
 <script>
-// 1. CAROUSEL AUTO-PLAY
+// Carousel Logic
 document.addEventListener('DOMContentLoaded', function() {
     const carousel = document.getElementById('hero-carousel');
-    if(!carousel) return;
-    
-    const items = carousel.children;
-    const dots = document.querySelectorAll('.carousel-dot');
-    let index = 0;
-
-    function showSlide(i) {
-        index = i % items.length;
-        carousel.style.transform = `translateX(-${index * 100}%)`;
-        dots.forEach((d, idx) => {
-            d.classList.toggle('w-4', idx === index);
-            d.classList.toggle('bg-white', idx === index);
-            d.classList.toggle('bg-white/50', idx !== index);
-        });
+    if(carousel) {
+        const items = carousel.children;
+        const dots = document.querySelectorAll('.carousel-dot');
+        let index = 0;
+        function showSlide(i) {
+            index = i % items.length;
+            carousel.style.transform = `translateX(-${index * 100}%)`;
+            dots.forEach((d, idx) => {
+                d.classList.toggle('w-4', idx === index);
+                d.classList.toggle('bg-white', idx === index);
+                d.classList.toggle('bg-white/50', idx !== index);
+            });
+        }
+        setInterval(() => showSlide(index + 1), 5000);
     }
-
-    setInterval(() => showSlide(index + 1), 5000);
 });
 
-// 2. FILTER KATEGORI (General Function)
+// Filter Function
 function filterContent(type, category, btn) {
-    // Determine Selector Class based on type (wisata or produk)
     const pinClass = type === 'wisata' ? '.cat-pin-wisata' : '.cat-pin-produk';
     const itemClass = type === 'wisata' ? '.wisata-item' : '.produk-item';
     
-    // Style Button
     document.querySelectorAll(pinClass).forEach(b => {
         b.classList.remove('bg-primary', 'text-white', 'active-pin');
         b.classList.add('bg-white', 'text-gray-600', 'border-gray-200');
@@ -325,9 +308,7 @@ function filterContent(type, category, btn) {
     btn.classList.remove('bg-white', 'text-gray-600', 'border-gray-200');
     btn.classList.add('bg-primary', 'text-white', 'active-pin');
 
-    // Filter Logic
-    const items = document.querySelectorAll(itemClass);
-    items.forEach(item => {
+    document.querySelectorAll(itemClass).forEach(item => {
         if (category === 'all' || item.dataset.category === category) {
             item.style.display = 'block'; 
         } else {
@@ -335,6 +316,39 @@ function filterContent(type, category, btn) {
         }
     });
 }
+
+// Cart Logic
+jQuery(document).ready(function($) {
+    $('.btn-add-to-cart').on('click', function(e) {
+        e.preventDefault();
+        var btn = $(this);
+        var originalIcon = btn.html();
+        var isCustom = btn.data('is-custom') ? 1 : 0;
+        
+        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin text-xs"></i>');
+
+        $.post(dw_ajax.ajax_url, {
+            action: 'dw_theme_add_to_cart',
+            nonce: dw_ajax.nonce,
+            product_id: btn.data('product-id'),
+            quantity: 1,
+            is_custom_db: isCustom
+        }, function(response) {
+            if(response.success) {
+                btn.html('<i class="fas fa-check text-xs"></i>').addClass('bg-green-600 text-white').removeClass('bg-primary');
+                setTimeout(function() {
+                    btn.html(originalIcon).removeClass('bg-green-600 text-white').addClass('bg-primary').prop('disabled', false);
+                }, 2000);
+                if(response.data.count) {
+                    $('#header-cart-count, #header-cart-count-mobile').text(response.data.count).removeClass('hidden').addClass('flex');
+                }
+            } else {
+                alert('Gagal: ' + (response.data.message || 'Error'));
+                btn.html(originalIcon).prop('disabled', false);
+            }
+        });
+    });
+});
 </script>
 
 <?php get_footer(); ?>
