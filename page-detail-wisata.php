@@ -21,14 +21,14 @@ $id_param = isset($_GET['id']) ? intval($_GET['id']) : 0;
 // 3. Query Data
 if (!empty($slug)) {
     $wisata = $wpdb->get_row($wpdb->prepare("
-        SELECT w.*, d.nama_desa, d.kabupaten 
+        SELECT w.*, d.nama_desa, d.kabupaten, d.id as id_desa
         FROM $table_wisata w
         LEFT JOIN $table_desa d ON w.id_desa = d.id
         WHERE w.slug = %s AND w.status = 'aktif'
     ", $slug));
 } elseif ($id_param > 0) {
     $wisata = $wpdb->get_row($wpdb->prepare("
-        SELECT w.*, d.nama_desa, d.kabupaten 
+        SELECT w.*, d.nama_desa, d.kabupaten, d.id as id_desa
         FROM $table_wisata w
         LEFT JOIN $table_desa d ON w.id_desa = d.id
         WHERE w.id = %d AND w.status = 'aktif'
@@ -61,7 +61,12 @@ if ($wpdb->get_var("SHOW TABLES LIKE '$table_ulasan'") == $table_ulasan) {
 // Data Formatting
 $harga_tiket = $wisata->harga_tiket;
 $price_display = ($harga_tiket > 0) ? '<span class="text-xs text-gray-500 font-normal block mb-1">Mulai dari</span> <span class="text-primary font-bold text-2xl">Rp ' . number_format($harga_tiket, 0, ',', '.') . '</span>' : '<span class="text-primary font-bold text-2xl">Gratis</span>';
-$lokasi = !empty($wisata->nama_desa) ? "Desa " . $wisata->nama_desa . ", " . $wisata->kabupaten : $wisata->kabupaten;
+
+// Link Desa (Profil Desa)
+$link_desa = home_url('/profil-desa/?id=' . $wisata->id_desa);
+$lokasi_html = !empty($wisata->nama_desa) 
+    ? '<a href="'.esc_url($link_desa).'" class="hover:text-primary hover:underline font-bold">Desa ' . esc_html($wisata->nama_desa) . '</a>, ' . esc_html($wisata->kabupaten) 
+    : esc_html($wisata->kabupaten);
 
 $fasilitas = [];
 if (!empty($wisata->fasilitas)) {
@@ -116,7 +121,9 @@ if (!empty($wisata->galeri)) {
         <div class="mb-6">
             <h1 class="text-2xl md:text-3xl lg:text-4xl font-extrabold text-gray-900 mb-3 leading-tight"><?php echo esc_html($wisata->nama_wisata); ?></h1>
             <div class="flex flex-wrap items-center gap-3 text-sm text-gray-600">
-                <span class="flex items-center gap-1.5"><i class="fas fa-map-marker-alt text-red-500"></i> <?php echo esc_html($lokasi); ?></span>
+                <span class="flex items-center gap-1.5 text-gray-800">
+                    <i class="fas fa-map-marker-alt text-red-500"></i> <?php echo $lokasi_html; ?>
+                </span>
                 <span class="text-gray-300">|</span>
                 <span class="flex items-center gap-1.5 font-medium"><i class="fas fa-star text-yellow-400"></i> <?php echo $rating; ?></span>
                 <span class="text-gray-300">|</span>
@@ -124,29 +131,20 @@ if (!empty($wisata->galeri)) {
             </div>
         </div>
 
-        <!-- Gallery Grid (FIXED: Klik sesuai gambar) -->
+        <!-- Gallery Grid (FIXED) -->
         <div class="relative h-[250px] md:h-[480px] rounded-2xl overflow-hidden shadow-sm border border-gray-100">
             <?php if (count($gallery_images) >= 3) : ?>
-                <!-- Layout 3 Gambar (Desktop/Tablet) -->
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-2 h-full">
-                    
-                    <!-- Gambar Utama (Index 0) -->
                     <div class="md:col-span-3 h-full relative overflow-hidden group cursor-pointer" onclick="openLightbox(0)">
                         <img src="<?php echo esc_url($gallery_images[0]); ?>" class="w-full h-full object-cover transition duration-700 group-hover:scale-105" alt="Main Photo">
                         <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition"></div>
                     </div>
-                    
-                    <!-- Gambar Samping -->
                     <div class="hidden md:flex flex-col gap-2 h-full">
-                        <!-- Gambar 2 (Index 1) -->
                         <div class="h-1/2 relative overflow-hidden group cursor-pointer" onclick="openLightbox(1)">
                             <img src="<?php echo esc_url($gallery_images[1]); ?>" class="w-full h-full object-cover transition duration-500 group-hover:scale-110" alt="Photo 2">
                         </div>
-                        
-                        <!-- Gambar 3 (Index 2) + Overlay -->
                         <div class="h-1/2 relative overflow-hidden group cursor-pointer" onclick="openLightbox(2)">
                             <img src="<?php echo esc_url($gallery_images[2]); ?>" class="w-full h-full object-cover transition duration-500 group-hover:scale-110" alt="Photo 3">
-                            
                             <?php if (count($gallery_images) > 3) : ?>
                             <div class="absolute inset-0 bg-black/50 flex items-center justify-center hover:bg-black/40 transition backdrop-blur-[1px]">
                                 <span class="text-white font-bold text-sm border border-white/50 px-3 py-1 rounded-lg">
@@ -158,7 +156,6 @@ if (!empty($wisata->galeri)) {
                     </div>
                 </div>
             <?php else : ?>
-                <!-- Single Image Layout -->
                 <div class="w-full h-full relative group cursor-pointer" onclick="openLightbox(0)">
                     <img src="<?php echo esc_url($gallery_images[0]); ?>" class="w-full h-full object-cover transition duration-700 group-hover:scale-105" alt="Main Photo">
                     <?php if (count($gallery_images) > 1) : ?>
@@ -168,8 +165,6 @@ if (!empty($wisata->galeri)) {
                     <?php endif; ?>
                 </div>
             <?php endif; ?>
-            
-            <!-- Tombol Mobile Overlay (Hanya di Mobile) -->
             <button onclick="openLightbox(0)" class="md:hidden absolute bottom-3 right-3 bg-white/90 text-gray-900 px-3 py-1.5 rounded-lg text-xs font-bold shadow-md flex items-center gap-2 z-10 border border-gray-200">
                 <i class="fas fa-th"></i> Lihat Galeri
             </button>
@@ -256,13 +251,11 @@ if (!empty($wisata->galeri)) {
                     </h2>
                     <p class="text-gray-600 mb-4 text-sm flex items-start gap-2">
                         <i class="fas fa-map-pin mt-1 text-red-500"></i> 
-                        <?php echo esc_html($lokasi); ?>
+                        <?php echo $lokasi_html; ?>
                     </p>
                     
                     <div class="relative w-full h-[250px] bg-gray-100 rounded-xl overflow-hidden group border border-gray-200">
-                        <!-- Placeholder Pattern -->
                         <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:16px_16px]"></div>
-                        
                         <div class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-10">
                             <?php if (!empty($wisata->lokasi_maps)) : ?>
                                 <a href="<?php echo esc_url($wisata->lokasi_maps); ?>" target="_blank" class="bg-white hover:bg-gray-50 text-gray-800 px-6 py-3 rounded-full font-bold shadow-lg transition transform hover:-translate-y-1 flex items-center gap-2 border border-gray-200">
@@ -270,7 +263,7 @@ if (!empty($wisata->galeri)) {
                                     Buka Google Maps
                                 </a>
                             <?php else : ?>
-                                <span class="text-gray-400 font-medium bg-white/80 px-4 py-2 rounded-lg border border-gray-200 text-sm">Peta belum tersedia</span>
+                                <span class="text-gray-400 font-medium bg-white/60 px-4 py-2 rounded-lg border border-gray-200 text-sm">Peta belum tersedia</span>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -341,7 +334,7 @@ if (!empty($wisata->galeri)) {
                                 </div>
                                 <div class="flex items-center gap-3 text-sm text-gray-600">
                                     <i class="fas fa-map-marker-alt text-gray-400 w-5 text-center"></i>
-                                    <span class="truncate"><?php echo esc_html($lokasi); ?></span>
+                                    <span class="truncate"><?php echo $lokasi_html; ?></span>
                                 </div>
                             </div>
 
@@ -390,25 +383,16 @@ if (!empty($wisata->galeri)) {
     <button onclick="closeLightbox()" class="absolute top-6 right-6 text-white/70 hover:text-white p-2 z-50 bg-white/10 rounded-full w-10 h-10 flex items-center justify-center backdrop-blur-md">
         <i class="fas fa-times text-xl"></i>
     </button>
-    
     <div class="flex-1 w-full h-full flex items-center justify-center px-2 md:px-10 py-16 relative">
         <img id="lightbox-img" src="" class="max-w-full max-h-full object-contain shadow-2xl transition-transform duration-300 select-none">
-        
-        <!-- Navigasi Lightbox Desktop -->
         <button onclick="prevImage()" class="hidden md:block absolute left-6 text-white/50 hover:text-white p-4 text-4xl focus:outline-none bg-black/20 rounded-full h-16 w-16 hover:bg-black/40 flex items-center justify-center transition"><i class="fas fa-chevron-left"></i></button>
         <button onclick="nextImage()" class="hidden md:block absolute right-6 text-white/50 hover:text-white p-4 text-4xl focus:outline-none bg-black/20 rounded-full h-16 w-16 hover:bg-black/40 flex items-center justify-center transition"><i class="fas fa-chevron-right"></i></button>
-        
-        <!-- Navigasi Mobile (Area Klik) -->
         <div class="md:hidden absolute inset-y-0 left-0 w-1/3 z-10" onclick="prevImage()"></div>
         <div class="md:hidden absolute inset-y-0 right-0 w-1/3 z-10" onclick="nextImage()"></div>
     </div>
-
-    <!-- Thumbnails Lightbox -->
     <div class="w-full bg-black/80 backdrop-blur-md p-4 flex gap-2 overflow-x-auto justify-center hide-scroll absolute bottom-0 left-0 h-24 items-center z-20">
         <?php foreach ($gallery_images as $idx => $img) : ?>
-            <img src="<?php echo esc_url($img); ?>" onclick="showImage(<?php echo $idx; ?>)" 
-                 class="h-14 w-20 object-cover rounded cursor-pointer opacity-40 hover:opacity-100 transition border-2 border-transparent lightbox-thumb flex-shrink-0" 
-                 data-index="<?php echo $idx; ?>">
+            <img src="<?php echo esc_url($img); ?>" onclick="showImage(<?php echo $idx; ?>)" class="h-14 w-20 object-cover rounded cursor-pointer opacity-40 hover:opacity-100 transition border-2 border-transparent lightbox-thumb flex-shrink-0" data-index="<?php echo $idx; ?>">
         <?php endforeach; ?>
     </div>
 </div>
@@ -421,49 +405,38 @@ document.addEventListener('DOMContentLoaded', () => {
     const stickyHeader = document.getElementById('sticky-tabs');
     const headerHeight = stickyHeader ? stickyHeader.offsetHeight + 100 : 150;
 
-    // 1. Smooth Scroll Click
     navLinks.forEach(link => {
         link.addEventListener('click', function(e) {
             e.preventDefault();
             const targetId = this.getAttribute('href').substring(1);
             const targetSection = document.getElementById(targetId);
-            
             if(targetSection) {
-                // Adjust scroll position for sticky header
                 const offsetTop = targetSection.offsetTop - headerHeight;
                 window.scrollTo({ top: offsetTop, behavior: 'smooth' });
             }
         });
     });
 
-    // 2. Scroll Spy
     window.addEventListener('scroll', () => {
         let current = '';
         const scrollPosition = window.scrollY + headerHeight + 50; 
-
         sections.forEach(section => {
             const sectionTop = section.offsetTop;
             const sectionHeight = section.clientHeight;
-            if (scrollPosition >= sectionTop) {
-                current = section.getAttribute('id');
-            }
+            if (scrollPosition >= sectionTop) current = section.getAttribute('id');
         });
-
         navLinks.forEach(link => {
             link.classList.remove('border-primary', 'text-primary');
             link.classList.add('border-transparent');
             if (link.dataset.target === current) {
                 link.classList.remove('border-transparent');
                 link.classList.add('border-primary', 'text-primary');
-                
-                // Auto scroll horizontal menu on mobile
                 link.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
             }
         });
     });
 });
 
-// Lightbox Logic
 const galleryImages = <?php echo json_encode($gallery_images); ?>;
 let currentIndex = 0;
 const lightbox = document.getElementById('lightbox-modal');
@@ -474,7 +447,7 @@ function openLightbox(index) {
     currentIndex = index;
     updateLightboxImage();
     lightbox.classList.remove('hidden');
-    void lightbox.offsetWidth; // Force Reflow
+    void lightbox.offsetWidth; 
     lightbox.classList.remove('opacity-0');
     document.body.style.overflow = 'hidden'; 
 }
@@ -489,7 +462,6 @@ function closeLightbox() {
 
 function updateLightboxImage() {
     lightboxImg.src = galleryImages[currentIndex];
-    // Update active thumb styling
     document.querySelectorAll('.lightbox-thumb').forEach((thumb, idx) => {
         if(idx === currentIndex) {
             thumb.classList.remove('opacity-40', 'border-transparent');
@@ -506,7 +478,6 @@ function showImage(index) { currentIndex = index; updateLightboxImage(); }
 function nextImage(e) { if(e) e.stopPropagation(); currentIndex = (currentIndex + 1) % galleryImages.length; updateLightboxImage(); }
 function prevImage(e) { if(e) e.stopPropagation(); currentIndex = (currentIndex - 1 + galleryImages.length) % galleryImages.length; updateLightboxImage(); }
 
-// Keyboard Nav
 document.addEventListener('keydown', function(e) {
     if (lightbox.classList.contains('hidden')) return;
     if (e.key === 'Escape') closeLightbox();
@@ -516,11 +487,9 @@ document.addEventListener('keydown', function(e) {
 </script>
 
 <style>
-/* Custom Utilities */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
-/* Scroll Margin agar judul tidak tertutup header saat discroll */
 .scroll-mt-32 { scroll-margin-top: 140px; }
 </style>
 

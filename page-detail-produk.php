@@ -17,17 +17,17 @@ $slug = get_query_var('dw_slug');
 // 2. Tangkap ID (Fallback)
 $id_param = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
-// 3. Query Data (AMAN)
+// 3. Query Data (Update: Select ped.id as pedagang_id)
 if (!empty($slug)) {
     $produk = $wpdb->get_row($wpdb->prepare("
-        SELECT p.*, ped.nama_toko, ped.alamat_lengkap as alamat_toko, ped.nomor_wa 
+        SELECT p.*, ped.id as pedagang_id, ped.nama_toko, ped.alamat_lengkap as alamat_toko, ped.nomor_wa, ped.foto_profil as foto_toko
         FROM $table_produk p
         LEFT JOIN $table_pedagang ped ON p.id_pedagang = ped.id
         WHERE p.slug = %s AND p.status = 'aktif'
     ", $slug));
 } elseif ($id_param > 0) {
     $produk = $wpdb->get_row($wpdb->prepare("
-        SELECT p.*, ped.nama_toko, ped.alamat_lengkap as alamat_toko, ped.nomor_wa 
+        SELECT p.*, ped.id as pedagang_id, ped.nama_toko, ped.alamat_lengkap as alamat_toko, ped.nomor_wa, ped.foto_profil as foto_toko
         FROM $table_produk p
         LEFT JOIN $table_pedagang ped ON p.id_pedagang = ped.id
         WHERE p.id = %d AND p.status = 'aktif'
@@ -52,18 +52,19 @@ $terjual = $produk->terjual;
 $img_main = !empty($produk->foto_utama) ? $produk->foto_utama : 'https://via.placeholder.com/500';
 $kategori = $produk->kategori ?: 'Umum';
 $nama_toko = $produk->nama_toko ?: 'Toko Desa';
+$foto_toko = !empty($produk->foto_toko) ? $produk->foto_toko : 'https://via.placeholder.com/100?text=Toko';
+
+// Link Profil Toko
+$link_toko = home_url('/profil-toko/?id=' . $produk->pedagang_id);
 
 // === LOGIKA GALERI FOTO ===
 $gallery_images = [];
-// Masukkan foto utama sebagai urutan pertama
 if (!empty($img_main)) {
     $gallery_images[] = $img_main;
 }
-// Ambil dari kolom galeri (JSON)
 if (!empty($produk->galeri)) {
     $decoded_gallery = json_decode($produk->galeri);
     if (json_last_error() === JSON_ERROR_NONE && is_array($decoded_gallery)) {
-        // Gabungkan array, pastikan tidak ada duplikat foto utama
         foreach($decoded_gallery as $g_img) {
             if ($g_img != $img_main) {
                 $gallery_images[] = $g_img;
@@ -88,16 +89,13 @@ if (!empty($produk->galeri)) {
                 
                 <!-- KOLOM KIRI: GALERI FOTO -->
                 <div class="w-full md:w-1/2 lg:w-5/12 bg-white p-4 lg:p-6">
-                    <!-- Main Image Display -->
                     <div class="aspect-square bg-gray-100 rounded-xl overflow-hidden relative border border-gray-100 mb-4 group cursor-zoom-in">
                         <img id="main-product-image" src="<?php echo esc_url($img_main); ?>" class="w-full h-full object-cover transition duration-500 group-hover:scale-105" alt="Foto Utama">
-                        
                         <?php if($produk->kondisi == 'bekas'): ?>
                             <span class="absolute top-2 right-2 bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded shadow-sm">Preloved</span>
                         <?php endif; ?>
                     </div>
 
-                    <!-- Thumbnails Slider (Horizontal Scroll) -->
                     <?php if (count($gallery_images) > 1): ?>
                     <div class="flex gap-2 overflow-x-auto hide-scroll pb-2 snap-x">
                         <?php foreach($gallery_images as $index => $img_url): ?>
@@ -134,13 +132,13 @@ if (!empty($produk->galeri)) {
                         Rp <?php echo number_format($harga, 0, ',', '.'); ?>
                     </div>
 
-                    <!-- Info Penjual -->
-                    <div class="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100 mb-6 transition hover:border-primary hover:bg-white hover:shadow-sm cursor-pointer group">
-                        <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center text-primary text-xl border border-gray-200 group-hover:border-primary transition">
-                            <i class="fas fa-store"></i>
+                    <!-- Info Penjual (LINK PROFIL TOKO) -->
+                    <a href="<?php echo esc_url($link_toko); ?>" class="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100 mb-6 transition hover:border-primary hover:bg-white hover:shadow-md cursor-pointer group">
+                        <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center text-primary text-xl border border-gray-200 group-hover:border-primary transition overflow-hidden">
+                            <img src="<?php echo esc_url($foto_toko); ?>" class="w-full h-full object-cover">
                         </div>
                         <div class="flex-1">
-                            <div class="font-bold text-gray-800 text-sm flex items-center gap-2">
+                            <div class="font-bold text-gray-800 text-sm flex items-center gap-2 group-hover:text-primary transition">
                                 <?php echo esc_html($nama_toko); ?>
                                 <i class="fas fa-check-circle text-blue-500 text-xs" title="Terverifikasi"></i>
                             </div>
@@ -149,10 +147,11 @@ if (!empty($produk->galeri)) {
                                 <?php echo esc_html($produk->alamat_toko ?: 'Lokasi Toko'); ?>
                             </div>
                         </div>
-                        <div class="text-gray-400">
-                            <i class="fas fa-chevron-right"></i>
+                        <div class="text-gray-400 group-hover:text-primary">
+                            <span class="text-xs font-bold mr-1">Kunjungi Toko</span>
+                            <i class="fas fa-chevron-right text-xs"></i>
                         </div>
-                    </div>
+                    </a>
 
                     <!-- Detail Spesifikasi -->
                     <div class="mb-6">
@@ -192,19 +191,13 @@ if (!empty($produk->galeri)) {
 </div>
 
 <script>
-// Fungsi Ganti Gambar Utama
 function changeMainImage(url, btn) {
     const mainImg = document.getElementById('main-product-image');
-    
-    // Efek fade out-in
     mainImg.style.opacity = '0.5';
-    
     setTimeout(() => {
         mainImg.src = url;
         mainImg.style.opacity = '1';
     }, 150);
-
-    // Update border aktif pada thumbnail
     document.querySelectorAll('.thumbnail-btn').forEach(b => {
         b.classList.remove('border-primary');
         b.classList.add('border-transparent');
@@ -213,14 +206,11 @@ function changeMainImage(url, btn) {
     btn.classList.add('border-primary');
 }
 
-// Handler Add to Cart
 jQuery(document).ready(function($) {
     $('.btn-add-cart-single').on('click', function(e) {
         e.preventDefault();
         const btn = $(this);
         const id = btn.data('id');
-        
-        // Simpan teks asli
         const originalText = btn.html();
         
         btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Loading...');
@@ -233,14 +223,10 @@ jQuery(document).ready(function($) {
             is_custom_db: 1 
         }, function(res) {
             if(res.success) {
-                // Efek visual sukses
                 btn.removeClass('bg-primary').addClass('bg-green-600').html('<i class="fas fa-check"></i> Masuk Keranjang');
-                
-                // Update badge cart di header jika ada
                 if(res.data.count) {
                     $('#header-cart-count, #header-cart-count-mobile').text(res.data.count).removeClass('hidden').addClass('flex');
                 }
-
                 setTimeout(() => {
                     btn.prop('disabled', false).removeClass('bg-green-600').addClass('bg-primary').html(originalText);
                 }, 2000);
