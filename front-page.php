@@ -51,17 +51,22 @@ $query_produk = "
 ";
 $list_produk = $wpdb->get_results($query_produk);
 
-// --- D. KATEGORI WISATA (Untuk Filter Pin) ---
-$kategori_wisata = get_terms([
-    'taxonomy'   => 'dw_kategori_wisata',
-    'hide_empty' => true,
-]);
+// --- D. KATEGORI WISATA (Untuk Filter Pin & Badge) ---
+// Mengambil unique value dari kolom 'kategori' di tabel dw_wisata
+$kategori_wisata_db = $wpdb->get_col("SELECT DISTINCT kategori FROM $table_wisata WHERE kategori IS NOT NULL AND kategori != ''");
+$kategori_wisata_clean = [];
+foreach($kategori_wisata_db as $kat) {
+    // Bersihkan spasi atau format lain jika perlu
+    $kategori_wisata_clean[sanitize_title($kat)] = $kat;
+}
 
 // --- E. KATEGORI PRODUK (Untuk Filter Pin) ---
-$kategori_produk = get_terms([
-    'taxonomy'   => 'dw_kategori_produk',
-    'hide_empty' => true,
-]);
+// Mengambil unique value dari kolom 'kategori' di tabel dw_produk
+$kategori_produk_db = $wpdb->get_col("SELECT DISTINCT kategori FROM $table_produk WHERE kategori IS NOT NULL AND kategori != ''");
+$kategori_produk_clean = [];
+foreach($kategori_produk_db as $kat) {
+    $kategori_produk_clean[sanitize_title($kat)] = $kat;
+}
 
 ?>
 
@@ -148,10 +153,10 @@ $kategori_produk = get_terms([
                 Semua
             </button>
             
-            <!-- Dynamic Terms -->
-            <?php foreach($kategori_wisata as $term): ?>
-            <button onclick="filterContent('wisata', '<?php echo $term->slug; ?>', this)" class="cat-pin-wisata snap-start px-4 py-1.5 rounded-full text-xs font-bold bg-white text-gray-600 border border-gray-200 hover:border-primary hover:text-primary whitespace-nowrap transition-all">
-                <?php echo esc_html($term->name); ?>
+            <!-- Dynamic Terms from DB -->
+            <?php foreach($kategori_wisata_clean as $slug => $label): ?>
+            <button onclick="filterContent('wisata', '<?php echo $slug; ?>', this)" class="cat-pin-wisata snap-start px-4 py-1.5 rounded-full text-xs font-bold bg-white text-gray-600 border border-gray-200 hover:border-primary hover:text-primary whitespace-nowrap transition-all">
+                <?php echo esc_html($label); ?>
             </button>
             <?php endforeach; ?>
         </div>
@@ -169,10 +174,9 @@ $kategori_produk = get_terms([
                 $rating = $wisata->rating_avg > 0 ? $wisata->rating_avg : '4.5';
                 $link = home_url('/wisata/?id=' . $wisata->id);
 
-                // Ambil Kategori Dinamis untuk Label di Foto & Filter
-                $terms = get_the_terms($wisata->id, 'dw_kategori_wisata');
-                $cat_name = !empty($terms) && !is_wp_error($terms) ? $terms[0]->name : 'Wisata';
-                $cat_slug = !empty($terms) && !is_wp_error($terms) ? $terms[0]->slug : 'all';
+                // Ambil Kategori Asli dari Kolom Database
+                $cat_label = !empty($wisata->kategori) ? $wisata->kategori : 'Umum';
+                $cat_slug = sanitize_title($cat_label);
             ?>
             <!-- Item Card -->
             <div class="wisata-item min-w-[75vw] md:min-w-0 md:w-auto flex-shrink-0 snap-center group relative bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden transition-all hover:shadow-md" data-category="<?php echo esc_attr($cat_slug); ?>">
@@ -188,7 +192,7 @@ $kategori_produk = get_terms([
                     
                     <!-- Dynamic Category Badge (Fix #2: Ganti "Wisata" jadi Kategori Asli) -->
                     <div class="absolute bottom-2 left-2 bg-black/60 backdrop-blur text-white text-[10px] px-2 py-0.5 rounded-md font-medium uppercase tracking-wider">
-                        <?php echo esc_html($cat_name); ?>
+                        <?php echo esc_html($cat_label); ?>
                     </div>
                 </div>
 
@@ -209,7 +213,7 @@ $kategori_produk = get_terms([
                         </div>
                         <!-- Fix #3: Ganti Tombol Arrow dengan Teks Detail tapi tetap Compact -->
                         <a href="<?php echo esc_url($link); ?>" class="px-3 py-1.5 rounded-lg bg-gray-50 text-gray-600 text-[10px] font-bold hover:bg-primary hover:text-white transition flex items-center gap-1">
-                            Detail <i class="fas fa-arrow-right text-[8px]"></i>
+                            Detail 
                         </a>
                     </div>
                 </div>
@@ -241,10 +245,10 @@ $kategori_produk = get_terms([
                 Semua
             </button>
             
-            <!-- Dynamic Terms -->
-            <?php foreach($kategori_produk as $term): ?>
-            <button onclick="filterContent('produk', '<?php echo $term->slug; ?>', this)" class="cat-pin-produk snap-start px-4 py-1.5 rounded-full text-xs font-bold bg-white text-gray-600 border border-gray-200 hover:border-primary hover:text-primary whitespace-nowrap transition-all">
-                <?php echo esc_html($term->name); ?>
+            <!-- Dynamic Terms from DB -->
+            <?php foreach($kategori_produk_clean as $slug => $label): ?>
+            <button onclick="filterContent('produk', '<?php echo $slug; ?>', this)" class="cat-pin-produk snap-start px-4 py-1.5 rounded-full text-xs font-bold bg-white text-gray-600 border border-gray-200 hover:border-primary hover:text-primary whitespace-nowrap transition-all">
+                <?php echo esc_html($label); ?>
             </button>
             <?php endforeach; ?>
         </div>
@@ -256,14 +260,18 @@ $kategori_produk = get_terms([
             $price = number_format($produk->harga, 0, ',', '.');
             $link = home_url('/produk/?id=' . $produk->id);
 
-            // Ambil Kategori Dinamis untuk Filter
-            $terms = get_the_terms($produk->id, 'dw_kategori_produk');
-            $cat_slug = !empty($terms) && !is_wp_error($terms) ? $terms[0]->slug : 'all';
+            // Ambil Kategori Asli
+            $cat_label = !empty($produk->kategori) ? $produk->kategori : 'Umum';
+            $cat_slug = sanitize_title($cat_label);
         ?>
         <div class="produk-item bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden group relative" data-category="<?php echo esc_attr($cat_slug); ?>">
             <a href="<?php echo esc_url($link); ?>">
                 <div class="aspect-square bg-gray-100 relative overflow-hidden">
                     <img src="<?php echo esc_url($img); ?>" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
+                    <!-- Kategori Badge Produk -->
+                    <div class="absolute top-2 left-2 bg-white/90 backdrop-blur text-[9px] px-2 py-1 rounded text-gray-600 font-bold shadow-sm uppercase tracking-wide">
+                        <?php echo esc_html($cat_label); ?>
+                    </div>
                 </div>
                 <div class="p-3">
                     <h4 class="text-xs md:text-sm font-bold text-gray-800 line-clamp-2 mb-1 min-h-[2.5em]"><?php echo esc_html($produk->nama_produk); ?></h4>
