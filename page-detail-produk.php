@@ -52,6 +52,25 @@ $terjual = $produk->terjual;
 $img_main = !empty($produk->foto_utama) ? $produk->foto_utama : 'https://via.placeholder.com/500';
 $kategori = $produk->kategori ?: 'Umum';
 $nama_toko = $produk->nama_toko ?: 'Toko Desa';
+
+// === LOGIKA GALERI FOTO ===
+$gallery_images = [];
+// Masukkan foto utama sebagai urutan pertama
+if (!empty($img_main)) {
+    $gallery_images[] = $img_main;
+}
+// Ambil dari kolom galeri (JSON)
+if (!empty($produk->galeri)) {
+    $decoded_gallery = json_decode($produk->galeri);
+    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded_gallery)) {
+        // Gabungkan array, pastikan tidak ada duplikat foto utama
+        foreach($decoded_gallery as $g_img) {
+            if ($g_img != $img_main) {
+                $gallery_images[] = $g_img;
+            }
+        }
+    }
+}
 ?>
 
 <div class="bg-gray-50 min-h-screen py-4 md:py-8 pb-24">
@@ -66,75 +85,146 @@ $nama_toko = $produk->nama_toko ?: 'Toko Desa';
 
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div class="flex flex-col md:flex-row">
-                <div class="w-full md:w-1/2 lg:w-2/5 bg-white p-4">
-                    <div class="aspect-square bg-gray-100 rounded-xl overflow-hidden relative border border-gray-100">
-                        <img src="<?php echo esc_url($img_main); ?>" class="w-full h-full object-cover">
+                
+                <!-- KOLOM KIRI: GALERI FOTO -->
+                <div class="w-full md:w-1/2 lg:w-5/12 bg-white p-4 lg:p-6">
+                    <!-- Main Image Display -->
+                    <div class="aspect-square bg-gray-100 rounded-xl overflow-hidden relative border border-gray-100 mb-4 group cursor-zoom-in">
+                        <img id="main-product-image" src="<?php echo esc_url($img_main); ?>" class="w-full h-full object-cover transition duration-500 group-hover:scale-105" alt="Foto Utama">
+                        
                         <?php if($produk->kondisi == 'bekas'): ?>
-                            <span class="absolute top-2 right-2 bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded">Preloved</span>
+                            <span class="absolute top-2 right-2 bg-orange-500 text-white text-xs font-bold px-2 py-1 rounded shadow-sm">Preloved</span>
                         <?php endif; ?>
                     </div>
+
+                    <!-- Thumbnails Slider (Horizontal Scroll) -->
+                    <?php if (count($gallery_images) > 1): ?>
+                    <div class="flex gap-2 overflow-x-auto hide-scroll pb-2 snap-x">
+                        <?php foreach($gallery_images as $index => $img_url): ?>
+                        <button onclick="changeMainImage('<?php echo esc_url($img_url); ?>', this)" 
+                                class="w-16 h-16 md:w-20 md:h-20 flex-shrink-0 rounded-lg overflow-hidden border-2 <?php echo ($index === 0) ? 'border-primary' : 'border-transparent'; ?> hover:border-primary focus:border-primary transition p-0.5 bg-white snap-start thumbnail-btn">
+                            <img src="<?php echo esc_url($img_url); ?>" class="w-full h-full object-cover rounded-md" alt="Thumbnail">
+                        </button>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php endif; ?>
                 </div>
-                <div class="w-full md:w-1/2 lg:w-3/5 p-6 md:p-8">
-                    <h1 class="text-2xl font-bold text-gray-900 mb-2 leading-tight"><?php echo esc_html($produk->nama_produk); ?></h1>
-                    <div class="flex items-center gap-4 text-sm text-gray-500 mb-4 pb-4 border-b border-gray-100">
-                        <span class="flex items-center gap-1">
-                            <i class="fas fa-star text-yellow-400"></i> <?php echo ($produk->rating_avg > 0) ? $produk->rating_avg : 'Baru'; ?>
+
+                <!-- KOLOM KANAN: INFO PRODUK -->
+                <div class="w-full md:w-1/2 lg:w-7/12 p-6 md:p-8 lg:pl-0">
+                    
+                    <div class="mb-4">
+                        <span class="text-xs font-bold text-primary bg-primary-light px-2 py-1 rounded-md mb-2 inline-block uppercase tracking-wider">
+                            <?php echo esc_html($kategori); ?>
+                        </span>
+                        <h1 class="text-2xl md:text-3xl font-bold text-gray-900 leading-tight"><?php echo esc_html($produk->nama_produk); ?></h1>
+                    </div>
+                    
+                    <div class="flex items-center gap-4 text-sm text-gray-500 mb-6 pb-6 border-b border-gray-100">
+                        <span class="flex items-center gap-1 text-yellow-500 font-bold">
+                            <i class="fas fa-star"></i> <?php echo ($produk->rating_avg > 0) ? $produk->rating_avg : 'Baru'; ?>
                         </span>
                         <span class="w-px h-4 bg-gray-300"></span>
-                        <span>Terjual <?php echo $terjual; ?></span>
+                        <span>Terjual <strong class="text-gray-800"><?php echo $terjual; ?></strong></span>
                         <span class="w-px h-4 bg-gray-300"></span>
-                        <span class="text-primary font-medium"><?php echo esc_html($kategori); ?></span>
+                        <span>Stok <strong class="text-gray-800"><?php echo $stok; ?></strong></span>
                     </div>
+
                     <div class="text-3xl font-bold text-primary mb-6">
                         Rp <?php echo number_format($harga, 0, ',', '.'); ?>
                     </div>
-                    <div class="mb-6">
-                        <h3 class="font-bold text-gray-800 mb-2 text-sm">Detail Produk</h3>
-                        <div class="text-sm text-gray-600 space-y-1">
-                            <p><span class="w-24 inline-block text-gray-400">Kondisi:</span> <?php echo ucfirst($produk->kondisi); ?></p>
-                            <p><span class="w-24 inline-block text-gray-400">Berat:</span> <?php echo $produk->berat_gram; ?> gram</p>
-                            <p><span class="w-24 inline-block text-gray-400">Stok:</span> <?php echo $stok; ?> pcs</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100 mb-6">
-                        <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center text-primary text-xl border border-gray-200">
+
+                    <!-- Info Penjual -->
+                    <div class="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100 mb-6 transition hover:border-primary hover:bg-white hover:shadow-sm cursor-pointer group">
+                        <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center text-primary text-xl border border-gray-200 group-hover:border-primary transition">
                             <i class="fas fa-store"></i>
                         </div>
-                        <div>
-                            <div class="font-bold text-gray-800 text-sm"><?php echo esc_html($nama_toko); ?></div>
-                            <div class="text-xs text-gray-500 truncate max-w-[200px]"><?php echo esc_html($produk->alamat_toko ?: 'Lokasi Toko'); ?></div>
+                        <div class="flex-1">
+                            <div class="font-bold text-gray-800 text-sm flex items-center gap-2">
+                                <?php echo esc_html($nama_toko); ?>
+                                <i class="fas fa-check-circle text-blue-500 text-xs" title="Terverifikasi"></i>
+                            </div>
+                            <div class="text-xs text-gray-500 truncate flex items-center gap-1">
+                                <i class="fas fa-map-marker-alt"></i>
+                                <?php echo esc_html($produk->alamat_toko ?: 'Lokasi Toko'); ?>
+                            </div>
+                        </div>
+                        <div class="text-gray-400">
+                            <i class="fas fa-chevron-right"></i>
                         </div>
                     </div>
+
+                    <!-- Detail Spesifikasi -->
+                    <div class="mb-6">
+                        <h3 class="font-bold text-gray-800 mb-3 text-sm border-l-4 border-primary pl-3">Spesifikasi Produk</h3>
+                        <div class="grid grid-cols-2 gap-y-2 text-sm text-gray-600 bg-white p-4 rounded-xl border border-gray-100">
+                            <p><span class="text-gray-400 block text-xs mb-0.5">Kondisi</span> <?php echo ucfirst($produk->kondisi); ?></p>
+                            <p><span class="text-gray-400 block text-xs mb-0.5">Berat Satuan</span> <?php echo $produk->berat_gram; ?> gram</p>
+                            <p><span class="text-gray-400 block text-xs mb-0.5">Kategori</span> <?php echo $kategori; ?></p>
+                            <p><span class="text-gray-400 block text-xs mb-0.5">Etalase</span> Utama</p>
+                        </div>
+                    </div>
+
+                    <!-- Deskripsi Lengkap -->
                     <div class="mb-8">
-                        <h3 class="font-bold text-gray-800 mb-2 text-sm">Deskripsi</h3>
-                        <div class="prose text-sm text-gray-600 max-w-none">
+                        <h3 class="font-bold text-gray-800 mb-3 text-sm border-l-4 border-primary pl-3">Deskripsi Lengkap</h3>
+                        <div class="prose prose-sm text-gray-600 max-w-none leading-relaxed">
                             <?php echo wpautop(esc_html($produk->deskripsi)); ?>
                         </div>
                     </div>
+
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-lg z-50 md:hidden">
+<!-- FIXED BOTTOM BAR (Mobile Action) -->
+<div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-50 md:hidden">
     <div class="flex gap-3">
-        <a href="https://wa.me/<?php echo preg_replace('/^0/', '62', $produk->nomor_wa); ?>" class="flex-1 border border-green-600 text-green-600 font-bold py-3 rounded-xl text-center text-sm flex items-center justify-center gap-2">
-            <i class="fab fa-whatsapp"></i> Chat
+        <a href="https://wa.me/<?php echo preg_replace('/^0/', '62', $produk->nomor_wa); ?>?text=Halo%2C%20saya%20tertarik%20dengan%20produk%20<?php echo urlencode($produk->nama_produk); ?>" class="flex-1 border border-green-600 text-green-600 font-bold py-3 rounded-xl text-center text-sm flex items-center justify-center gap-2 active:bg-green-50">
+            <i class="fab fa-whatsapp text-lg"></i> Chat
         </a>
-        <button class="flex-1 bg-primary text-white font-bold py-3 rounded-xl text-center text-sm shadow-md hover:bg-green-700 btn-add-cart-single" data-id="<?php echo $produk->id; ?>">
-            + Keranjang
+        <button class="flex-1 bg-primary text-white font-bold py-3 rounded-xl text-center text-sm shadow-md hover:bg-green-700 active:scale-95 transition btn-add-cart-single" data-id="<?php echo $produk->id; ?>">
+            <i class="fas fa-plus mr-1"></i> Keranjang
         </button>
     </div>
 </div>
 
 <script>
+// Fungsi Ganti Gambar Utama
+function changeMainImage(url, btn) {
+    const mainImg = document.getElementById('main-product-image');
+    
+    // Efek fade out-in
+    mainImg.style.opacity = '0.5';
+    
+    setTimeout(() => {
+        mainImg.src = url;
+        mainImg.style.opacity = '1';
+    }, 150);
+
+    // Update border aktif pada thumbnail
+    document.querySelectorAll('.thumbnail-btn').forEach(b => {
+        b.classList.remove('border-primary');
+        b.classList.add('border-transparent');
+    });
+    btn.classList.remove('border-transparent');
+    btn.classList.add('border-primary');
+}
+
+// Handler Add to Cart
 jQuery(document).ready(function($) {
     $('.btn-add-cart-single').on('click', function(e) {
         e.preventDefault();
         const btn = $(this);
         const id = btn.data('id');
-        btn.prop('disabled', true).text('Memproses...');
+        
+        // Simpan teks asli
+        const originalText = btn.html();
+        
+        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Loading...');
+        
         $.post(dw_ajax.ajax_url, {
             action: 'dw_theme_add_to_cart',
             nonce: dw_ajax.nonce,
@@ -143,12 +233,20 @@ jQuery(document).ready(function($) {
             is_custom_db: 1 
         }, function(res) {
             if(res.success) {
-                alert('Berhasil masuk keranjang!');
-                btn.text('Berhasil');
-                setTimeout(() => btn.prop('disabled', false).text('+ Keranjang'), 2000);
+                // Efek visual sukses
+                btn.removeClass('bg-primary').addClass('bg-green-600').html('<i class="fas fa-check"></i> Masuk Keranjang');
+                
+                // Update badge cart di header jika ada
+                if(res.data.count) {
+                    $('#header-cart-count, #header-cart-count-mobile').text(res.data.count).removeClass('hidden').addClass('flex');
+                }
+
+                setTimeout(() => {
+                    btn.prop('disabled', false).removeClass('bg-green-600').addClass('bg-primary').html(originalText);
+                }, 2000);
             } else {
                 alert('Gagal: ' + (res.data.message || 'Error'));
-                btn.prop('disabled', false).text('+ Keranjang');
+                btn.prop('disabled', false).html(originalText);
             }
         });
     });

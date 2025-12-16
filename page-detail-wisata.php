@@ -19,7 +19,6 @@ $id_param = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
 // 3. Query Data (AMAN DARI SQL INJECTION)
 if (!empty($slug)) {
-    // Cari berdasarkan Slug
     $wisata = $wpdb->get_row($wpdb->prepare("
         SELECT w.*, d.nama_desa, d.kabupaten 
         FROM $table_wisata w
@@ -27,7 +26,6 @@ if (!empty($slug)) {
         WHERE w.slug = %s AND w.status = 'aktif'
     ", $slug));
 } elseif ($id_param > 0) {
-    // Cari berdasarkan ID
     $wisata = $wpdb->get_row($wpdb->prepare("
         SELECT w.*, d.nama_desa, d.kabupaten 
         FROM $table_wisata w
@@ -73,21 +71,40 @@ if (!empty($wisata->kontak_pengelola)) {
     $wa_text = urlencode("Halo, saya tertarik berkunjung ke " . $wisata->nama_wisata . ". Boleh info lebih lanjut?");
     $wa_link = "https://wa.me/{$wa_num}?text={$wa_text}";
 }
+
+// === LOGIKA GALERI FOTO ===
+$gallery_images = [];
+// Foto utama selalu pertama
+if (!empty($img_hero)) {
+    $gallery_images[] = $img_hero;
+}
+// Tambahan dari JSON galeri
+if (!empty($wisata->galeri)) {
+    $decoded_gallery = json_decode($wisata->galeri);
+    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded_gallery)) {
+        foreach($decoded_gallery as $g_img) {
+            // Hindari duplikasi foto utama
+            if ($g_img != $img_hero) {
+                $gallery_images[] = $g_img;
+            }
+        }
+    }
+}
 ?>
 
-<!-- HERO SECTION -->
+<!-- HERO SECTION (Background Header) -->
 <div class="relative bg-gray-900 h-[300px] md:h-[400px]">
     <img src="<?php echo esc_url($img_hero); ?>" class="w-full h-full object-cover opacity-60">
-    <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+    <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>
     <div class="absolute bottom-0 left-0 w-full p-4 md:p-8">
         <div class="container mx-auto">
-            <span class="bg-primary text-white text-xs font-bold px-2 py-1 rounded mb-2 inline-block uppercase tracking-wider">
+            <span class="bg-primary text-white text-xs font-bold px-2 py-1 rounded mb-2 inline-block uppercase tracking-wider shadow-sm">
                 <?php echo esc_html($wisata->kategori ?: 'Wisata'); ?>
             </span>
-            <h1 class="text-2xl md:text-4xl font-bold text-white mb-1 leading-tight">
+            <h1 class="text-2xl md:text-4xl font-bold text-white mb-2 leading-tight drop-shadow-md">
                 <?php echo esc_html($wisata->nama_wisata); ?>
             </h1>
-            <p class="text-gray-200 text-sm md:text-base flex items-center gap-1">
+            <p class="text-gray-200 text-sm md:text-base flex items-center gap-2 font-medium">
                 <i class="fas fa-map-marker-alt text-red-400"></i> <?php echo esc_html($lokasi); ?>
             </p>
         </div>
@@ -97,19 +114,58 @@ if (!empty($wisata->kontak_pengelola)) {
 <!-- CONTENT & SIDEBAR -->
 <div class="container mx-auto px-4 py-8">
     <div class="flex flex-col lg:flex-row gap-8">
+        
+        <!-- KOLOM KIRI (Konten Utama) -->
         <div class="w-full lg:w-2/3">
+            
+            <!-- Tabs Nav -->
+            <div class="flex gap-6 border-b border-gray-200 mb-6 text-sm font-bold text-gray-500 overflow-x-auto hide-scroll">
+                <button class="pb-2 border-b-2 border-primary text-primary whitespace-nowrap">Ikhtisar</button>
+                <button class="pb-2 border-b-2 border-transparent hover:text-gray-800 whitespace-nowrap">Fasilitas</button>
+                <button class="pb-2 border-b-2 border-transparent hover:text-gray-800 whitespace-nowrap">Lokasi</button>
+            </div>
+
+            <!-- GALERI FOTO INTERAKTIF -->
+            <?php if (count($gallery_images) > 0): ?>
+            <div class="mb-8 bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
+                <h3 class="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+                    <i class="fas fa-images text-primary"></i> Galeri Foto
+                </h3>
+                
+                <!-- Main View -->
+                <div class="aspect-video bg-gray-100 rounded-lg overflow-hidden relative mb-3 group cursor-pointer">
+                    <img id="main-wisata-image" src="<?php echo esc_url($gallery_images[0]); ?>" class="w-full h-full object-cover transition duration-500 group-hover:scale-105">
+                </div>
+
+                <!-- Thumbnails -->
+                <?php if (count($gallery_images) > 1): ?>
+                <div class="flex gap-2 overflow-x-auto hide-scroll pb-2 snap-x">
+                    <?php foreach($gallery_images as $idx => $img_url): ?>
+                    <button onclick="changeWisataImage('<?php echo esc_url($img_url); ?>', this)" 
+                            class="w-20 h-14 md:w-24 md:h-16 flex-shrink-0 rounded-md overflow-hidden border-2 <?php echo ($idx === 0) ? 'border-primary' : 'border-transparent'; ?> hover:border-primary transition p-0.5 bg-white snap-start thumb-wisata">
+                        <img src="<?php echo esc_url($img_url); ?>" class="w-full h-full object-cover rounded-sm">
+                    </button>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+
+            <!-- Deskripsi -->
             <div class="mb-8">
                 <h3 class="text-lg font-bold text-gray-800 mb-3">Tentang Wisata</h3>
                 <div class="prose max-w-none text-gray-600 text-sm leading-relaxed">
                     <?php echo wpautop(esc_html($wisata->deskripsi)); ?>
                 </div>
             </div>
+
+            <!-- Fasilitas -->
             <?php if(!empty($fasilitas)): ?>
             <div class="mb-8">
                 <h3 class="text-lg font-bold text-gray-800 mb-3">Fasilitas Tersedia</h3>
                 <div class="grid grid-cols-2 gap-3">
                     <?php foreach($fasilitas as $f): if(trim($f) == '') continue; ?>
-                    <div class="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 p-2 rounded-lg border border-gray-100">
+                    <div class="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 p-3 rounded-lg border border-gray-100">
                         <i class="fas fa-check-circle text-green-500"></i>
                         <span><?php echo esc_html(trim($f)); ?></span>
                     </div>
@@ -117,6 +173,8 @@ if (!empty($wisata->kontak_pengelola)) {
                 </div>
             </div>
             <?php endif; ?>
+
+            <!-- Peta Lokasi -->
             <?php if(!empty($wisata->lokasi_maps)): ?>
             <div class="mb-8">
                 <h3 class="text-lg font-bold text-gray-800 mb-3">Lokasi</h3>
@@ -130,7 +188,10 @@ if (!empty($wisata->kontak_pengelola)) {
                 </div>
             </div>
             <?php endif; ?>
+
         </div>
+
+        <!-- KOLOM KANAN (Sidebar Sticky) -->
         <div class="w-full lg:w-1/3">
             <div class="bg-white rounded-xl shadow-lg border border-gray-100 p-6 sticky top-24">
                 <div class="flex justify-between items-center mb-4 pb-4 border-b border-gray-100">
@@ -142,6 +203,7 @@ if (!empty($wisata->kontak_pengelola)) {
                         <span class="text-xs text-gray-400">Rating Pengunjung</span>
                     </div>
                 </div>
+
                 <div class="space-y-4">
                     <div class="flex items-start gap-3">
                         <div class="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-500 flex-shrink-0">
@@ -152,12 +214,18 @@ if (!empty($wisata->kontak_pengelola)) {
                             <span class="text-sm font-semibold text-gray-700"><?php echo esc_html($jam_buka); ?> WIB</span>
                         </div>
                     </div>
+
                     <a href="<?php echo esc_url($wa_link); ?>" target="_blank" class="block w-full bg-green-600 text-white text-center py-3 rounded-xl font-bold hover:bg-green-700 transition shadow-md flex items-center justify-center gap-2">
                         <i class="fab fa-whatsapp text-lg"></i> Hubungi Pengelola
                     </a>
+                    
+                    <button class="block w-full bg-gray-100 text-gray-600 text-center py-3 rounded-xl font-bold hover:bg-gray-200 transition text-sm">
+                        <i class="far fa-heart mr-1"></i> Simpan ke Wishlist
+                    </button>
                 </div>
             </div>
         </div>
+
     </div>
 </div>
 
@@ -186,5 +254,24 @@ if (!empty($wisata->kontak_pengelola)) {
         </div>
     </div>
 </div>
+
+<!-- Script Galeri -->
+<script>
+function changeWisataImage(url, btn) {
+    const mainImg = document.getElementById('main-wisata-image');
+    mainImg.style.opacity = '0.5';
+    setTimeout(() => {
+        mainImg.src = url;
+        mainImg.style.opacity = '1';
+    }, 150);
+
+    document.querySelectorAll('.thumb-wisata').forEach(b => {
+        b.classList.remove('border-primary');
+        b.classList.add('border-transparent');
+    });
+    btn.classList.remove('border-transparent');
+    btn.classList.add('border-primary');
+}
+</script>
 
 <?php get_footer(); ?>
