@@ -251,21 +251,38 @@ add_filter('login_redirect', 'dw_custom_login_redirect', 10, 3);
 
 // 1. Daftarkan variable query baru
 function dw_register_query_vars( $vars ) {
-    $vars[] = 'dw_slug';
+    $vars[] = 'dw_slug'; // Untuk Wisata & Produk
+    $vars[] = 'dw_slug_toko'; // Untuk Profil Toko
+    $vars[] = 'dw_slug_desa'; // Untuk Profil Desa
     return $vars;
 }
 add_filter( 'query_vars', 'dw_register_query_vars' );
 
 // 2. Tambahkan Aturan Rewrite URL
 function dw_add_rewrite_rules() {
-    // Wisata: domain.com/wisata/detail/judul-wisata -> page 'detail-wisata'
+    
+    // Profil Toko: sadesa.site/profil/toko/nama-toko -> page 'profil-toko'
+    add_rewrite_rule(
+        '^profil/toko/([^/]*)/?',
+        'index.php?pagename=profil-toko&dw_slug_toko=$matches[1]',
+        'top'
+    );
+
+    // Profil Desa: sadesa.site/profil/desa/nama-desa -> page 'profil-desa'
+    add_rewrite_rule(
+        '^profil/desa/([^/]*)/?',
+        'index.php?pagename=profil-desa&dw_slug_desa=$matches[1]',
+        'top'
+    );
+
+    // Wisata: sadesa.site/wisata/detail/judul-wisata -> page 'detail-wisata'
     add_rewrite_rule(
         '^wisata/detail/([^/]*)/?',
         'index.php?pagename=detail-wisata&dw_slug=$matches[1]',
         'top'
     );
 
-    // Produk: domain.com/produk/detail/judul-produk -> page 'detail-produk'
+    // Produk: sadesa.site/produk/detail/judul-produk -> page 'detail-produk'
     add_rewrite_rule(
         '^produk/detail/([^/]*)/?',
         'index.php?pagename=detail-produk&dw_slug=$matches[1]',
