@@ -159,37 +159,40 @@ if($kategori_produk_db) {
                 $price = ($wisata->harga_tiket > 0) ? 'Rp '.number_format($wisata->harga_tiket,0,',','.') : 'Gratis';
                 $rating = $wisata->rating_avg > 0 ? $wisata->rating_avg : '4.5';
                 
-                // [FIX] URL CANTIK
+                // Link ke detail wisata custom
                 $link = home_url('/wisata/detail/' . $wisata->slug);
                 
                 $cat_label = !empty($wisata->kategori) ? $wisata->kategori : 'Umum';
                 $cat_slug = sanitize_title($cat_label);
             ?>
-            <div class="wisata-item min-w-[75vw] md:min-w-0 md:w-auto flex-shrink-0 snap-center group relative bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden transition-all hover:shadow-md" data-category="<?php echo esc_attr($cat_slug); ?>">
-                <div class="relative h-40 md:h-48 bg-gray-200 overflow-hidden">
+            <div class="wisata-item min-w-[75vw] md:min-w-0 md:w-auto flex-shrink-0 snap-center group card-sadesa" data-category="<?php echo esc_attr($cat_slug); ?>">
+                <div class="card-img-wrap">
                     <img src="<?php echo esc_url($img); ?>" class="w-full h-full object-cover transition duration-700 group-hover:scale-110">
-                    <div class="absolute top-2 right-2 bg-white/90 backdrop-blur px-2 py-0.5 rounded-lg text-[10px] font-bold shadow-sm flex items-center gap-1">
-                        <i class="fas fa-star text-yellow-400"></i> <?php echo $rating; ?>
-                    </div>
-                    <div class="absolute bottom-2 left-2 bg-black/60 backdrop-blur text-white text-[10px] px-2 py-0.5 rounded-md font-medium uppercase tracking-wider">
-                        <?php echo esc_html($cat_label); ?>
-                    </div>
+                    
+                    <!-- Rating -->
+                    <div class="badge-rating"><i class="fas fa-star text-yellow-400"></i> <?php echo $rating; ?></div>
+                    
+                    <!-- Kategori -->
+                    <div class="badge-category"><?php echo esc_html($cat_label); ?></div>
                 </div>
-                <div class="p-3 md:p-4 flex flex-col h-[130px] md:h-auto">
-                    <h3 class="font-bold text-sm md:text-base text-gray-800 line-clamp-1 mb-1 group-hover:text-primary transition">
+                
+                <div class="card-body">
+                    <h3 class="card-title group-hover:text-primary transition">
                         <a href="<?php echo esc_url($link); ?>"><?php echo esc_html($title); ?></a>
                     </h3>
-                    <div class="text-xs text-gray-500 mb-3 flex items-center gap-1">
+                    <div class="card-meta">
                         <i class="fas fa-map-marker-alt text-red-400"></i>
                         <span class="truncate"><?php echo esc_html($loc); ?></span>
                     </div>
-                    <div class="mt-auto flex justify-between items-center border-t border-dashed border-gray-100 pt-2">
+                    
+                    <div class="card-footer">
                         <div>
-                            <p class="text-[10px] text-gray-400 uppercase font-bold">Tiket</p>
-                            <p class="text-sm font-bold text-primary"><?php echo $price; ?></p>
+                            <p class="price-label">Tiket Masuk</p>
+                            <p class="price-tag"><?php echo $price; ?></p>
                         </div>
-                        <a href="<?php echo esc_url($link); ?>" class="px-3 py-1.5 rounded-lg bg-gray-50 text-gray-600 text-[10px] font-bold hover:bg-primary hover:text-white transition flex items-center gap-1">
-                            Detail <i class="fas fa-arrow-right text-[8px]"></i>
+                        <!-- BUTTON DETAIL SESUAI REQUEST (style.css btn-detail) -->
+                        <a href="<?php echo esc_url($link); ?>" class="btn-detail">
+                            Lihat Detail <i class="fas fa-arrow-right ml-1"></i>
                         </a>
                     </div>
                 </div>
@@ -228,7 +231,6 @@ if($kategori_produk_db) {
             $img = !empty($produk->foto_utama) ? $produk->foto_utama : 'https://via.placeholder.com/300';
             $price = number_format($produk->harga, 0, ',', '.');
             
-            // [FIX] URL CANTIK
             $link = home_url('/produk/detail/' . $produk->slug);
             
             $cat_label = !empty($produk->kategori) ? $produk->kategori : 'Umum';
