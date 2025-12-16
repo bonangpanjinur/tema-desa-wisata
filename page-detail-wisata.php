@@ -62,7 +62,7 @@ if (!empty($wisata->fasilitas)) {
 }
 
 $jam_buka = !empty($wisata->jam_buka) ? $wisata->jam_buka : '08:00 - 17:00';
-$rating = $wisata->rating_avg > 0 ? $wisata->rating_avg : '4.8'; // Default rating jika kosong
+$rating = $wisata->rating_avg > 0 ? $wisata->rating_avg : '4.5';
 $img_hero = !empty($wisata->foto_utama) ? $wisata->foto_utama : 'https://via.placeholder.com/1200x600?text=Wisata+Desa';
 
 $wa_link = '#';
@@ -74,11 +74,9 @@ if (!empty($wisata->kontak_pengelola)) {
 
 // === LOGIKA GALERI FOTO ===
 $gallery_images = [];
-// Foto utama selalu pertama
 if (!empty($img_hero)) {
     $gallery_images[] = $img_hero;
 }
-// Tambahan dari JSON galeri
 if (!empty($wisata->galeri)) {
     $decoded_gallery = json_decode($wisata->galeri);
     if (json_last_error() === JSON_ERROR_NONE && is_array($decoded_gallery)) {
@@ -166,14 +164,16 @@ if (!empty($wisata->galeri)) {
 <!-- === MAIN CONTENT === -->
 <div class="bg-gray-50 min-h-screen relative">
     
-    <!-- Sticky Sub-Navigation -->
+    <!-- Sticky Sub-Navigation (Tab Berfungsi) -->
     <div class="sticky top-0 md:top-20 z-20 bg-white border-b border-gray-200 shadow-sm transition-all duration-300" id="sub-nav">
         <div class="container mx-auto px-4">
             <div class="flex gap-6 md:gap-8 text-sm font-medium text-gray-500 overflow-x-auto hide-scroll">
-                <a href="#ikhtisar" class="py-4 border-b-2 border-transparent hover:text-primary hover:border-gray-300 transition whitespace-nowrap sub-nav-link active" data-target="ikhtisar">Ikhtisar</a>
+                <!-- Gunakan <a> dengan HREF ID untuk scroll -->
+                <a href="#ikhtisar" class="py-4 border-b-2 border-primary text-primary font-bold whitespace-nowrap sub-nav-link active" data-target="ikhtisar">Ikhtisar</a>
+                <?php if (!empty($fasilitas)) : ?>
                 <a href="#fasilitas" class="py-4 border-b-2 border-transparent hover:text-primary hover:border-gray-300 transition whitespace-nowrap sub-nav-link" data-target="fasilitas">Fasilitas</a>
+                <?php endif; ?>
                 <a href="#lokasi" class="py-4 border-b-2 border-transparent hover:text-primary hover:border-gray-300 transition whitespace-nowrap sub-nav-link" data-target="lokasi">Lokasi</a>
-                <a href="#ulasan" class="py-4 border-b-2 border-transparent hover:text-primary hover:border-gray-300 transition whitespace-nowrap sub-nav-link" data-target="ulasan">Ulasan</a>
             </div>
         </div>
     </div>
@@ -185,6 +185,7 @@ if (!empty($wisata->galeri)) {
             <div class="w-full lg:w-2/3 space-y-10">
                 
                 <!-- Section: Deskripsi -->
+                <!-- Tambahkan ID agar link scroll berfungsi -->
                 <div id="ikhtisar" class="scroll-mt-36 content-section">
                     <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
                         Tentang Tempat Ini
@@ -405,41 +406,52 @@ if (!empty($wisata->galeri)) {
 
 <!-- === SCRIPTS === -->
 <script>
-// --- Navigasi Sticky Active State ---
+// --- Navigasi Sticky Active State & Smooth Scroll ---
 document.addEventListener('DOMContentLoaded', () => {
     const sections = document.querySelectorAll('.content-section');
     const navLinks = document.querySelectorAll('.sub-nav-link');
     
-    // Smooth Scroll manual
+    // 1. Smooth Scroll saat klik Link Tab
     navLinks.forEach(link => {
         link.addEventListener('click', function(e) {
             e.preventDefault();
             const targetId = this.getAttribute('href').substring(1);
             const targetSection = document.getElementById(targetId);
+            
             if(targetSection) {
-                const offsetTop = targetSection.offsetTop - 100; // Adjust offset header
+                // Hitung offset agar tidak tertutup header sticky
+                const offsetTop = targetSection.offsetTop - 180; 
                 window.scrollTo({ top: offsetTop, behavior: 'smooth' });
+                
+                // Update active state manual langsung agar responsif
+                navLinks.forEach(n => {
+                    n.classList.remove('border-primary', 'text-primary', 'font-bold');
+                    n.classList.add('border-transparent');
+                });
+                this.classList.remove('border-transparent');
+                this.classList.add('border-primary', 'text-primary', 'font-bold');
             }
         });
     });
 
-    // Scroll Spy
+    // 2. Scroll Spy (Otomatis ganti tab aktif saat scroll)
     window.addEventListener('scroll', () => {
         let current = '';
         sections.forEach(section => {
             const sectionTop = section.offsetTop;
             const sectionHeight = section.clientHeight;
-            if (pageYOffset >= (sectionTop - 150)) {
+            // 200px offset untuk trigger lebih awal sebelum sampai atas persis
+            if (window.scrollY >= (sectionTop - 250)) {
                 current = section.getAttribute('id');
             }
         });
 
         navLinks.forEach(link => {
-            link.classList.remove('border-primary', 'text-primary');
+            link.classList.remove('border-primary', 'text-primary', 'font-bold');
             link.classList.add('border-transparent');
             if (link.dataset.target === current) {
                 link.classList.remove('border-transparent');
-                link.classList.add('border-primary', 'text-primary');
+                link.classList.add('border-primary', 'text-primary', 'font-bold');
             }
         });
     });
@@ -518,6 +530,8 @@ document.addEventListener('keydown', function(e) {
   0%, 100% { transform: translateY(-5%); animation-timing-function: cubic-bezier(0.8,0,1,1); }
   50% { transform: translateY(0); animation-timing-function: cubic-bezier(0,0,0.2,1); }
 }
+/* Scroll Margin Top untuk Sticky Header */
+.scroll-mt-36 { scroll-margin-top: 150px; }
 </style>
 
 <?php get_footer(); ?>
