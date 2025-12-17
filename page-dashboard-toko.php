@@ -400,7 +400,7 @@ get_header();
                 break;
 
             // ------------------------------------------------------------------
-            // TAB 3: MANAJEMEN PESANAN
+            // TAB 3: MANAJEMEN PESANAN (FIXED: Compatible with PHP < 8.0)
             // ------------------------------------------------------------------
             case 'pesanan':
                 $orders = $wpdb->get_results($wpdb->prepare("
@@ -423,14 +423,16 @@ get_header();
                                     <div class="font-bold text-gray-800 mt-1">Invoice Utama: <?php echo esc_html($order->kode_unik); ?></div>
                                 </div>
                                 <div>
-                                    <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide <?php 
-                                        echo match($order->status_pesanan) {
-                                            'menunggu_konfirmasi' => 'bg-yellow-100 text-yellow-700',
-                                            'diproses' => 'bg-blue-100 text-blue-700',
-                                            'selesai' => 'bg-green-100 text-green-700',
-                                            default => 'bg-gray-100 text-gray-600'
-                                        };
-                                    ?>">
+                                    <?php
+                                    // FIX: Menggunakan Array Map agar kompatibel PHP 7.4+ (Pengganti match)
+                                    $status_colors = [
+                                        'menunggu_konfirmasi' => 'bg-yellow-100 text-yellow-700',
+                                        'diproses'            => 'bg-blue-100 text-blue-700',
+                                        'selesai'             => 'bg-green-100 text-green-700',
+                                    ];
+                                    $bg_class = isset($status_colors[$order->status_pesanan]) ? $status_colors[$order->status_pesanan] : 'bg-gray-100 text-gray-600';
+                                    ?>
+                                    <span class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide <?php echo $bg_class; ?>">
                                         <?php echo str_replace('_', ' ', $order->status_pesanan); ?>
                                     </span>
                                 </div>
