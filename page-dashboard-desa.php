@@ -310,7 +310,7 @@ get_header();
                                         <input type="hidden" name="existing_foto" value="<?php echo esc_attr($w_data->foto_utama); ?>">
                                     </div>
                                 <?php endif; ?>
-                                <input type="file" name="foto_utama" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 accept="image/*"">
+                                <input type="file" name="foto_utama" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100" accept="image/*">
                             </div>
 
                             <div>
@@ -420,15 +420,15 @@ get_header();
                                     <td class="p-4"><?php echo esc_html($p->nama_pemilik); ?></td>
                                     <td class="p-4 text-gray-500"><?php echo esc_html($p->nomor_wa); ?></td>
                                     <td class="p-4">
-                                        <span class="px-2 py-1 rounded text-xs font-bold capitalize <?php 
-                                            echo match($p->status_pendaftaran) {
-                                                'disetujui' => 'bg-green-100 text-green-700',
-                                                'menunggu_desa' => 'bg-orange-100 text-orange-700',
-                                                'ditolak' => 'bg-red-100 text-red-700',
-                                                default => 'bg-gray-100 text-gray-600'
-                                            };
-                                        ?>">
-                                            <?php echo str_replace('_', ' ', $p->status_pendaftaran); ?>
+                                        <?php 
+                                            $status_label = str_replace('_', ' ', $p->status_pendaftaran);
+                                            $status_class = 'bg-gray-100 text-gray-600';
+                                            if ($p->status_pendaftaran === 'disetujui') $status_class = 'bg-green-100 text-green-700';
+                                            elseif ($p->status_pendaftaran === 'menunggu_desa') $status_class = 'bg-orange-100 text-orange-700';
+                                            elseif ($p->status_pendaftaran === 'ditolak') $status_class = 'bg-red-100 text-red-700';
+                                        ?>
+                                        <span class="px-2 py-1 rounded text-xs font-bold capitalize <?php echo $status_class; ?>">
+                                            <?php echo $status_label; ?>
                                         </span>
                                     </td>
                                     <td class="p-4 text-right">
@@ -477,7 +477,7 @@ get_header();
                                 ?>
                                     <img src="<?php echo esc_url($img_src); ?>" class="h-20 w-20 object-cover rounded border border-gray-200 mb-2">
                                 <?php endif; ?>
-                                <input type="file" name="foto_desa" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 accept="image/*"">
+                                <input type="file" name="foto_desa" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100" accept="image/*">
                             </div>
 
                             <div>
