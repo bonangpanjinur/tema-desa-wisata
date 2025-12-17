@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $jam_buka  = sanitize_text_field($_POST['jam_buka']);
         $kontak    = sanitize_text_field($_POST['kontak_pengelola']);
         $lokasi    = sanitize_textarea_field($_POST['lokasi_maps']);
-        $fasilitas = sanitize_textarea_field($_POST['fasilitas']); // Field baru
+        $fasilitas = sanitize_textarea_field($_POST['fasilitas']);
         
         // 1. Handle Foto Utama
         $attachment_id = '';
@@ -65,13 +65,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // 2. Handle Galeri (Multi Upload)
         $galeri_ids = [];
-        // Ambil galeri lama jika ada
         if (isset($_POST['existing_galeri']) && !empty($_POST['existing_galeri'])) {
             $galeri_ids = json_decode(stripslashes($_POST['existing_galeri']), true);
             if (!is_array($galeri_ids)) $galeri_ids = [];
         }
 
-        // Proses upload file baru untuk galeri
         if (!empty($_FILES['galeri']['name'][0])) {
             require_once(ABSPATH . 'wp-admin/includes/image.php');
             require_once(ABSPATH . 'wp-admin/includes/file.php');
@@ -114,11 +112,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ];
 
         if ($wisata_id > 0) {
-            // Update
             $wpdb->update($table_wisata, $data, ['id' => $wisata_id, 'id_desa' => $desa->id]);
             $message = 'Data wisata berhasil diperbarui.';
         } else {
-            // Insert
             $data['created_at'] = current_time('mysql');
             $wpdb->insert($table_wisata, $data);
             $message = 'Wisata baru berhasil ditambahkan.';
@@ -134,13 +130,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $message_type = 'success';
     }
 
-    // C. UPDATE PROFIL DESA (LENGKAP)
+    // C. UPDATE PROFIL DESA
     if (isset($_POST['action']) && $_POST['action'] === 'update_desa') {
         $nama_desa = sanitize_text_field($_POST['nama_desa']);
         $desc_desa = wp_kses_post($_POST['deskripsi']);
         $alamat    = sanitize_textarea_field($_POST['alamat_lengkap']);
         
-        // Info Bank
         $nama_bank      = sanitize_text_field($_POST['nama_bank_desa']);
         $no_rekening    = sanitize_text_field($_POST['no_rekening_desa']);
         $atas_nama_rek  = sanitize_text_field($_POST['atas_nama_rekening_desa']);
@@ -149,14 +144,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         require_once(ABSPATH . 'wp-admin/includes/file.php');
         require_once(ABSPATH . 'wp-admin/includes/media.php');
 
-        // 1. Upload Foto Profil Desa
         $foto_desa_id = $desa->foto;
         if (!empty($_FILES['foto_desa']['name'])) {
             $attach_id = media_handle_upload('foto_desa', 0);
             if (!is_wp_error($attach_id)) $foto_desa_id = $attach_id;
         }
 
-        // 2. Upload QRIS Desa
         $qris_desa_url = $desa->qris_image_url_desa;
         if (!empty($_FILES['qris_desa']['name'])) {
             $attach_id = media_handle_upload('qris_desa', 0);
@@ -178,14 +171,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         $message = 'Profil desa & informasi pembayaran berhasil diperbarui.';
         $message_type = 'success';
-        // Refresh data
         $desa = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_desa WHERE id = %d", $desa->id));
     }
 
     // D. VERIFIKASI PEDAGANG
     if (isset($_POST['action']) && $_POST['action'] === 'verify_pedagang') {
         $pedagang_id = intval($_POST['pedagang_id']);
-        $status_baru = sanitize_text_field($_POST['status_verifikasi']); // 'disetujui' atau 'ditolak'
+        $status_baru = sanitize_text_field($_POST['status_verifikasi']);
         
         $wpdb->update($table_pedagang, [
             'status_pendaftaran' => $status_baru,
@@ -197,7 +189,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// --- SETUP TABS ---
+// --- PREPARE DYNAMIC CATEGORIES ---
+// Ambil semua kategori unik dari tabel wisata untuk dropdown
+$kategori_wisata_db = $wpdb->get_col("SELECT DISTINCT kategori FROM $table_wisata WHERE kategori IS NOT NULL AND kategori != '' ORDER BY kategori ASC");
+// Gabungkan dengan default jika ada yang belum terpakai di DB
+$default_cats = ['Alam', 'Budaya', 'Edukasi', 'Religi', 'Kuliner', 'Buatan', 'Sejarah'];
+$kategori_wisata_list = array_unique(array_merge($default_cats, $kategori_wisata_db));
+sort($kategori_wisata_list);
+
 $tab = isset($_GET['tab']) ? sanitize_text_field($_GET['tab']) : 'dashboard';
 
 get_header(); 
@@ -257,10 +256,6 @@ get_header();
 
         <?php 
         switch($tab) {
-            
-            // ------------------------------------------------------------------
-            // TAB 1: DASHBOARD UTAMA
-            // ------------------------------------------------------------------
             case 'dashboard':
                 $total_wisata   = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table_wisata WHERE id_desa = %d", $desa->id));
                 $total_pedagang = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table_pedagang WHERE id_desa = %d AND status_pendaftaran = 'disetujui'", $desa->id));
@@ -298,14 +293,10 @@ get_header();
                 <?php
                 break;
 
-            // ------------------------------------------------------------------
-            // TAB 2: MANAJEMEN WISATA (CRUD LENGKAP)
-            // ------------------------------------------------------------------
             case 'wisata':
                 $action = isset($_GET['act']) ? $_GET['act'] : 'list';
                 $edit_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
-                // --- FORM TAMBAH / EDIT ---
                 if ($action === 'add' || $action === 'edit') {
                     $w_data = null;
                     if ($action === 'edit' && $edit_id) {
@@ -334,8 +325,7 @@ get_header();
                                     <label class="block text-sm font-bold text-gray-700 mb-2">Kategori</label>
                                     <select name="kategori" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors">
                                         <?php 
-                                        $cats = ['Alam', 'Budaya', 'Edukasi', 'Religi', 'Kuliner', 'Buatan', 'Sejarah'];
-                                        foreach($cats as $c) {
+                                        foreach($kategori_wisata_list as $c) {
                                             $sel = ($w_data && $w_data->kategori == $c) ? 'selected' : '';
                                             echo "<option value='$c' $sel>$c</option>";
                                         }
@@ -425,7 +415,6 @@ get_header();
                     </div>
                     <?php
                 } 
-                // --- LIST WISATA ---
                 else {
                     $wisata_list = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_wisata WHERE id_desa = %d ORDER BY created_at DESC", $desa->id));
                     ?>
@@ -482,9 +471,6 @@ get_header();
                 }
                 break;
 
-            // ------------------------------------------------------------------
-            // TAB 3: MANAJEMEN PEDAGANG (VERIFIKASI)
-            // ------------------------------------------------------------------
             case 'pedagang':
                 $pedagangs = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_pedagang WHERE id_desa = %d ORDER BY created_at DESC", $desa->id));
                 ?>
@@ -543,9 +529,6 @@ get_header();
                 <?php
                 break;
 
-            // ------------------------------------------------------------------
-            // TAB 4: PROFIL DESA & BANK (LENGKAP)
-            // ------------------------------------------------------------------
             case 'pengaturan':
                 ?>
                 <div class="max-w-4xl mx-auto">

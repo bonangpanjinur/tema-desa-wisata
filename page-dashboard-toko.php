@@ -391,7 +391,12 @@ get_header();
                                     <label class="block text-sm font-bold text-gray-700 mb-2">Kategori</label>
                                     <select name="kategori" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors">
                                         <?php 
-                                        $cats = ['Makanan', 'Minuman', 'Kerajinan', 'Fashion', 'Pertanian', 'Jasa'];
+                                        // Dinamis Kategori dari DB + Default
+                                        $kategori_produk_db = $wpdb->get_col("SELECT DISTINCT kategori FROM $table_produk WHERE kategori IS NOT NULL AND kategori != ''");
+                                        $cats_default = ['Makanan', 'Minuman', 'Kerajinan', 'Fashion', 'Pertanian', 'Jasa'];
+                                        $cats = array_unique(array_merge($cats_default, $kategori_produk_db));
+                                        sort($cats);
+
                                         foreach($cats as $c) {
                                             $sel = ($p_data && $p_data->kategori == $c) ? 'selected' : '';
                                             echo "<option value='$c' $sel>$c</option>";
