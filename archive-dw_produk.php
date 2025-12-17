@@ -19,6 +19,7 @@ $max_harga  = isset($_GET['max_price']) ? intval($_GET['max_price']) : 0;
 $urutan     = isset($_GET['sort']) ? sanitize_text_field($_GET['sort']) : 'terbaru';
 
 // --- 2. QUERY BUILDER ---
+// FIX: Mengambil kolom 'slug' dan 'foto_utama' sesuai skema DB
 $sql = "SELECT p.*, pd.nama_toko, pd.slug_toko, d.kabupaten, d.nama_desa 
         FROM $table_produk p 
         LEFT JOIN $table_pedagang pd ON p.id_pedagang = pd.id
@@ -26,7 +27,7 @@ $sql = "SELECT p.*, pd.nama_toko, pd.slug_toko, d.kabupaten, d.nama_desa
         WHERE p.status = 'aktif' AND pd.status_akun = 'aktif'";
 
 if ($pencarian) {
-    $sql .= $wpdb->prepare(" AND (p.nama_produk LIKE %s OR p.deskripsi_produk LIKE %s)", '%' . $pencarian . '%', '%' . $pencarian . '%');
+    $sql .= $wpdb->prepare(" AND (p.nama_produk LIKE %s OR p.deskripsi LIKE %s)", '%' . $pencarian . '%', '%' . $pencarian . '%');
 }
 if ($kategori) {
     $sql .= $wpdb->prepare(" AND p.kategori = %s", $kategori);
@@ -180,47 +181,28 @@ function get_cat_color_prod($cat) {
         <!-- GRID LAYOUT -->
         <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
             <?php foreach ($produk_list as $p) : 
-                // --- 1. LINK PRODUK (Pretty Permalink) ---
-                $slug_produk = !empty($p->slug_produk) ? $p->slug_produk : sanitize_title($p->nama_produk);
+                // --- 1. LINK PRODUK (Pretty Permalink sesuai front-page) ---
+                // Format: /produk/detail/{slug}
+                $slug_produk = !empty($p->slug) ? $p->slug : sanitize_title($p->nama_produk);
                 $link_p = home_url('/produk/detail/' . $slug_produk);
                 
-                // --- 2. LOGIKA GAMBAR (ROBUST) ---
+                // --- 2. LOGIKA GAMBAR (Sesuai Skema foto_utama) ---
                 $img_p = 'https://via.placeholder.com/400x400?text=Produk'; 
                 $foto_id = null;
 
-                // Cek isi kolom foto_produk
-                $raw_foto = $p->foto_produk;
+                // Kolom di DB: foto_utama
+                $raw_foto = $p->foto_utama;
 
                 if (!empty($raw_foto)) {
-                    // Coba decode JSON (jika array ID: ["10", "11"])
-                    $json_data = json_decode($raw_foto, true);
-                    
-                    if (json_last_error() === JSON_ERROR_NONE && is_array($json_data) && !empty($json_data)) {
-                        // Ambil ID pertama dari array JSON
-                        $foto_id = $json_data[0];
-                    } elseif (is_serialized($raw_foto)) {
-                        // Coba Unserialize (jika format serialized WP)
-                        $ser_data = @unserialize($raw_foto);
-                        if ($ser_data && is_array($ser_data) && !empty($ser_data)) {
-                            $foto_id = $ser_data[0];
+                    // Cek jika numeric ID
+                    if (is_numeric($raw_foto)) {
+                        $img_att = wp_get_attachment_image_src($raw_foto, 'medium_large');
+                        if ($img_att) {
+                            $img_p = $img_att[0];
                         }
                     } else {
-                        // Jika bukan JSON/Serialized, anggap Single Value (ID atau URL)
-                        $foto_id = $raw_foto;
-                    }
-
-                    // Konversi ID ke URL Gambar
-                    if (!empty($foto_id)) {
-                        if (is_numeric($foto_id)) {
-                            // Ambil URL dari Attachment ID
-                            $img_att = wp_get_attachment_image_src($foto_id, 'medium_large'); // Gunakan 'medium_large' atau 'large'
-                            if ($img_att) {
-                                $img_p = $img_att[0];
-                            }
-                        } else {
-                            // Jika sudah berupa URL (misal dari import eksternal)
-                            $img_p = $foto_id;
-                        }
+                        // Jika URL string langsung
+                        $img_p = $raw_foto;
                     }
                 }
                 

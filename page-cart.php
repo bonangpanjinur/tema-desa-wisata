@@ -6,20 +6,13 @@
 
 get_header(); 
 
-// 1. Ambil data keranjang
-// Pastikan user login untuk mengambil dari user_meta. 
-// Jika plugin mendukung guest cart via cookie, logika itu harus ada di dw_get_user_cart atau wrapper function.
 $user_id = get_current_user_id();
 $cart_items = [];
 
-// Cek apakah session sudah dimulai, jika belum start session
 if (!session_id()) session_start();
 
 // LOGIKA PENGAMBILAN DATA KERANJANG
-// Prioritas 1: Ambil dari Session (untuk guest/user login yang baru nambah item)
 if (isset($_SESSION['dw_cart']) && !empty($_SESSION['dw_cart'])) {
-    // Format session kita: [product_id => qty]
-    // Kita perlu konversi ke format array lengkap untuk view
     global $wpdb;
     $table_produk = $wpdb->prefix . 'dw_produk';
     $table_pedagang = $wpdb->prefix . 'dw_pedagang';
@@ -27,6 +20,7 @@ if (isset($_SESSION['dw_cart']) && !empty($_SESSION['dw_cart'])) {
     $product_ids = array_keys($_SESSION['dw_cart']);
     if (!empty($product_ids)) {
         $ids_placeholder = implode(',', array_fill(0, count($product_ids), '%d'));
+        // FIX: Select kolom yang sesuai skema (foto_utama, slug)
         $sql = "SELECT p.*, pd.nama_toko 
                 FROM $table_produk p 
                 LEFT JOIN $table_pedagang pd ON p.id_pedagang = pd.id
@@ -36,16 +30,14 @@ if (isset($_SESSION['dw_cart']) && !empty($_SESSION['dw_cart'])) {
         foreach ($raw_products as $prod) {
             $qty = intval($_SESSION['dw_cart'][$prod->id]);
             if ($qty > 0) {
-                // Standarisasi struktur item cart
                 $cart_items[] = [
-                    'id' => $prod->id, // Cart ID (bisa sama dengan Product ID untuk session)
+                    'id' => $prod->id,
                     'product_id' => $prod->id,
-                    'productId' => $prod->id, // Alias
                     'quantity' => $qty,
-                    'qty' => $qty, // Alias
                     'price' => $prod->harga,
                     'name' => $prod->nama_produk,
-                    'image' => $prod->foto_produk,
+                    'image' => $prod->foto_utama, // FIX: Gunakan foto_utama
+                    'slug' => $prod->slug, // FIX: Gunakan slug
                     'toko' => [
                         'nama_toko' => $prod->nama_toko
                     ]
@@ -54,10 +46,6 @@ if (isset($_SESSION['dw_cart']) && !empty($_SESSION['dw_cart'])) {
         }
     }
 } 
-// Prioritas 2: Ambil dari Fungsi Helper (jika ada sistem cart di DB)
-elseif (function_exists('dw_get_user_cart') && $user_id) {
-    $cart_items = dw_get_user_cart($user_id);
-}
 
 $total_belanja = 0;
 ?>
@@ -106,41 +94,35 @@ $total_belanja = 0;
                     </div>
 
                     <?php foreach ($cart_items as $item) : 
-                        // FIX: Mapping Key yang sangat aman
-                        $product_id = $item['productId'] ?? $item['product_id'] ?? 0;
-                        $qty = $item['quantity'] ?? $item['qty'] ?? 1;
-                        $price = $item['price'] ?? 0;
-                        $name = $item['name'] ?? 'Produk Tanpa Nama';
-                        $image_url = $item['image'] ?? '';
+                        $product_id = $item['product_id'];
+                        $qty = $item['quantity'];
+                        $price = $item['price'];
+                        $name = $item['name'];
+                        $raw_foto = $item['image'];
                         
-                        // FIX: Fallback Image Logic
+                        // FIX: URL Slug
+                        $slug = $item['slug'];
+                        $link = home_url('/produk/detail/' . $slug);
+
+                        // FIX: Logic Gambar sesuai archive
                         $img_src = 'https://via.placeholder.com/150?text=No+Image';
-                        if (!empty($image_url)) {
-                            // Cek apakah JSON string (multiple images)
-                            $json_decoded = json_decode($image_url, true);
-                            if (json_last_error() === JSON_ERROR_NONE && is_array($json_decoded) && !empty($json_decoded)) {
-                                $image_url = $json_decoded[0]; // Ambil gambar pertama
-                            }
-                            
-                            // Resolusi ID ke URL
-                            if (is_numeric($image_url)) {
-                                $att = wp_get_attachment_image_src($image_url, 'thumbnail');
+                        if (!empty($raw_foto)) {
+                            if (is_numeric($raw_foto)) {
+                                $att = wp_get_attachment_image_src($raw_foto, 'thumbnail');
                                 if ($att) $img_src = $att[0];
-                            } elseif(filter_var($image_url, FILTER_VALIDATE_URL)) {
-                                $img_src = $image_url;
+                            } else {
+                                $img_src = $raw_foto;
                             }
                         }
 
-                        // FIX: Ambil Nama Toko
                         $shop_name = $item['toko']['nama_toko'] ?? 'Toko Desa';
-
                         $subtotal = $price * $qty;
                         $total_belanja += $subtotal;
                     ?>
                     
                     <!-- ITEM CARD -->
                     <div class="cart-item-row group bg-white p-4 rounded-2xl shadow-sm border border-gray-100 transition-all hover:shadow-md relative overflow-hidden" 
-                         data-cart-id="<?php echo esc_attr($item['id'] ?? $product_id); ?>" 
+                         data-cart-id="<?php echo esc_attr($product_id); ?>" 
                          data-product-id="<?php echo esc_attr($product_id); ?>">
                         
                         <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
@@ -149,7 +131,7 @@ $total_belanja = 0;
                             <div class="col-span-1 md:col-span-6 flex gap-4">
                                 <!-- Gambar -->
                                 <div class="w-20 h-20 md:w-24 md:h-24 bg-gray-50 rounded-xl overflow-hidden flex-shrink-0 border border-gray-100 relative">
-                                    <a href="<?php echo get_permalink($product_id); ?>"> // Asumsi link produk standar WP atau custom link logic
+                                    <a href="<?php echo esc_url($link); ?>">
                                         <img src="<?php echo esc_url($img_src); ?>" 
                                              alt="<?php echo esc_attr($name); ?>" 
                                              class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
@@ -159,7 +141,7 @@ $total_belanja = 0;
                                 
                                 <!-- Detail -->
                                 <div class="flex-1 min-w-0 flex flex-col justify-center">
-                                    <a href="<?php echo get_permalink($product_id); ?>" class="block">
+                                    <a href="<?php echo esc_url($link); ?>" class="block">
                                         <h3 class="font-bold text-gray-800 text-sm md:text-base leading-tight mb-1 line-clamp-2 hover:text-orange-600 transition-colors">
                                             <?php echo esc_html($name); ?>
                                         </h3>
