@@ -1,6 +1,7 @@
 <?php
 /**
  * Template Name: Detail Wisata Custom
+ * Description: Halaman detail wisata dengan fitur galeri, peta, dan ulasan.
  */
 
 get_header();
@@ -12,13 +13,17 @@ $table_ulasan = $wpdb->prefix . 'dw_ulasan';
 
 $wisata = null;
 
-// 1. Coba Tangkap Slug dari URL (Rewrite Rule)
+// ============================================================================
+// 1. LOGIKA PENGAMBILAN DATA (SLUG vs ID)
+// ============================================================================
+
+// Coba tangkap Slug dari URL (Rewrite Rule: /wisata/detail/slug)
 $slug = get_query_var('dw_slug');
 
-// 2. Coba Tangkap ID (Fallback)
+// Coba tangkap ID (Fallback: ?id=1)
 $id_param = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
-// 3. Query Data (Tambahkan d.slug_desa ke SELECT)
+// Query Data Utama (JOIN dengan tabel desa untuk ambil slug & nama desa)
 if (!empty($slug)) {
     $wisata = $wpdb->get_row($wpdb->prepare("
         SELECT w.*, d.nama_desa, d.kabupaten, d.slug_desa, d.id as id_desa
@@ -35,18 +40,25 @@ if (!empty($slug)) {
     ", $id_param));
 }
 
-// 4. Not Found
+// ============================================================================
+// 2. ERROR HANDLER (JIKA TIDAK DITEMUKAN)
+// ============================================================================
 if (!$wisata) {
-    echo '<div class="min-h-[60vh] flex flex-col items-center justify-center text-center p-4">';
-    echo '<div class="text-6xl text-gray-200 mb-4"><i class="fas fa-map-signs"></i></div>';
+    echo '<div class="min-h-[60vh] flex flex-col items-center justify-center text-center p-4 bg-gray-50">';
+    echo '<div class="text-6xl text-gray-300 mb-4"><i class="fas fa-map-signs"></i></div>';
     echo '<h1 class="text-2xl font-bold text-gray-800 mb-2">Wisata Tidak Ditemukan</h1>';
-    echo '<a href="'.home_url('/').'" class="bg-primary text-white px-6 py-3 rounded-xl font-bold hover:bg-green-700 transition">Kembali ke Beranda</a>';
+    echo '<p class="text-gray-500 mb-6">Mungkin tautan rusak atau destinasi ini sudah tidak aktif.</p>';
+    echo '<a href="'.home_url('/').'" class="bg-primary text-white px-6 py-3 rounded-xl font-bold hover:bg-green-700 transition shadow-lg shadow-primary/30">Kembali ke Beranda</a>';
     echo '</div>';
     get_footer();
     exit;
 }
 
-// 5. Query Ulasan
+// ============================================================================
+// 3. PERSIAPAN DATA PENDUKUNG
+// ============================================================================
+
+// A. Ulasan (Ambil 5 terbaru)
 $ulasan_list = [];
 if ($wpdb->get_var("SHOW TABLES LIKE '$table_ulasan'") == $table_ulasan) {
     $ulasan_list = $wpdb->get_results($wpdb->prepare("
@@ -58,49 +70,36 @@ if ($wpdb->get_var("SHOW TABLES LIKE '$table_ulasan'") == $table_ulasan) {
     ", $wisata->id));
 }
 
-// Data Formatting
-$harga_tiket = $wisata->harga_tiket;
-
-// === PERBAIKAN LINK DESA (UPDATE) ===
+// B. Link Profil Desa (URL Cantik)
 $link_desa = '#';
 if (!empty($wisata->slug_desa)) {
-    // Gunakan rawurlencode untuk menangani spasi (misal "Desa Taraju" -> "Desa%20Taraju")
+    // Gunakan rawurlencode untuk menangani spasi di slug
     $link_desa = home_url('/profil/desa/' . rawurlencode($wisata->slug_desa));
 } elseif (!empty($wisata->id_desa)) {
-    // Fallback ke ID jika slug kosong
+    // Fallback ID
     $link_desa = home_url('/profil-desa/?id=' . $wisata->id_desa);
 }
 
 $lokasi_html = !empty($wisata->nama_desa) 
-    ? '<a href="'.esc_url($link_desa).'" class="hover:text-primary hover:underline font-bold">Desa ' . esc_html($wisata->nama_desa) . '</a>, ' . esc_html($wisata->kabupaten) 
+    ? '<a href="'.esc_url($link_desa).'" class="hover:text-primary hover:underline font-bold text-gray-900 transition">Desa ' . esc_html($wisata->nama_desa) . '</a>, ' . esc_html($wisata->kabupaten) 
     : esc_html($wisata->kabupaten);
 
+// C. Fasilitas (JSON Decode)
 $fasilitas = [];
 if (!empty($wisata->fasilitas)) {
     $json_test = json_decode($wisata->fasilitas);
     if (json_last_error() === JSON_ERROR_NONE && is_array($json_test)) {
         $fasilitas = $json_test;
     } else {
-        $fasilitas = explode(',', $wisata->fasilitas);
+        $fasilitas = explode(',', $wisata->fasilitas); // Support legacy format
     }
 }
 
-$jam_buka = !empty($wisata->jam_buka) ? $wisata->jam_buka : '08:00 - 17:00';
-$rating = $wisata->rating_avg > 0 ? $wisata->rating_avg : '4.8';
+// D. Galeri Gambar
 $img_hero = !empty($wisata->foto_utama) ? $wisata->foto_utama : 'https://via.placeholder.com/1200x600?text=Wisata+Desa';
-
-$wa_link = '#';
-if (!empty($wisata->kontak_pengelola)) {
-    $wa_num = preg_replace('/^0/', '62', preg_replace('/[^0-9]/', '', $wisata->kontak_pengelola));
-    $wa_text = urlencode("Halo, saya tertarik berkunjung ke " . $wisata->nama_wisata . ". Boleh info lebih lanjut?");
-    $wa_link = "https://wa.me/{$wa_num}?text={$wa_text}";
-}
-
-// Galeri
 $gallery_images = [];
-if (!empty($img_hero)) {
-    $gallery_images[] = $img_hero;
-}
+if (!empty($img_hero)) $gallery_images[] = $img_hero;
+
 if (!empty($wisata->galeri)) {
     $decoded_gallery = json_decode($wisata->galeri);
     if (json_last_error() === JSON_ERROR_NONE && is_array($decoded_gallery)) {
@@ -109,10 +108,25 @@ if (!empty($wisata->galeri)) {
         }
     }
 }
+
+// E. Data Lain
+$harga_tiket = $wisata->harga_tiket;
+$jam_buka = !empty($wisata->jam_buka) ? $wisata->jam_buka : '08:00 - 17:00';
+$rating = $wisata->rating_avg > 0 ? $wisata->rating_avg : '4.8';
+
+// F. Link WhatsApp
+$wa_link = '#';
+if (!empty($wisata->kontak_pengelola)) {
+    $wa_num = preg_replace('/^0/', '62', preg_replace('/[^0-9]/', '', $wisata->kontak_pengelola));
+    $wa_text = urlencode("Halo, saya tertarik berkunjung ke " . $wisata->nama_wisata . ". Boleh info lebih lanjut?");
+    $wa_link = "https://wa.me/{$wa_num}?text={$wa_text}";
+}
 ?>
 
-<!-- === HERO SECTION === -->
-<div class="bg-white pt-4 pb-6">
+<!-- ============================================================================
+     4. TAMPILAN HALAMAN (HERO & GALLERY)
+     ============================================================================ -->
+<div class="bg-white pt-4 pb-8">
     <div class="container mx-auto px-4">
         
         <!-- Breadcrumb -->
@@ -138,9 +152,10 @@ if (!empty($wisata->galeri)) {
             </div>
         </div>
 
-        <!-- Gallery Grid (FIXED) -->
-        <div class="relative h-[250px] md:h-[480px] rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+        <!-- Gallery Grid (Desktop & Mobile) -->
+        <div class="relative h-[250px] md:h-[480px] rounded-2xl overflow-hidden shadow-sm border border-gray-100 bg-gray-100">
             <?php if (count($gallery_images) >= 3) : ?>
+                <!-- Grid 3 Gambar -->
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-2 h-full">
                     <div class="md:col-span-3 h-full relative overflow-hidden group cursor-pointer" onclick="openLightbox(0)">
                         <img src="<?php echo esc_url($gallery_images[0]); ?>" class="w-full h-full object-cover transition duration-700 group-hover:scale-105" alt="Main Photo">
@@ -163,6 +178,7 @@ if (!empty($wisata->galeri)) {
                     </div>
                 </div>
             <?php else : ?>
+                <!-- Single Image / Kurang dari 3 -->
                 <div class="w-full h-full relative group cursor-pointer" onclick="openLightbox(0)">
                     <img src="<?php echo esc_url($gallery_images[0]); ?>" class="w-full h-full object-cover transition duration-700 group-hover:scale-105" alt="Main Photo">
                     <?php if (count($gallery_images) > 1) : ?>
@@ -172,20 +188,24 @@ if (!empty($wisata->galeri)) {
                     <?php endif; ?>
                 </div>
             <?php endif; ?>
+            
+            <!-- Mobile Gallery Button -->
             <button onclick="openLightbox(0)" class="md:hidden absolute bottom-3 right-3 bg-white/90 text-gray-900 px-3 py-1.5 rounded-lg text-xs font-bold shadow-md flex items-center gap-2 z-10 border border-gray-200">
-                <i class="fas fa-th"></i> Lihat Galeri
+                <i class="fas fa-th"></i> Galeri
             </button>
         </div>
 
     </div>
 </div>
 
-<!-- === STICKY NAVIGATION === -->
-<div class="sticky top-[60px] md:top-[80px] z-30 bg-white border-b border-gray-200 shadow-sm transition-all duration-300" id="sticky-tabs">
+<!-- ============================================================================
+     5. STICKY NAVIGATION
+     ============================================================================ -->
+<div class="sticky top-[60px] md:top-[0px] z-30 bg-white border-b border-gray-200 shadow-sm transition-all duration-300" id="sticky-tabs">
     <div class="container mx-auto px-4">
         <div class="flex gap-6 md:gap-8 text-sm font-medium text-gray-500 overflow-x-auto no-scrollbar scroll-smooth">
             <a href="#tentang" class="py-4 border-b-2 border-primary text-primary font-bold whitespace-nowrap sub-nav-link active" data-target="tentang">Tentang</a>
-            <a href="#harga" class="py-4 border-b-2 border-transparent hover:text-primary hover:border-gray-300 transition whitespace-nowrap sub-nav-link" data-target="harga">Harga Tiket</a>
+            <a href="#harga" class="py-4 border-b-2 border-transparent hover:text-primary hover:border-gray-300 transition whitespace-nowrap sub-nav-link" data-target="harga">Tiket</a>
             <?php if (!empty($fasilitas)) : ?>
             <a href="#fasilitas" class="py-4 border-b-2 border-transparent hover:text-primary hover:border-gray-300 transition whitespace-nowrap sub-nav-link" data-target="fasilitas">Fasilitas</a>
             <?php endif; ?>
@@ -195,7 +215,9 @@ if (!empty($wisata->galeri)) {
     </div>
 </div>
 
-<!-- === MAIN CONTENT === -->
+<!-- ============================================================================
+     6. MAIN CONTENT (2 Columns)
+     ============================================================================ -->
 <div class="bg-gray-50 min-h-screen py-8">
     <div class="container mx-auto px-4">
         <div class="flex flex-col lg:flex-row gap-8 lg:gap-12">
@@ -203,7 +225,7 @@ if (!empty($wisata->galeri)) {
             <!-- KOLOM KIRI (Konten Utama) -->
             <div class="w-full lg:w-2/3 space-y-8">
                 
-                <!-- 1. TENTANG -->
+                <!-- Section: TENTANG -->
                 <div id="tentang" class="scroll-mt-32 content-section bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
                     <h2 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2 border-b border-gray-100 pb-3">
                         <i class="far fa-file-alt text-primary"></i> Tentang Tempat Ini
@@ -213,7 +235,7 @@ if (!empty($wisata->galeri)) {
                     </div>
                 </div>
 
-                <!-- 2. HARGA TIKET -->
+                <!-- Section: HARGA TIKET -->
                 <div id="harga" class="scroll-mt-32 content-section bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
                     <h2 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2 border-b border-gray-100 pb-3">
                         <i class="fas fa-ticket-alt text-primary"></i> Informasi Tiket
@@ -234,7 +256,7 @@ if (!empty($wisata->galeri)) {
                     </div>
                 </div>
 
-                <!-- 3. FASILITAS -->
+                <!-- Section: FASILITAS -->
                 <?php if (!empty($fasilitas)) : ?>
                 <div id="fasilitas" class="scroll-mt-32 content-section bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
                     <h2 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2 border-b border-gray-100 pb-3">
@@ -251,7 +273,7 @@ if (!empty($wisata->galeri)) {
                 </div>
                 <?php endif; ?>
 
-                <!-- 4. LOKASI -->
+                <!-- Section: LOKASI -->
                 <div id="lokasi" class="scroll-mt-32 content-section bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
                     <h2 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2 border-b border-gray-100 pb-3">
                         <i class="fas fa-map-marked-alt text-primary"></i> Lokasi
@@ -276,7 +298,7 @@ if (!empty($wisata->galeri)) {
                     </div>
                 </div>
 
-                <!-- 5. ULASAN -->
+                <!-- Section: ULASAN -->
                 <div id="ulasan" class="scroll-mt-32 content-section">
                     <div class="flex justify-between items-center mb-4">
                         <h2 class="text-lg font-bold text-gray-900">Ulasan Pengunjung</h2>
@@ -364,7 +386,9 @@ if (!empty($wisata->galeri)) {
     </div>
 </div>
 
-<!-- === MOBILE FLOATING ACTION BAR === -->
+<!-- ============================================================================
+     7. MOBILE FLOATING ACTION BAR
+     ============================================================================ -->
 <div class="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-50 shadow-[0_-4px_20px_-1px_rgba(0,0,0,0.1)] pb-safe">
     <div class="flex gap-3 items-center">
         <div class="flex-1">
@@ -385,18 +409,26 @@ if (!empty($wisata->galeri)) {
     </div>
 </div>
 
-<!-- === LIGHTBOX MODAL === -->
+<!-- ============================================================================
+     8. LIGHTBOX MODAL
+     ============================================================================ -->
 <div id="lightbox-modal" class="fixed inset-0 z-[60] bg-black/95 hidden flex flex-col items-center justify-center transition-opacity duration-300 opacity-0 touch-none">
     <button onclick="closeLightbox()" class="absolute top-6 right-6 text-white/70 hover:text-white p-2 z-50 bg-white/10 rounded-full w-10 h-10 flex items-center justify-center backdrop-blur-md">
         <i class="fas fa-times text-xl"></i>
     </button>
     <div class="flex-1 w-full h-full flex items-center justify-center px-2 md:px-10 py-16 relative">
         <img id="lightbox-img" src="" class="max-w-full max-h-full object-contain shadow-2xl transition-transform duration-300 select-none">
+        
+        <!-- Navigation Buttons -->
         <button onclick="prevImage()" class="hidden md:block absolute left-6 text-white/50 hover:text-white p-4 text-4xl focus:outline-none bg-black/20 rounded-full h-16 w-16 hover:bg-black/40 flex items-center justify-center transition"><i class="fas fa-chevron-left"></i></button>
         <button onclick="nextImage()" class="hidden md:block absolute right-6 text-white/50 hover:text-white p-4 text-4xl focus:outline-none bg-black/20 rounded-full h-16 w-16 hover:bg-black/40 flex items-center justify-center transition"><i class="fas fa-chevron-right"></i></button>
+        
+        <!-- Click zones for mobile -->
         <div class="md:hidden absolute inset-y-0 left-0 w-1/3 z-10" onclick="prevImage()"></div>
         <div class="md:hidden absolute inset-y-0 right-0 w-1/3 z-10" onclick="nextImage()"></div>
     </div>
+
+    <!-- Thumbnails -->
     <div class="w-full bg-black/80 backdrop-blur-md p-4 flex gap-2 overflow-x-auto justify-center hide-scroll absolute bottom-0 left-0 h-24 items-center z-20">
         <?php foreach ($gallery_images as $idx => $img) : ?>
             <img src="<?php echo esc_url($img); ?>" onclick="showImage(<?php echo $idx; ?>)" class="h-14 w-20 object-cover rounded cursor-pointer opacity-40 hover:opacity-100 transition border-2 border-transparent lightbox-thumb flex-shrink-0" data-index="<?php echo $idx; ?>">
@@ -404,9 +436,12 @@ if (!empty($wisata->galeri)) {
     </div>
 </div>
 
-<!-- === SCRIPTS === -->
+<!-- ============================================================================
+     9. JAVASCRIPT
+     ============================================================================ -->
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    // A. Sticky Nav Logic
     const sections = document.querySelectorAll('.content-section');
     const navLinks = document.querySelectorAll('.sub-nav-link');
     const stickyHeader = document.getElementById('sticky-tabs');
@@ -424,6 +459,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // B. Scroll Spy (Highlight Nav Active)
     window.addEventListener('scroll', () => {
         let current = '';
         const scrollPosition = window.scrollY + headerHeight + 50; 
@@ -444,6 +480,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+// C. Lightbox Logic
 const galleryImages = <?php echo json_encode($gallery_images); ?>;
 let currentIndex = 0;
 const lightbox = document.getElementById('lightbox-modal');
@@ -454,7 +491,7 @@ function openLightbox(index) {
     currentIndex = index;
     updateLightboxImage();
     lightbox.classList.remove('hidden');
-    void lightbox.offsetWidth; 
+    void lightbox.offsetWidth; // Trigger reflow for transition
     lightbox.classList.remove('opacity-0');
     document.body.style.overflow = 'hidden'; 
 }
@@ -469,6 +506,7 @@ function closeLightbox() {
 
 function updateLightboxImage() {
     lightboxImg.src = galleryImages[currentIndex];
+    // Update active thumb
     document.querySelectorAll('.lightbox-thumb').forEach((thumb, idx) => {
         if(idx === currentIndex) {
             thumb.classList.remove('opacity-40', 'border-transparent');
@@ -485,6 +523,7 @@ function showImage(index) { currentIndex = index; updateLightboxImage(); }
 function nextImage(e) { if(e) e.stopPropagation(); currentIndex = (currentIndex + 1) % galleryImages.length; updateLightboxImage(); }
 function prevImage(e) { if(e) e.stopPropagation(); currentIndex = (currentIndex - 1 + galleryImages.length) % galleryImages.length; updateLightboxImage(); }
 
+// Keyboard Support
 document.addEventListener('keydown', function(e) {
     if (lightbox.classList.contains('hidden')) return;
     if (e.key === 'Escape') closeLightbox();
@@ -494,6 +533,7 @@ document.addEventListener('keydown', function(e) {
 </script>
 
 <style>
+/* Utilities specific for this page */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
