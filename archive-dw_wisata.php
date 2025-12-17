@@ -61,16 +61,16 @@ $list_kabupaten = $wpdb->get_col("SELECT DISTINCT kabupaten FROM $table_desa WHE
 $list_kategori = $wpdb->get_col("SELECT DISTINCT kategori FROM $table_wisata WHERE status='aktif' AND kategori != '' ORDER BY kategori ASC");
 if(empty($list_kategori)) $list_kategori = ['Alam', 'Budaya', 'Religi', 'Kuliner', 'Edukasi'];
 
-// Warna Kategori (Helper Sederhana untuk Variasi Visual)
+// Warna Kategori (Updated: Solid & Jelas)
 function get_cat_color($cat) {
     $colors = [
-        'Alam' => 'bg-green-100 text-green-700 border-green-200',
-        'Budaya' => 'bg-orange-100 text-orange-700 border-orange-200',
-        'Religi' => 'bg-purple-100 text-purple-700 border-purple-200',
-        'Kuliner' => 'bg-red-100 text-red-700 border-red-200',
-        'Edukasi' => 'bg-blue-100 text-blue-700 border-blue-200'
+        'Alam'    => 'bg-emerald-600 text-white border-emerald-700 shadow-emerald-200',
+        'Budaya'  => 'bg-amber-600 text-white border-amber-700 shadow-amber-200',
+        'Religi'  => 'bg-purple-600 text-white border-purple-700 shadow-purple-200',
+        'Kuliner' => 'bg-rose-600 text-white border-rose-700 shadow-rose-200',
+        'Edukasi' => 'bg-blue-600 text-white border-blue-700 shadow-blue-200'
     ];
-    return isset($colors[$cat]) ? $colors[$cat] : 'bg-gray-100 text-gray-700 border-gray-200';
+    return isset($colors[$cat]) ? $colors[$cat] : 'bg-gray-800 text-white border-gray-900';
 }
 ?>
 
@@ -182,7 +182,10 @@ function get_cat_color($cat) {
                 $link_w = !empty($w->slug) ? home_url('/wisata/detail/' . $w->slug) : home_url('/detail-wisata/?id=' . $w->id);
                 $img_w = !empty($w->foto_utama) ? $w->foto_utama : 'https://via.placeholder.com/600x400?text=Wisata';
                 $rating = ($w->rating_avg > 0) ? $w->rating_avg : 'Baru';
-                $lokasi = !empty($w->kabupaten) ? $w->kabupaten : 'Indonesia';
+                
+                // UPDATE: Menampilkan Nama Desa, Fallback ke Kabupaten jika nama desa kosong
+                $lokasi_display = !empty($w->nama_desa) ? 'Desa ' . $w->nama_desa : $w->kabupaten;
+                
                 $cat_class = get_cat_color($w->kategori);
             ?>
             
@@ -196,17 +199,17 @@ function get_cat_color($cat) {
                     <!-- Overlay Gradient -->
                     <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition duration-300"></div>
 
-                    <!-- Category Badge -->
+                    <!-- Category Badge (Updated Style) -->
                     <?php if(isset($w->kategori)): ?>
                     <div class="absolute top-3 left-3">
-                        <span class="text-[10px] font-bold px-2.5 py-1 rounded-full border shadow-sm <?php echo $cat_class; ?> bg-opacity-90 backdrop-blur-sm">
+                        <span class="text-[10px] font-bold px-3 py-1 rounded-full border shadow-lg <?php echo $cat_class; ?> backdrop-blur-sm uppercase tracking-wide">
                             <?php echo esc_html($w->kategori); ?>
                         </span>
                     </div>
                     <?php endif; ?>
 
-                    <!-- Wishlist/Like Button (Visual Only) -->
-                    <button class="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/30 backdrop-blur-md flex items-center justify-center text-white hover:bg-white hover:text-red-500 transition">
+                    <!-- Wishlist/Like Button (Visual Only - Ready for Plugin) -->
+                    <button class="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-white hover:text-red-500 transition btn-wishlist" data-id="<?php echo $w->id; ?>" title="Simpan ke Favorit">
                         <i class="far fa-heart"></i>
                     </button>
                 </div>
@@ -218,8 +221,9 @@ function get_cat_color($cat) {
                         <div class="flex items-center gap-1 text-yellow-500 font-bold bg-yellow-50 px-2 py-0.5 rounded-md">
                             <i class="fas fa-star"></i> <?php echo $rating; ?>
                         </div>
-                        <div class="flex items-center gap-1 text-gray-400">
-                            <i class="fas fa-map-marker-alt"></i> <span class="truncate max-w-[80px]"><?php echo esc_html($lokasi); ?></span>
+                        <div class="flex items-center gap-1 text-gray-500 font-medium">
+                            <i class="fas fa-map-marker-alt text-green-500"></i> 
+                            <span class="truncate max-w-[120px]"><?php echo esc_html($lokasi_display); ?></span>
                         </div>
                     </div>
 
@@ -423,6 +427,24 @@ document.addEventListener('DOMContentLoaded', () => {
     if(openBtn) openBtn.addEventListener('click', openDrawer);
     if(closeBtn) closeBtn.addEventListener('click', closeDrawer);
     if(backdrop) backdrop.addEventListener('click', closeDrawer);
+    
+    // Wishlist Button Logic (Placeholder for Plugin Integration)
+    const wishlistBtns = document.querySelectorAll('.btn-wishlist');
+    wishlistBtns.forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            // Disini logic AJAX ke plugin nanti akan ditempatkan
+            // Contoh sederhana toggle visual:
+            const icon = this.querySelector('i');
+            if (icon.classList.contains('far')) {
+                icon.classList.remove('far');
+                icon.classList.add('fas', 'text-red-500');
+            } else {
+                icon.classList.remove('fas', 'text-red-500');
+                icon.classList.add('far');
+            }
+        });
+    });
 });
 </script>
 
