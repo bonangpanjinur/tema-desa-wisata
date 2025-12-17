@@ -47,8 +47,6 @@ function tema_desa_wisata_scripts() {
     // Styles Utama
     wp_enqueue_style('main-style', get_template_directory_uri() . '/assets/css/main.css', array(), '1.0.0');
     wp_enqueue_style('theme-style', get_stylesheet_uri());
-    wp_enqueue_style( 'font-awesome', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css', array(), '6.4.0' );
-    wp_enqueue_script( 'tailwind', 'https://cdn.tailwindcss.com', array(), '3.3.0', false );
     
     // Scripts JS
     wp_enqueue_script('jquery');
@@ -70,7 +68,7 @@ add_action('wp_enqueue_scripts', 'tema_desa_wisata_scripts');
 
 /**
  * ============================================================================
- * 4. HELPER FUNCTIONS (Safe Mode)
+ * 4. HELPER FUNCTIONS (Safe Mode - Wrapped with function_exists)
  * ============================================================================
  */
 
@@ -128,7 +126,7 @@ if ( ! function_exists( 'dw_get_cart_count' ) ) {
  * ============================================================================
  */
 
-// Add To Cart
+// Add To Cart Handler
 if (!function_exists('dw_ajax_add_to_cart')) {
     function dw_ajax_add_to_cart() {
         // Cek Nonce (Security)
@@ -146,7 +144,7 @@ if (!function_exists('dw_ajax_add_to_cart')) {
         $product_price = 0;
         $product_image = '';
 
-        // Ambil data produk
+        // Ambil data produk dari DB Custom
         if ($is_custom_db) {
             global $wpdb;
             $tbl_prod = $wpdb->prefix . 'dw_produk';
@@ -158,8 +156,8 @@ if (!function_exists('dw_ajax_add_to_cart')) {
                 $product_image = $prod->foto_utama;
             }
         } else {
-            // Fallback ke Post Type (Wisata Ticket misalnya)
-            $table_wisata = $wpdb->prefix . 'dw_wisata'; // Asumsi tiket wisata disimpan di tabel custom juga
+            // Fallback ke Custom Table Wisata (Jika tiket wisata)
+            $table_wisata = $wpdb->prefix . 'dw_wisata'; 
             $wisata = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_wisata WHERE id = %d", $product_id));
             
             if($wisata) {
@@ -179,7 +177,7 @@ if (!function_exists('dw_ajax_add_to_cart')) {
 
         if (!isset($_SESSION['dw_cart'])) $_SESSION['dw_cart'] = [];
 
-        // Cek apakah produk sudah ada
+        // Cek apakah produk sudah ada di session cart
         $found = false;
         foreach ($_SESSION['dw_cart'] as &$item) {
             if ($item['product_id'] == $product_id) {
@@ -258,27 +256,39 @@ if (!function_exists('dw_process_checkout_handler')) {
         $user_id = get_current_user_id();
         
         $tbl_transaksi = $wpdb->prefix . 'dw_transaksi';
-        $tbl_sub       = $wpdb->prefix . 'dw_transaksi_sub'; // Asumsi tabel sub ada (jika pakai plugin core)
-        $tbl_items     = $wpdb->prefix . 'dw_detail_transaksi'; // Perbaikan nama tabel sesuai struktur plugin core
+        $tbl_sub       = $wpdb->prefix . 'dw_transaksi_sub'; 
+        $tbl_items     = $wpdb->prefix . 'dw_detail_transaksi'; 
         $tbl_pedagang  = $wpdb->prefix . 'dw_pedagang';
         $tbl_produk    = $wpdb->prefix . 'dw_produk'; 
 
         $grand_total = 0;
+        $grouped_orders = [];
+
         foreach ($cart as $item) {
             $grand_total += $item['price'] * $item['quantity'];
+            
+            // Grouping logic (simplified)
+            $product_id = $item['product_id'];
+            $pedagang_id = 0; // Default logic, bisa dikembangkan
+            
+            if (!isset($grouped_orders[$pedagang_id])) {
+                $grouped_orders[$pedagang_id] = ['total_toko' => 0, 'items' => []];
+            }
+            $grouped_orders[$pedagang_id]['items'][] = $item;
+            $grouped_orders[$pedagang_id]['total_toko'] += ($item['price'] * $item['quantity']);
         }
 
         $kode_unik = 'TRX-' . strtoupper(wp_generate_password(6, false));
         
         // Insert Parent Transaksi
         $wpdb->insert($tbl_transaksi, [
-            'id_user_pembeli' => $user_id, // Perbaikan nama kolom: id_pembeli -> id_user_pembeli
-            'kode_transaksi' => $kode_unik, // Perbaikan nama kolom: kode_unik -> kode_transaksi
-            'total_belanja' => $grand_total, // Perbaikan nama kolom
-            'status_pembayaran' => 'pending', // Perbaikan enum status
-            'detail_pengiriman' => sanitize_textarea_field($_POST['billing_address']), // Asumsi kolom ini ada
+            'id_user_pembeli' => $user_id, 
+            'kode_transaksi' => $kode_unik, 
+            'total_belanja' => $grand_total, 
+            'status_pembayaran' => 'pending', 
+            'detail_pengiriman' => sanitize_textarea_field($_POST['billing_address']), 
             'metode_pembayaran' => sanitize_text_field($_POST['payment_method']),
-            'tanggal_transaksi' => current_time('mysql') // Perbaikan nama kolom created_at
+            'tanggal_transaksi' => current_time('mysql') 
         ]);
         $parent_trx_id = $wpdb->insert_id;
 
@@ -286,8 +296,8 @@ if (!function_exists('dw_process_checkout_handler')) {
         foreach ($cart as $item) {
              $wpdb->insert($tbl_items, [
                 'id_transaksi' => $parent_trx_id,
-                'id_produk' => $item['product_id'], // Asumsi produk, sesuaikan jika wisata
-                'jenis_item' => 'produk', // Default produk
+                'id_produk' => $item['product_id'], 
+                'jenis_item' => 'produk', 
                 'nama_item' => $item['name'],
                 'harga_satuan' => $item['price'],
                 'qty' => $item['quantity'], 
@@ -371,6 +381,8 @@ function dw_template_include( $template ) {
     }
     // Load Detail Wisata (Membedakan dengan Detail Produk via URL)
     if ( get_query_var( 'dw_slug' ) ) {
+        // Cek URL untuk membedakan wisata vs produk jika slug mirip (opsional)
+        // Disini kita asumsikan rule URL sudah memisahkan
         if (strpos($_SERVER['REQUEST_URI'], '/wisata/detail/') !== false) {
             $new_template = locate_template( array( 'page-detail-wisata.php' ) );
             if ( '' != $new_template ) return $new_template;
