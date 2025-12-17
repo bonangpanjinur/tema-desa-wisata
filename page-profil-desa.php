@@ -11,24 +11,32 @@ $table_desa     = $wpdb->prefix . 'dw_desa';
 $table_wisata   = $wpdb->prefix . 'dw_wisata';
 $table_pedagang = $wpdb->prefix . 'dw_pedagang';
 
-// 1. Tangkap Slug dari URL (Rewrite Rule)
+// 1. Tangkap Slug dari URL (Rewrite Rule) atau ID (Fallback)
 $slug_desa = get_query_var('dw_slug_desa');
-
-// 2. Tangkap ID (Fallback)
 $desa_id_param = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
 $desa = null;
 
-// 3. Query Data Desa
+// 2. Query Data Desa
 if (!empty($slug_desa)) {
-    // Query By Slug
-    $desa = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_desa WHERE slug_desa = %s AND status = 'aktif'", $slug_desa));
-} elseif ($desa_id_param > 0) {
-    // Query By ID
-    $desa = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_desa WHERE id = %d AND status = 'aktif'", $desa_id_param));
+    // Decode slug untuk menangani spasi (misal: "Desa%20Taraju" -> "Desa Taraju")
+    $decoded_slug = urldecode($slug_desa);
+    
+    // Query berdasarkan Slug
+    $desa = $wpdb->get_row($wpdb->prepare("
+        SELECT * FROM $table_desa 
+        WHERE slug_desa = %s AND status = 'aktif'
+    ", $decoded_slug));
+} 
+elseif ($desa_id_param > 0) {
+    // Query berdasarkan ID (Fallback jika link masih pakai ?id=)
+    $desa = $wpdb->get_row($wpdb->prepare("
+        SELECT * FROM $table_desa 
+        WHERE id = %d AND status = 'aktif'
+    ", $desa_id_param));
 }
 
-// 4. Not Found
+// 3. Not Found Handler
 if (!$desa) {
     echo '<div class="min-h-[60vh] flex flex-col items-center justify-center text-center p-4">';
     echo '<div class="text-6xl text-gray-200 mb-4"><i class="fas fa-home"></i></div>';
@@ -40,11 +48,8 @@ if (!$desa) {
     exit;
 }
 
-// 5. Statistik & Data Relasi
-// Ambil Wisata milik desa ini
+// 4. Statistik & Data Relasi
 $wisata_list = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_wisata WHERE id_desa = %d AND status='aktif' ORDER BY created_at DESC", $desa->id));
-
-// Ambil UMKM milik desa ini
 $pedagang_list = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_pedagang WHERE id_desa = %d AND status_akun='aktif' ORDER BY created_at DESC", $desa->id));
 
 $count_wisata = count($wisata_list);
@@ -112,7 +117,7 @@ $foto_desa = !empty($desa->foto) ? $desa->foto : 'https://via.placeholder.com/12
                     <?php if ($wisata_list) : ?>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <?php foreach ($wisata_list as $w) : 
-                            // Gunakan slug jika tersedia, jika tidak fallback manual
+                            // Link ke detail wisata (pastikan menggunakan slug jika ada)
                             $link_w = !empty($w->slug) ? home_url('/wisata/detail/' . $w->slug) : home_url('/detail-wisata/?id=' . $w->id);
                             $img_w = !empty($w->foto_utama) ? $w->foto_utama : 'https://via.placeholder.com/400x300';
                         ?>
@@ -149,7 +154,7 @@ $foto_desa = !empty($desa->foto) ? $desa->foto : 'https://via.placeholder.com/12
                     <?php if ($pedagang_list) : ?>
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <?php foreach ($pedagang_list as $p) : 
-                            // Gunakan slug toko
+                            // Link ke profil toko (slug)
                             $link_p = !empty($p->slug_toko) ? home_url('/profil/toko/' . $p->slug_toko) : home_url('/profil-toko/?id=' . $p->id);
                             $img_p = !empty($p->foto_profil) ? $p->foto_profil : 'https://via.placeholder.com/150';
                         ?>
