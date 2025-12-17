@@ -183,7 +183,23 @@ function get_cat_color_prod($cat) {
         <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
             <?php foreach ($produk_list as $p) : 
                 $link_p = !empty($p->slug_produk) ? home_url('/produk/detail/' . $p->slug_produk) : home_url('/detail-produk/?id=' . $p->id);
-                $img_p = !empty($p->foto_produk) ? $p->foto_produk : 'https://via.placeholder.com/400x400?text=Produk';
+                
+                // --- FIX GAMBAR PRODUK ---
+                // Cek apakah foto_produk berisi ID attachment (angka) atau URL string
+                $img_p = 'https://via.placeholder.com/400x400?text=Produk'; // Default
+                if (!empty($p->foto_produk)) {
+                    if (is_numeric($p->foto_produk)) {
+                        // Jika berupa ID, ambil URL-nya
+                        $img_src = wp_get_attachment_image_src($p->foto_produk, 'medium'); // atau 'large'
+                        if ($img_src) {
+                            $img_p = $img_src[0];
+                        }
+                    } else {
+                        // Jika berupa URL string
+                        $img_p = $p->foto_produk;
+                    }
+                }
+                
                 $lokasi = !empty($p->nama_desa) ? 'Desa ' . $p->nama_desa : ($p->kabupaten ?: 'Indonesia');
                 $rating = ($p->rating_avg > 0) ? $p->rating_avg : '4.5';
                 $cat_class = get_cat_color_prod($p->kategori);
