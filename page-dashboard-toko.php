@@ -112,12 +112,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'status'      => 'pending', // Menunggu konfirmasi admin/upload bukti
                 'created_at'  => current_time('mysql')
             ]);
-            $message = 'Permintaan pembelian paket berhasil. Silakan lakukan pembayaran dan upload bukti bayar.';
+            $message = 'Permintaan pembelian paket berhasil. Silakan lakukan pembayaran dan upload bukti bayar di tabel riwayat di bawah.';
             $message_type = 'success';
         }
     }
 
-    // D. UPDATE TOKO
+    // D. UPLOAD BUKTI BAYAR PAKET (NEW FEATURE)
+    if (isset($_POST['action']) && $_POST['action'] === 'upload_bukti_paket') {
+        if (!wp_verify_nonce($_POST['_wpnonce'], 'upload_bukti_paket_nonce')) die('Security check failed');
+        
+        $pembelian_id = intval($_POST['pembelian_id']);
+        
+        // Verifikasi kepemilikan transaksi
+        $check_trx = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_pembelian_paket WHERE id = %d AND id_pedagang = %d", $pembelian_id, $pedagang->id));
+        
+        if ($check_trx && $check_trx->status === 'pending') {
+            if (!empty($_FILES['bukti_bayar']['name'])) {
+                require_once(ABSPATH . 'wp-admin/includes/image.php');
+                require_once(ABSPATH . 'wp-admin/includes/file.php');
+                require_once(ABSPATH . 'wp-admin/includes/media.php');
+                
+                $attach_id = media_handle_upload('bukti_bayar', 0);
+                
+                if (!is_wp_error($attach_id)) {
+                    $url_bukti = wp_get_attachment_url($attach_id);
+                    $wpdb->update($table_pembelian_paket, ['url_bukti_bayar' => $url_bukti], ['id' => $pembelian_id]);
+                    $message = 'Bukti pembayaran berhasil diupload. Mohon tunggu verifikasi admin.';
+                    $message_type = 'success';
+                } else {
+                    $message = 'Gagal upload gambar: ' . $attach_id->get_error_message();
+                    $message_type = 'error';
+                }
+            } else {
+                $message = 'Silakan pilih file gambar bukti pembayaran.';
+                $message_type = 'error';
+            }
+        } else {
+            $message = 'Transaksi tidak valid atau sudah diproses.';
+            $message_type = 'error';
+        }
+    }
+
+    // E. UPDATE TOKO
     if (isset($_POST['action']) && $_POST['action'] === 'update_shop') {
         $nama_toko = sanitize_text_field($_POST['nama_toko']);
         $no_wa     = sanitize_text_field($_POST['nomor_wa']);
@@ -424,7 +460,6 @@ get_header();
                                 </div>
                                 <div>
                                     <?php
-                                    // FIX: Menggunakan Array Map agar kompatibel PHP 7.4+ (Pengganti match)
                                     $status_colors = [
                                         'menunggu_konfirmasi' => 'bg-yellow-100 text-yellow-700',
                                         'diproses'            => 'bg-blue-100 text-blue-700',
@@ -510,6 +545,7 @@ get_header();
                                     <th class="p-4">Paket</th>
                                     <th class="p-4">Harga</th>
                                     <th class="p-4">Status</th>
+                                    <th class="p-4">Bukti Bayar</th>
                                     <th class="p-4 text-right">Tanggal</th>
                                 </tr>
                             </thead>
@@ -525,10 +561,28 @@ get_header();
                                             <?php echo $h->status; ?>
                                         </span>
                                     </td>
+                                    <td class="p-4">
+                                        <?php if($h->status == 'pending'): ?>
+                                            <?php if($h->url_bukti_bayar): ?>
+                                                <a href="<?php echo esc_url($h->url_bukti_bayar); ?>" target="_blank" class="text-blue-600 underline text-xs">Lihat Bukti</a>
+                                                <br><span class="text-[10px] text-gray-400">Menunggu Verifikasi</span>
+                                            <?php else: ?>
+                                                <form method="POST" enctype="multipart/form-data" class="flex flex-col gap-1">
+                                                    <?php wp_nonce_field('upload_bukti_paket_nonce'); ?>
+                                                    <input type="hidden" name="action" value="upload_bukti_paket">
+                                                    <input type="hidden" name="pembelian_id" value="<?php echo $h->id; ?>">
+                                                    <input type="file" name="bukti_bayar" class="text-[10px]" required accept="image/*">
+                                                    <button type="submit" class="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 w-fit">Upload</button>
+                                                </form>
+                                            <?php endif; ?>
+                                        <?php elseif($h->status == 'disetujui'): ?>
+                                            <span class="text-green-600 text-xs"><i class="fas fa-check-circle"></i> Selesai</span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td class="p-4 text-right text-gray-500"><?php echo date('d/m/Y', strtotime($h->created_at)); ?></td>
                                 </tr>
                                 <?php endforeach; else: ?>
-                                <tr><td colspan="4" class="p-4 text-center text-gray-400">Belum ada riwayat pembelian.</td></tr>
+                                <tr><td colspan="5" class="p-4 text-center text-gray-400">Belum ada riwayat pembelian.</td></tr>
                                 <?php endif; ?>
                             </tbody>
                         </table>
