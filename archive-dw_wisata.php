@@ -1,228 +1,291 @@
 <?php
 /**
- * Template Name: Halaman Wisata (Sadesa Style)
+ * Template Name: Arsip Wisata Modern
+ * Description: Menampilkan daftar wisata dengan filter canggih.
  */
 
-get_header(); 
+get_header();
 
-// --- 1. LOGIKA FILTER & QUERY ---
+global $wpdb;
+$table_wisata = $wpdb->prefix . 'dw_wisata';
+$table_desa   = $wpdb->prefix . 'dw_desa';
 
-// Ambil parameter dari URL
-$search_query   = isset($_GET['keyword']) ? sanitize_text_field($_GET['keyword']) : '';
-$kategori_slug  = isset($_GET['kategori']) ? sanitize_text_field($_GET['kategori']) : '';
-$urutkan        = isset($_GET['urutkan']) ? sanitize_text_field($_GET['urutkan']) : 'terbaru';
-$paged          = (get_query_var('paged')) ? get_query_var('paged') : 1;
+// --- 1. PARAMETER FILTER (Dari URL) ---
+$pencarian  = isset($_GET['q']) ? sanitize_text_field($_GET['q']) : '';
+$kabupaten  = isset($_GET['kab']) ? sanitize_text_field($_GET['kab']) : '';
+$kategori   = isset($_GET['kat']) ? sanitize_text_field($_GET['kat']) : '';
+$urutan     = isset($_GET['sort']) ? sanitize_text_field($_GET['sort']) : 'terbaru';
 
-// Setup Query Arguments
-$args = array(
-    'post_type'      => 'dw_wisata',
-    'posts_per_page' => 9,
-    'paged'          => $paged,
-    'post_status'    => 'publish',
-    'tax_query'      => array(),
-    'meta_query'     => array(),
-);
+// --- 2. QUERY BUILDER ---
+$sql = "SELECT w.*, d.nama_desa, d.kabupaten, d.kecamatan 
+        FROM $table_wisata w 
+        LEFT JOIN $table_desa d ON w.id_desa = d.id 
+        WHERE w.status = 'aktif'";
 
-// Filter: Pencarian
-if (!empty($search_query)) {
-    $args['s'] = $search_query;
+if ($pencarian) {
+    $sql .= $wpdb->prepare(" AND (w.nama_wisata LIKE %s OR w.deskripsi LIKE %s)", '%' . $pencarian . '%', '%' . $pencarian . '%');
+}
+if ($kabupaten) {
+    $sql .= $wpdb->prepare(" AND d.kabupaten = %s", $kabupaten);
+}
+// Jika ada kolom kategori di tabel wisata (asumsi 'kategori')
+if ($kategori) {
+    $sql .= $wpdb->prepare(" AND w.kategori = %s", $kategori); 
 }
 
-// Filter: Kategori
-if (!empty($kategori_slug)) {
-    $args['tax_query'][] = array(
-        'taxonomy' => 'dw_kategori_wisata',
-        'field'    => 'slug',
-        'terms'    => $kategori_slug,
-    );
-}
-
-// Filter: Pengurutan
-switch ($urutkan) {
+// Sorting
+switch ($urutan) {
     case 'termurah':
-        $args['meta_key'] = 'dw_harga_tiket';
-        $args['orderby']  = 'meta_value_num';
-        $args['order']    = 'ASC';
+        $sql .= " ORDER BY w.harga_tiket ASC";
         break;
     case 'termahal':
-        $args['meta_key'] = 'dw_harga_tiket';
-        $args['orderby']  = 'meta_value_num';
-        $args['order']    = 'DESC';
+        $sql .= " ORDER BY w.harga_tiket DESC";
+        break;
+    case 'terpopuler':
+        $sql .= " ORDER BY w.rating_avg DESC"; // Asumsi ada rating
         break;
     default: // terbaru
-        $args['orderby'] = 'date';
-        $args['order']   = 'DESC';
+        $sql .= " ORDER BY w.created_at DESC";
         break;
 }
 
-$wisata_query = new WP_Query($args);
+// Pagination Logic (Simple)
+$items_per_page = 12;
+$page = isset($_GET['halaman']) ? intval($_GET['halaman']) : 1;
+$offset = ($page - 1) * $items_per_page;
 
-// Helper function untuk mengambil kategori pertama (sama seperti di front-page)
-if (!function_exists('get_first_category_label')) {
-    function get_first_category_label($post_id) {
-        $terms = get_the_terms($post_id, 'dw_kategori_wisata');
-        return (!empty($terms) && !is_wp_error($terms)) ? $terms[0]->name : 'Wisata';
-    }
-}
+// Count Total for Pagination
+$count_sql = str_replace("SELECT w.*, d.nama_desa, d.kabupaten, d.kecamatan", "SELECT COUNT(*)", $sql);
+$total_items = $wpdb->get_var($count_sql);
+$total_pages = ceil($total_items / $items_per_page);
+
+// Final SQL with Limit
+$sql .= $wpdb->prepare(" LIMIT %d OFFSET %d", $items_per_page, $offset);
+$wisata_list = $wpdb->get_results($sql);
+
+// --- 3. DATA UNTUK FILTER (Ambil Unique Values) ---
+$list_kabupaten = $wpdb->get_col("SELECT DISTINCT kabupaten FROM $table_desa WHERE status='aktif' ORDER BY kabupaten ASC");
+// $list_kategori = $wpdb->get_col("SELECT DISTINCT kategori FROM $table_wisata WHERE status='aktif'"); // Uncomment jika kolom kategori ada
+$list_kategori = ['Alam', 'Budaya', 'Religi', 'Kuliner', 'Edukasi']; // Dummy kategori jika kolom belum ada
 ?>
 
-<div class="bg-gray-50 min-h-screen">
-    
-    <!-- PAGE HEADER -->
-    <div class="bg-white border-b border-gray-200 pt-10 pb-8 px-4">
-        <div class="container mx-auto text-center max-w-3xl">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-3">Jelajahi Desa Wisata</h1>
-            <p class="text-gray-500 text-lg">Temukan destinasi alam, budaya, dan pengalaman tak terlupakan.</p>
-        </div>
-    </div>
-
-    <!-- FILTER SECTION (Sticky) -->
-    <div class="sticky top-16 md:top-20 z-30 bg-white/90 backdrop-blur-md shadow-sm border-b border-gray-100 transition-all">
-        <div class="container mx-auto px-4 py-4">
-            <form action="<?php echo home_url('/wisata'); // Sesuaikan slug halaman jika perlu ?>" method="GET" class="flex flex-col md:flex-row gap-3 items-center justify-center">
-                
-                <!-- Input Pencarian -->
-                <div class="relative w-full md:w-1/3">
-                    <i class="fas fa-search absolute left-4 top-3.5 text-gray-400"></i>
-                    <input type="text" name="keyword" value="<?php echo esc_attr($search_query); ?>" placeholder="Cari nama wisata..." class="w-full pl-10 pr-4 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition text-sm">
-                </div>
-
-                <!-- Dropdown Kategori -->
-                <div class="relative w-full md:w-1/4">
-                    <i class="fas fa-filter absolute left-4 top-3.5 text-gray-400"></i>
-                    <select name="kategori" class="w-full pl-10 pr-8 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition text-sm appearance-none cursor-pointer">
-                        <option value="">Semua Kategori</option>
-                        <?php
-                        $terms = get_terms(array('taxonomy' => 'dw_kategori_wisata', 'hide_empty' => true));
-                        if (!is_wp_error($terms) && !empty($terms)) {
-                            foreach ($terms as $term) {
-                                $selected = ($kategori_slug == $term->slug) ? 'selected' : '';
-                                echo '<option value="' . esc_attr($term->slug) . '" ' . $selected . '>' . esc_html($term->name) . '</option>';
-                            }
-                        }
-                        ?>
-                    </select>
-                    <i class="fas fa-chevron-down absolute right-4 top-4 text-xs text-gray-400 pointer-events-none"></i>
-                </div>
-
-                <!-- Dropdown Sort -->
-                <div class="relative w-full md:w-1/5">
-                    <i class="fas fa-sort-amount-down absolute left-4 top-3.5 text-gray-400"></i>
-                    <select name="urutkan" class="w-full pl-10 pr-8 py-3 rounded-xl bg-gray-50 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition text-sm appearance-none cursor-pointer">
-                        <option value="terbaru" <?php selected($urutkan, 'terbaru'); ?>>Terbaru</option>
-                        <option value="termurah" <?php selected($urutkan, 'termurah'); ?>>Harga Terendah</option>
-                        <option value="termahal" <?php selected($urutkan, 'termahal'); ?>>Harga Tertinggi</option>
-                    </select>
-                    <i class="fas fa-chevron-down absolute right-4 top-4 text-xs text-gray-400 pointer-events-none"></i>
-                </div>
-
-                <!-- Tombol Submit -->
-                <button type="submit" class="w-full md:w-auto px-6 py-3 bg-primary text-white font-bold rounded-xl hover:bg-green-700 transition shadow-md flex items-center justify-center gap-2">
-                    Cari
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <!-- MAIN CONTENT GRID -->
-    <div class="container mx-auto px-4 py-8">
+<!-- === HEADER HERO SEARCH === -->
+<div class="bg-white border-b border-gray-100 pt-8 pb-12">
+    <div class="container mx-auto px-4 text-center">
+        <span class="text-primary font-bold tracking-wider text-xs uppercase mb-2 block">Jelajahi Indonesia</span>
+        <h1 class="text-3xl md:text-5xl font-extrabold text-gray-900 mb-6">Temukan Destinasi Impianmu</h1>
         
-        <?php if ($wisata_query->have_posts()) : ?>
-            
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                <?php while ($wisata_query->have_posts()) : $wisata_query->the_post(); 
-                    // Ambil Meta Data
-                    $lokasi = get_post_meta(get_the_ID(), 'dw_lokasi', true);
-                    $harga  = get_post_meta(get_the_ID(), 'dw_harga_tiket', true);
-                    
-                    // Format Data untuk Tampilan
-                    $img_src = get_the_post_thumbnail_url(get_the_ID(), 'medium_large') ?: 'https://via.placeholder.com/400x300?text=Wisata';
-                    $price_display = ($harga > 0) ? 'Rp ' . number_format($harga, 0, ',', '.') : 'Gratis';
-                    $kategori_label = get_first_category_label(get_the_ID());
-                ?>
-                
-                <!-- CARD SADESA STYLE (Sama persis dengan Front Page) -->
-                <div class="card-sadesa group">
-                    <div class="card-img-wrap">
-                        <img src="<?php echo esc_url($img_src); ?>" alt="<?php the_title(); ?>" loading="lazy">
-                        
-                        <!-- Badge Rating (Dummy/Placeholder) -->
-                        <div class="badge-rating"><i class="fas fa-star text-yellow-400"></i> 4.8</div>
-                        
-                        <!-- Badge Category -->
-                        <div class="badge-category"><?php echo esc_html($kategori_label); ?></div>
-                    </div>
-                    
-                    <div class="card-body">
-                        <h3 class="card-title group-hover:text-primary transition">
-                            <a href="<?php the_permalink(); ?>"><?php the_title(); ?></a>
-                        </h3>
-                        <div class="card-meta">
-                            <i class="fas fa-map-marker-alt text-red-400"></i>
-                            <span class="truncate"><?php echo esc_html($lokasi ?: 'Desa Wisata'); ?></span>
-                        </div>
-                        
-                        <div class="card-footer">
-                            <div>
-                                <p class="price-label">Tiket Masuk</p>
-                                <p class="price-tag"><?php echo $price_display; ?></p>
-                            </div>
-                            <a href="<?php the_permalink(); ?>" class="btn-detail">
-                                Lihat Detail <i class="fas fa-arrow-right ml-1"></i>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-                <!-- END CARD -->
-
-                <?php endwhile; ?>
+        <form action="" method="GET" class="max-w-2xl mx-auto relative group">
+            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <i class="fas fa-search text-gray-400 group-focus-within:text-primary transition"></i>
             </div>
+            <input type="text" name="q" value="<?php echo esc_attr($pencarian); ?>" 
+                   class="w-full pl-11 pr-4 py-4 rounded-full border border-gray-200 focus:border-primary focus:ring-4 focus:ring-primary/10 transition shadow-lg shadow-gray-100 text-gray-700 placeholder-gray-400" 
+                   placeholder="Cari wisata, misal: 'Curug' atau 'Pantai'...">
+            <!-- Hidden inputs untuk menjaga filter lain saat search -->
+            <?php if($kabupaten): ?><input type="hidden" name="kab" value="<?php echo esc_attr($kabupaten); ?>"><?php endif; ?>
+            <?php if($kategori): ?><input type="hidden" name="kat" value="<?php echo esc_attr($kategori); ?>"><?php endif; ?>
+        </form>
 
-            <!-- PAGINATION -->
-            <div class="mt-12 flex justify-center">
-                <?php
-                $pagination_args = array(
-                    'base'         => str_replace(999999999, '%#%', esc_url(get_pagenum_link(999999999))),
-                    'format'       => '?paged=%#%',
-                    'current'      => max(1, get_query_var('paged')),
-                    'total'        => $wisata_query->max_num_pages,
-                    'prev_text'    => '<i class="fas fa-chevron-left"></i>',
-                    'next_text'    => '<i class="fas fa-chevron-right"></i>',
-                    'type'         => 'array',
-                );
-
-                $pages = paginate_links($pagination_args);
-
-                if (is_array($pages)) {
-                    echo '<ul class="flex gap-2 items-center bg-white p-2 rounded-xl shadow-sm border border-gray-100">';
-                    foreach ($pages as $page) {
-                        // Styling Pagination agar sesuai tema Tailwind
-                        $page = str_replace('page-numbers', 'flex items-center justify-center w-10 h-10 rounded-lg text-sm font-bold transition hover:bg-gray-100 text-gray-600', $page);
-                        $page = str_replace('current', 'bg-primary text-white hover:bg-green-700 hover:text-white', $page);
-                        echo '<li>' . $page . '</li>';
-                    }
-                    echo '</ul>';
-                }
-                ?>
-            </div>
-
-        <?php else : ?>
-
-            <!-- EMPTY STATE -->
-            <div class="flex flex-col items-center justify-center py-20 text-center">
-                <div class="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4 text-gray-300">
-                    <i class="fas fa-search text-4xl"></i>
-                </div>
-                <h3 class="text-xl font-bold text-gray-800 mb-2">Wisata Tidak Ditemukan</h3>
-                <p class="text-gray-500 max-w-md mx-auto">Maaf, kami tidak dapat menemukan wisata yang cocok dengan pencarian atau filter Anda. Coba kata kunci lain atau reset filter.</p>
-                <a href="<?php echo home_url('/wisata'); ?>" class="mt-6 px-6 py-2 bg-white border border-gray-300 rounded-lg text-gray-600 font-bold hover:bg-gray-50 transition">
-                    Reset Filter
-                </a>
-            </div>
-
-        <?php endif; wp_reset_postdata(); ?>
-
+        <!-- Quick Tags -->
+        <div class="mt-6 flex flex-wrap justify-center gap-2 text-sm">
+            <span class="text-gray-400">Populer:</span>
+            <a href="?kat=Alam" class="hover:text-primary hover:underline transition">Wisata Alam</a>
+            <span class="text-gray-300">•</span>
+            <a href="?kat=Budaya" class="hover:text-primary hover:underline transition">Desa Budaya</a>
+            <span class="text-gray-300">•</span>
+            <a href="?sort=termurah" class="hover:text-primary hover:underline transition">Tiket Murah</a>
+        </div>
     </div>
 </div>
+
+<!-- === MAIN CONTENT AREA === -->
+<div class="bg-gray-50 min-h-screen py-10">
+    <div class="container mx-auto px-4">
+        
+        <div class="flex flex-col lg:flex-row gap-8">
+            
+            <!-- === SIDEBAR FILTER (Desktop Sticky) === -->
+            <div class="w-full lg:w-1/4">
+                
+                <!-- Tombol Filter Mobile -->
+                <button onclick="document.getElementById('mobile-filter').classList.toggle('hidden')" class="lg:hidden w-full bg-white border border-gray-200 text-gray-700 font-bold py-3 rounded-xl shadow-sm mb-4 flex items-center justify-center gap-2">
+                    <i class="fas fa-filter"></i> Filter & Urutkan
+                </button>
+
+                <div id="mobile-filter" class="hidden lg:block bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sticky top-24">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="font-bold text-gray-900 text-lg">Filter</h3>
+                        <?php if($pencarian || $kabupaten || $kategori): ?>
+                            <a href="<?php echo home_url('/wisata'); ?>" class="text-xs text-red-500 hover:underline">Reset</a>
+                        <?php endif; ?>
+                    </div>
+
+                    <form action="" method="GET" id="filter-form">
+                        <!-- Pertahankan query search -->
+                        <?php if($pencarian): ?><input type="hidden" name="q" value="<?php echo esc_attr($pencarian); ?>"><?php endif; ?>
+
+                        <!-- Filter Lokasi -->
+                        <div class="mb-6">
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Lokasi (Kabupaten)</label>
+                            <div class="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-2">
+                                <label class="flex items-center gap-2 cursor-pointer group">
+                                    <input type="radio" name="kab" value="" <?php checked($kabupaten, ''); ?> onchange="this.form.submit()" class="text-primary focus:ring-primary border-gray-300">
+                                    <span class="text-sm text-gray-600 group-hover:text-primary transition">Semua Lokasi</span>
+                                </label>
+                                <?php foreach($list_kabupaten as $kab): ?>
+                                <label class="flex items-center gap-2 cursor-pointer group">
+                                    <input type="radio" name="kab" value="<?php echo esc_attr($kab); ?>" <?php checked($kabupaten, $kab); ?> onchange="this.form.submit()" class="text-primary focus:ring-primary border-gray-300">
+                                    <span class="text-sm text-gray-600 group-hover:text-primary transition"><?php echo esc_html($kab); ?></span>
+                                </label>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+
+                        <!-- Filter Kategori -->
+                        <div class="mb-6">
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Kategori</label>
+                            <div class="flex flex-wrap gap-2">
+                                <?php foreach($list_kategori as $kat): 
+                                    $is_active = ($kategori == $kat);
+                                    $cls = $is_active ? 'bg-primary text-white border-primary' : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-primary hover:text-primary';
+                                ?>
+                                <a href="?kat=<?php echo urlencode($kat); ?><?php echo $pencarian ? '&q='.$pencarian : ''; ?><?php echo $kabupaten ? '&kab='.$kabupaten : ''; ?>" 
+                                   class="text-xs font-medium px-3 py-1.5 rounded-full border transition <?php echo $cls; ?>">
+                                   <?php echo esc_html($kat); ?>
+                                </a>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+
+                        <!-- Filter Urutan -->
+                        <div class="mb-6">
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Urutkan</label>
+                            <select name="sort" onchange="this.form.submit()" class="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-primary focus:border-primary block p-2.5">
+                                <option value="terbaru" <?php selected($urutan, 'terbaru'); ?>>Terbaru Ditambahkan</option>
+                                <option value="terpopuler" <?php selected($urutan, 'terpopuler'); ?>>Rating Tertinggi</option>
+                                <option value="termurah" <?php selected($urutan, 'termurah'); ?>>Harga Terendah</option>
+                                <option value="termahal" <?php selected($urutan, 'termahal'); ?>>Harga Tertinggi</option>
+                            </select>
+                        </div>
+
+                        <button type="submit" class="w-full bg-primary text-white font-bold py-2.5 rounded-lg hover:bg-green-700 transition shadow-lg shadow-green-200">
+                            Terapkan Filter
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- === GRID CONTENT === -->
+            <div class="w-full lg:w-3/4">
+                
+                <!-- Result Count -->
+                <div class="flex items-center justify-between mb-6">
+                    <p class="text-gray-500 text-sm">Menampilkan <span class="font-bold text-gray-900"><?php echo $total_items; ?></span> destinasi wisata</p>
+                    <div class="hidden md:flex gap-2 text-sm">
+                        <span class="text-gray-400">Tampilan:</span>
+                        <button class="text-primary"><i class="fas fa-th-large"></i></button>
+                    </div>
+                </div>
+
+                <?php if ($wisata_list) : ?>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <?php foreach ($wisata_list as $w) : 
+                        $link_w = !empty($w->slug) ? home_url('/wisata/detail/' . $w->slug) : home_url('/detail-wisata/?id=' . $w->id);
+                        $img_w = !empty($w->foto_utama) ? $w->foto_utama : 'https://via.placeholder.com/600x400?text=Wisata';
+                        $rating = ($w->rating_avg > 0) ? $w->rating_avg : 'Baru';
+                        $kab = !empty($w->kabupaten) ? $w->kabupaten : 'Indonesia';
+                    ?>
+                    <a href="<?php echo esc_url($link_w); ?>" class="group bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition duration-300 flex flex-col h-full">
+                        <!-- Image Wrapper -->
+                        <div class="relative h-48 overflow-hidden">
+                            <img src="<?php echo esc_url($img_w); ?>" class="w-full h-full object-cover group-hover:scale-110 transition duration-700" loading="lazy">
+                            
+                            <!-- Badges -->
+                            <div class="absolute top-3 left-3 flex gap-2">
+                                <?php if(isset($w->kategori)): ?>
+                                <span class="bg-black/60 backdrop-blur text-white text-[10px] font-bold px-2 py-1 rounded-md">
+                                    <?php echo esc_html($w->kategori); ?>
+                                </span>
+                                <?php endif; ?>
+                            </div>
+                            
+                            <!-- Rating -->
+                            <div class="absolute top-3 right-3 bg-white/95 backdrop-blur px-2 py-1 rounded-lg text-xs font-bold shadow-sm flex items-center gap-1">
+                                <i class="fas fa-star text-yellow-400"></i> <?php echo $rating; ?>
+                            </div>
+                        </div>
+
+                        <!-- Content -->
+                        <div class="p-5 flex flex-col flex-1">
+                            <div class="mb-2 flex items-center gap-1 text-xs text-gray-400">
+                                <i class="fas fa-map-marker-alt"></i>
+                                <span class="truncate"><?php echo esc_html($kab); ?></span>
+                            </div>
+                            
+                            <h3 class="font-bold text-gray-800 text-lg mb-2 leading-tight group-hover:text-primary transition line-clamp-2">
+                                <?php echo esc_html($w->nama_wisata); ?>
+                            </h3>
+                            
+                            <!-- Price & Action -->
+                            <div class="mt-auto pt-4 border-t border-gray-50 flex items-center justify-between">
+                                <div>
+                                    <span class="text-[10px] text-gray-400 uppercase font-bold block">Tiket Mulai</span>
+                                    <span class="text-primary font-bold text-base">
+                                        <?php echo ($w->harga_tiket > 0) ? 'Rp ' . number_format($w->harga_tiket, 0, ',', '.') : 'Gratis'; ?>
+                                    </span>
+                                </div>
+                                <span class="w-8 h-8 rounded-full bg-gray-50 text-gray-400 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition">
+                                    <i class="fas fa-arrow-right text-xs"></i>
+                                </span>
+                            </div>
+                        </div>
+                    </a>
+                    <?php endforeach; ?>
+                </div>
+
+                <!-- Pagination -->
+                <?php if ($total_pages > 1): ?>
+                <div class="mt-12 flex justify-center gap-2">
+                    <?php for ($i = 1; $i <= $total_pages; $i++): 
+                        $active_cls = ($i == $page) ? 'bg-primary text-white border-primary' : 'bg-white text-gray-600 border-gray-200 hover:border-primary hover:text-primary';
+                        // Bangun URL Pagination
+                        $query_params = $_GET;
+                        $query_params['halaman'] = $i;
+                        $page_url = '?' . http_build_query($query_params);
+                    ?>
+                    <a href="<?php echo esc_url($page_url); ?>" class="w-10 h-10 flex items-center justify-center rounded-lg border font-bold text-sm transition <?php echo $active_cls; ?>">
+                        <?php echo $i; ?>
+                    </a>
+                    <?php endfor; ?>
+                </div>
+                <?php endif; ?>
+
+                <?php else: ?>
+                    <!-- Empty State -->
+                    <div class="text-center py-20 bg-white rounded-2xl border-2 border-dashed border-gray-200">
+                        <div class="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-search text-3xl text-gray-300"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-gray-800 mb-2">Tidak ditemukan</h3>
+                        <p class="text-gray-500 max-w-md mx-auto">Coba ubah kata kunci pencarian atau reset filter untuk melihat hasil lainnya.</p>
+                        <a href="<?php echo home_url('/wisata'); ?>" class="inline-block mt-6 px-6 py-2 bg-white border border-gray-300 text-gray-700 font-bold rounded-full hover:bg-gray-50 transition">
+                            Reset Filter
+                        </a>
+                    </div>
+                <?php endif; ?>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Custom Scrollbar untuk filter */
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #ddd; border-radius: 4px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #bbb; }
+</style>
 
 <?php get_footer(); ?>
