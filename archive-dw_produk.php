@@ -14,12 +14,11 @@ $table_desa     = $wpdb->prefix . 'dw_desa';
 // --- 1. PARAMETER FILTER ---
 $pencarian  = isset($_GET['q']) ? sanitize_text_field($_GET['q']) : '';
 $kategori   = isset($_GET['kat']) ? sanitize_text_field($_GET['kat']) : '';
-$kabupaten  = isset($_GET['kab']) ? sanitize_text_field($_GET['kab']) : ''; // Filter lokasi toko
+$kabupaten  = isset($_GET['kab']) ? sanitize_text_field($_GET['kab']) : ''; 
 $max_harga  = isset($_GET['max_price']) ? intval($_GET['max_price']) : 0;
 $urutan     = isset($_GET['sort']) ? sanitize_text_field($_GET['sort']) : 'terbaru';
 
 // --- 2. QUERY BUILDER ---
-// Pastikan nama tabel benar dan ada prefix wp_
 $sql = "SELECT p.*, pd.nama_toko, pd.slug_toko, d.kabupaten, d.nama_desa 
         FROM $table_produk p 
         LEFT JOIN $table_pedagang pd ON p.id_pedagang = pd.id
@@ -48,7 +47,7 @@ switch ($urutan) {
 }
 
 // Pagination
-$items_per_page = 12; // Konsisten dengan wisata
+$items_per_page = 12;
 $page = isset($_GET['halaman']) ? intval($_GET['halaman']) : 1;
 $offset = ($page - 1) * $items_per_page;
 
@@ -59,13 +58,13 @@ $total_pages = ceil($total_items / $items_per_page);
 $sql .= $wpdb->prepare(" LIMIT %d OFFSET %d", $items_per_page, $offset);
 $produk_list = $wpdb->get_results($sql);
 
-// Data Filter Dinamis (Gunakan DISTINCT agar efisien)
+// Data Filter Dinamis
 $list_kabupaten = $wpdb->get_col("SELECT DISTINCT kabupaten FROM $table_desa WHERE status='aktif' AND kabupaten != '' ORDER BY kabupaten ASC");
 $list_kategori = $wpdb->get_col("SELECT DISTINCT kategori FROM $table_produk WHERE status='aktif' AND kategori != '' ORDER BY kategori ASC");
 
 if(empty($list_kategori)) $list_kategori = ['Makanan', 'Minuman', 'Kerajinan', 'Fashion', 'Pertanian'];
 
-// Warna Kategori (Style Wisata)
+// Warna Kategori
 function get_cat_color_prod($cat) {
     $colors = [
         'Makanan'   => 'bg-orange-600 text-white border-orange-700 shadow-orange-200',
@@ -74,18 +73,17 @@ function get_cat_color_prod($cat) {
         'Fashion'   => 'bg-pink-600 text-white border-pink-700 shadow-pink-200',
         'Pertanian' => 'bg-green-600 text-white border-green-700 shadow-green-200'
     ];
-    // Default fallback
     return isset($colors[$cat]) ? $colors[$cat] : 'bg-gray-800 text-white border-gray-900';
 }
 ?>
 
 <div class="bg-[#FAFAFA] min-h-screen font-sans text-gray-800 pb-20 relative overflow-x-hidden">
     
-    <!-- Background Decor (Sama dengan Wisata tapi nuansa Orange) -->
+    <!-- Background Decor -->
     <div class="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-orange-50/50 to-transparent -z-10"></div>
     <div class="absolute top-0 right-0 w-[500px] h-[500px] bg-yellow-50/30 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 -z-10"></div>
 
-    <!-- === 1. TOP HEADER & SEARCH (PERSIS ARSIP WISATA) === -->
+    <!-- === 1. TOP HEADER & SEARCH === -->
     <div class="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-100 transition-all duration-300">
         <div class="container mx-auto px-4 py-4">
             <div class="flex flex-col md:flex-row items-center justify-between gap-4">
@@ -95,8 +93,8 @@ function get_cat_color_prod($cat) {
                     <div class="w-8 h-8 bg-gradient-to-tr from-orange-500 to-amber-400 rounded-lg flex items-center justify-center text-white shadow-lg shadow-orange-200">
                         <i class="fas fa-box-open text-sm"></i>
                     </div>
-                    <!-- Mengambil nama website dari pengaturan WordPress -->
-                    <span class="font-bold text-lg tracking-tight"><?php echo get_bloginfo( 'name' ); ?></span>
+                    <!-- NAMA WEBSITE -->
+                    <span class="font-bold text-lg tracking-tight"><?php echo get_bloginfo('name'); ?></span>
                 </div>
 
                 <!-- Search & Filter Group -->
@@ -124,15 +122,12 @@ function get_cat_color_prod($cat) {
                     </button>
                 </div>
 
-                <!-- User/Cart Actions (Optional - Menyesuaikan Layout Wisata) -->
-                <div class="hidden md:flex items-center gap-3">
-                     <!-- Cart Button Placeholder jika diperlukan -->
-                </div>
+                <div class="hidden md:flex items-center gap-3"></div>
             </div>
         </div>
     </div>
 
-    <!-- === 2. CATEGORY NAV (SWIPEABLE) === -->
+    <!-- === 2. CATEGORY NAV === -->
     <div class="border-b border-gray-100 bg-white/50">
         <div class="container mx-auto px-4">
             <div class="flex items-center gap-2 overflow-x-auto py-3 no-scrollbar mask-gradient">
@@ -185,49 +180,67 @@ function get_cat_color_prod($cat) {
         <!-- GRID LAYOUT -->
         <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
             <?php foreach ($produk_list as $p) : 
-                // --- FIX 1: URL PRODUK (Menyamakan dengan Front Page) ---
-                // Prioritaskan slug yang tersimpan. Jika kosong, buat slug sementara dari nama produk.
+                // --- 1. LINK PRODUK (Pretty Permalink) ---
                 $slug_produk = !empty($p->slug_produk) ? $p->slug_produk : sanitize_title($p->nama_produk);
                 $link_p = home_url('/produk/detail/' . $slug_produk);
                 
-                // --- FIX 2: LOGIKA GAMBAR PRODUK (Disesuaikan dengan Front Page) ---
+                // --- 2. LOGIKA GAMBAR (ROBUST) ---
                 $img_p = 'https://via.placeholder.com/400x400?text=Produk'; 
-                
-                // Cek apakah data foto berupa JSON (array ID) atau String langsung
-                $fotos = !empty($p->foto_produk) ? json_decode($p->foto_produk) : [];
-                
-                // Ambil foto pertama dari array, atau jika bukan array gunakan langsung
-                if (json_last_error() === JSON_ERROR_NONE && is_array($fotos) && !empty($fotos)) {
-                    $foto_utama = $fotos[0];
-                } else {
-                    $foto_utama = $p->foto_produk;
-                }
+                $foto_id = null;
 
-                if (!empty($foto_utama)) {
-                    if (is_numeric($foto_utama)) {
-                        // Jika berupa ID Attachment
-                        $img_src = wp_get_attachment_image_src($foto_utama, 'medium_large');
-                        if ($img_src) {
-                            $img_p = $img_src[0];
+                // Cek isi kolom foto_produk
+                $raw_foto = $p->foto_produk;
+
+                if (!empty($raw_foto)) {
+                    // Coba decode JSON (jika array ID: ["10", "11"])
+                    $json_data = json_decode($raw_foto, true);
+                    
+                    if (json_last_error() === JSON_ERROR_NONE && is_array($json_data) && !empty($json_data)) {
+                        // Ambil ID pertama dari array JSON
+                        $foto_id = $json_data[0];
+                    } elseif (is_serialized($raw_foto)) {
+                        // Coba Unserialize (jika format serialized WP)
+                        $ser_data = @unserialize($raw_foto);
+                        if ($ser_data && is_array($ser_data) && !empty($ser_data)) {
+                            $foto_id = $ser_data[0];
                         }
                     } else {
-                        // Jika berupa URL string
-                        $img_p = $foto_utama;
+                        // Jika bukan JSON/Serialized, anggap Single Value (ID atau URL)
+                        $foto_id = $raw_foto;
+                    }
+
+                    // Konversi ID ke URL Gambar
+                    if (!empty($foto_id)) {
+                        if (is_numeric($foto_id)) {
+                            // Ambil URL dari Attachment ID
+                            $img_att = wp_get_attachment_image_src($foto_id, 'medium_large'); // Gunakan 'medium_large' atau 'large'
+                            if ($img_att) {
+                                $img_p = $img_att[0];
+                            }
+                        } else {
+                            // Jika sudah berupa URL (misal dari import eksternal)
+                            $img_p = $foto_id;
+                        }
                     }
                 }
                 
+                // Data Lainnya
                 $lokasi = !empty($p->nama_desa) ? 'Desa ' . $p->nama_desa : ($p->kabupaten ?: 'Indonesia');
                 $rating = isset($p->rating_avg) && $p->rating_avg > 0 ? $p->rating_avg : '4.5';
                 $cat_class = get_cat_color_prod($p->kategori);
             ?>
             
-            <!-- CARD MODERN (Style Wisata) -->
+            <!-- CARD MODERN -->
             <div class="group bg-white rounded-2xl overflow-hidden hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 flex flex-col h-full border border-gray-100 relative">
                 
                 <!-- Image Wrapper -->
                 <div class="relative aspect-square overflow-hidden bg-gray-200">
                     <a href="<?php echo esc_url($link_p); ?>" class="block w-full h-full">
-                        <img src="<?php echo esc_url($img_p); ?>" class="w-full h-full object-cover transition duration-700 group-hover:scale-110 group-hover:rotate-1" alt="<?php echo esc_attr($p->nama_produk); ?>" loading="lazy" onerror="this.src='https://via.placeholder.com/400x400?text=No+Image';">
+                        <img src="<?php echo esc_url($img_p); ?>" 
+                             class="w-full h-full object-cover transition duration-700 group-hover:scale-110 group-hover:rotate-1" 
+                             alt="<?php echo esc_attr($p->nama_produk); ?>" 
+                             loading="lazy" 
+                             onerror="this.src='https://via.placeholder.com/400x400?text=No+Image';">
                         
                         <!-- Overlay Gradient -->
                         <div class="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition duration-300"></div>
@@ -242,7 +255,7 @@ function get_cat_color_prod($cat) {
                     </div>
                     <?php endif; ?>
 
-                    <!-- Terlaris Badge (Conditional) -->
+                    <!-- Terlaris Badge -->
                     <?php if($p->terjual > 10): ?>
                     <div class="absolute top-3 right-3 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded shadow-sm flex items-center gap-1">
                         <i class="fas fa-fire"></i> Terlaris
@@ -252,7 +265,7 @@ function get_cat_color_prod($cat) {
 
                 <!-- Content -->
                 <div class="p-4 flex flex-col flex-1">
-                    <!-- Rating & Location Row -->
+                    <!-- Rating & Location -->
                     <div class="flex items-center justify-between mb-2 text-xs">
                         <div class="flex items-center gap-1 text-yellow-500 font-bold bg-yellow-50 px-2 py-0.5 rounded-md">
                             <i class="fas fa-star"></i> <?php echo $rating; ?>
@@ -325,117 +338,69 @@ function get_cat_color_prod($cat) {
     </div>
 </div>
 
-<!-- === FILTER DRAWER / MODAL (Sama dengan Wisata) === -->
+<!-- === FILTER DRAWER / MODAL === -->
 <div id="filter-drawer" class="fixed inset-0 z-50 hidden transition-opacity duration-300" aria-labelledby="slide-over-title" role="dialog" aria-modal="true">
-    <!-- Backdrop -->
     <div class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0" id="filter-backdrop"></div>
-
     <div class="absolute inset-y-0 right-0 flex max-w-full pl-10 pointer-events-none">
         <div class="pointer-events-auto w-screen max-w-md transform transition ease-in-out duration-300 translate-x-full" id="filter-panel">
             <div class="flex h-full flex-col overflow-y-scroll bg-white shadow-xl">
-                
-                <!-- Header Drawer -->
                 <div class="px-4 py-6 sm:px-6 border-b border-gray-100 flex items-center justify-between">
                     <h2 class="text-lg font-bold text-gray-900" id="slide-over-title">Filter Produk</h2>
                     <button type="button" id="close-filter" class="rounded-md text-gray-400 hover:text-gray-500 focus:outline-none">
                         <i class="fas fa-times text-xl"></i>
                     </button>
                 </div>
-
-                <!-- Form Filter -->
                 <div class="relative mt-6 flex-1 px-4 sm:px-6">
                     <form action="" method="GET" id="drawer-form">
                         <input type="hidden" name="q" value="<?php echo esc_attr($pencarian); ?>">
                         <input type="hidden" name="kat" value="<?php echo esc_attr($kategori); ?>">
-
-                        <!-- Section: Urutkan -->
                         <div class="mb-8">
                             <label class="text-sm font-bold text-gray-900 block mb-3">Urutkan Berdasarkan</label>
                             <div class="grid grid-cols-2 gap-3">
-                                <!-- Terbaru (Biru) -->
                                 <label class="cursor-pointer">
                                     <input type="radio" name="sort" value="terbaru" <?php checked($urutan, 'terbaru'); ?> class="peer sr-only">
                                     <div class="px-4 py-3 rounded-xl border border-gray-200 hover:bg-gray-50 text-center text-sm font-medium text-gray-600 peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:text-orange-700 transition flex flex-col items-center justify-center gap-2 group">
-                                        <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center group-peer-checked:bg-blue-100 transition">
-                                            <i class="fas fa-clock text-blue-400 group-peer-checked:text-blue-600 text-lg"></i>
-                                        </div>
-                                        <span>Terbaru</span>
+                                        <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center group-peer-checked:bg-blue-100 transition"><i class="fas fa-clock text-blue-400 group-peer-checked:text-blue-600 text-lg"></i></div><span>Terbaru</span>
                                     </div>
                                 </label>
-                                
-                                <!-- Terlaris (Merah/Api) -->
                                 <label class="cursor-pointer">
                                     <input type="radio" name="sort" value="terlaris" <?php checked($urutan, 'terlaris'); ?> class="peer sr-only">
                                     <div class="px-4 py-3 rounded-xl border border-gray-200 hover:bg-gray-50 text-center text-sm font-medium text-gray-600 peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:text-orange-700 transition flex flex-col items-center justify-center gap-2 group">
-                                        <div class="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center group-peer-checked:bg-red-100 transition">
-                                            <i class="fas fa-fire text-red-400 group-peer-checked:text-red-600 text-lg"></i>
-                                        </div>
-                                        <span>Terlaris</span>
+                                        <div class="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center group-peer-checked:bg-red-100 transition"><i class="fas fa-fire text-red-400 group-peer-checked:text-red-600 text-lg"></i></div><span>Terlaris</span>
                                     </div>
                                 </label>
-
-                                <!-- Termurah (Hijau/Tag) -->
                                 <label class="cursor-pointer">
                                     <input type="radio" name="sort" value="termurah" <?php checked($urutan, 'termurah'); ?> class="peer sr-only">
                                     <div class="px-4 py-3 rounded-xl border border-gray-200 hover:bg-gray-50 text-center text-sm font-medium text-gray-600 peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:text-orange-700 transition flex flex-col items-center justify-center gap-2 group">
-                                        <div class="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center group-peer-checked:bg-green-100 transition">
-                                            <i class="fas fa-tag text-green-400 group-peer-checked:text-green-600 text-lg"></i>
-                                        </div>
-                                        <span>Termurah</span>
+                                        <div class="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center group-peer-checked:bg-green-100 transition"><i class="fas fa-tag text-green-400 group-peer-checked:text-green-600 text-lg"></i></div><span>Termurah</span>
                                     </div>
                                 </label>
-                                
-                                <!-- Termahal (Ungu/Mahkota) -->
                                 <label class="cursor-pointer">
                                     <input type="radio" name="sort" value="termahal" <?php checked($urutan, 'termahal'); ?> class="peer sr-only">
                                     <div class="px-4 py-3 rounded-xl border border-gray-200 hover:bg-gray-50 text-center text-sm font-medium text-gray-600 peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:text-orange-700 transition flex flex-col items-center justify-center gap-2 group">
-                                        <div class="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center group-peer-checked:bg-purple-100 transition">
-                                            <i class="fas fa-crown text-purple-400 group-peer-checked:text-purple-600 text-lg"></i>
-                                        </div>
-                                        <span>Termahal</span>
+                                        <div class="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center group-peer-checked:bg-purple-100 transition"><i class="fas fa-crown text-purple-400 group-peer-checked:text-purple-600 text-lg"></i></div><span>Termahal</span>
                                     </div>
                                 </label>
                             </div>
                         </div>
-
-                        <!-- Section: Budget -->
                         <div class="mb-8">
                             <label class="text-sm font-bold text-gray-900 block mb-3">Maksimal Harga</label>
-                            <input type="range" min="0" max="500000" step="10000" value="<?php echo $max_harga > 0 ? $max_harga : 500000; ?>" 
-                                   class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-500"
-                                   oninput="document.getElementById('price-label').innerText = 'Rp ' + new Intl.NumberFormat('id-ID').format(this.value)">
-                            <div class="flex justify-between mt-2 text-xs font-bold text-gray-500">
-                                <span>Rp 0</span>
-                                <span id="price-label" class="text-orange-600">Rp <?php echo $max_harga > 0 ? number_format($max_harga,0,',','.') : '500.000+'; ?></span>
-                            </div>
+                            <input type="range" min="0" max="500000" step="10000" value="<?php echo $max_harga > 0 ? $max_harga : 500000; ?>" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-500" oninput="document.getElementById('price-label').innerText = 'Rp ' + new Intl.NumberFormat('id-ID').format(this.value)">
+                            <div class="flex justify-between mt-2 text-xs font-bold text-gray-500"><span>Rp 0</span><span id="price-label" class="text-orange-600">Rp <?php echo $max_harga > 0 ? number_format($max_harga,0,',','.') : '500.000+'; ?></span></div>
                             <input type="hidden" name="max_price" value="<?php echo esc_attr($max_harga); ?>" id="input-max-price">
                         </div>
-
-                        <!-- Section: Lokasi (Asal Produk/Kabupaten) -->
                         <div class="mb-8">
                             <label class="text-sm font-bold text-gray-900 block mb-3">Lokasi (Kabupaten)</label>
                             <div class="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
-                                <label class="flex items-center p-3 rounded-lg border border-gray-100 hover:bg-gray-50 cursor-pointer transition">
-                                    <input type="radio" name="kab" value="" <?php checked($kabupaten, ''); ?> class="w-4 h-4 text-orange-600 border-gray-300 focus:ring-orange-500">
-                                    <span class="ml-3 text-sm text-gray-700">Semua Lokasi</span>
-                                </label>
+                                <label class="flex items-center p-3 rounded-lg border border-gray-100 hover:bg-gray-50 cursor-pointer transition"><input type="radio" name="kab" value="" <?php checked($kabupaten, ''); ?> class="w-4 h-4 text-orange-600 border-gray-300 focus:ring-orange-500"><span class="ml-3 text-sm text-gray-700">Semua Lokasi</span></label>
                                 <?php foreach($list_kabupaten as $kab): ?>
-                                <label class="flex items-center p-3 rounded-lg border border-gray-100 hover:bg-gray-50 cursor-pointer transition">
-                                    <input type="radio" name="kab" value="<?php echo esc_attr($kab); ?>" <?php checked($kabupaten, $kab); ?> class="w-4 h-4 text-orange-600 border-gray-300 focus:ring-orange-500">
-                                    <span class="ml-3 text-sm text-gray-700"><?php echo esc_html($kab); ?></span>
-                                </label>
+                                <label class="flex items-center p-3 rounded-lg border border-gray-100 hover:bg-gray-50 cursor-pointer transition"><input type="radio" name="kab" value="<?php echo esc_attr($kab); ?>" <?php checked($kabupaten, $kab); ?> class="w-4 h-4 text-orange-600 border-gray-300 focus:ring-orange-500"><span class="ml-3 text-sm text-gray-700"><?php echo esc_html($kab); ?></span></label>
                                 <?php endforeach; ?>
                             </div>
                         </div>
-
-                        <!-- Action Buttons -->
                         <div class="pt-6 border-t border-gray-100 flex gap-3">
-                            <a href="<?php echo home_url('/produk'); ?>" class="flex-1 py-3 text-center border border-gray-300 rounded-xl text-gray-700 font-bold hover:bg-gray-50 transition">
-                                Reset
-                            </a>
-                            <button type="submit" class="flex-1 py-3 bg-orange-600 text-white rounded-xl font-bold hover:bg-orange-700 shadow-lg shadow-orange-200 transition">
-                                Terapkan
-                            </button>
+                            <a href="<?php echo home_url('/produk'); ?>" class="flex-1 py-3 text-center border border-gray-300 rounded-xl text-gray-700 font-bold hover:bg-gray-50 transition">Reset</a>
+                            <button type="submit" class="flex-1 py-3 bg-orange-600 text-white rounded-xl font-bold hover:bg-orange-700 shadow-lg shadow-orange-200 transition">Terapkan</button>
                         </div>
                     </form>
                 </div>
@@ -445,62 +410,35 @@ function get_cat_color_prod($cat) {
 </div>
 
 <style>
-/* Utilities */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .mask-gradient { -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent); }
-/* Custom Scrollbar for Drawer */
 .custom-scrollbar::-webkit-scrollbar { width: 4px; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
 </style>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    // Drawer Logic (Sama seperti Wisata)
     const drawer = document.getElementById('filter-drawer');
     const backdrop = document.getElementById('filter-backdrop');
     const panel = document.getElementById('filter-panel');
     const openBtn = document.getElementById('open-filter');
     const closeBtn = document.getElementById('close-filter');
-    
-    // Range Slider Logic Sync
     const rangeInput = document.querySelector('input[type="range"]');
     const hiddenInput = document.getElementById('input-max-price');
-    if(rangeInput) {
-        rangeInput.addEventListener('change', (e) => {
-            hiddenInput.value = e.target.value;
-        });
-    }
-
-    function openDrawer() {
-        drawer.classList.remove('hidden');
-        setTimeout(() => {
-            backdrop.classList.remove('opacity-0');
-            panel.classList.remove('translate-x-full');
-        }, 10);
-    }
-
-    function closeDrawer() {
-        backdrop.classList.add('opacity-0');
-        panel.classList.add('translate-x-full');
-        setTimeout(() => {
-            drawer.classList.add('hidden');
-        }, 300);
-    }
-
+    if(rangeInput) { rangeInput.addEventListener('change', (e) => { hiddenInput.value = e.target.value; }); }
+    function openDrawer() { drawer.classList.remove('hidden'); setTimeout(() => { backdrop.classList.remove('opacity-0'); panel.classList.remove('translate-x-full'); }, 10); }
+    function closeDrawer() { backdrop.classList.add('opacity-0'); panel.classList.add('translate-x-full'); setTimeout(() => { drawer.classList.add('hidden'); }, 300); }
     if(openBtn) openBtn.addEventListener('click', openDrawer);
     if(closeBtn) closeBtn.addEventListener('click', closeDrawer);
     if(backdrop) backdrop.addEventListener('click', closeDrawer);
     
-    // Add to Cart Logic (AJAX)
     jQuery('.btn-add-to-cart').on('click', function(e) {
         e.preventDefault();
         var btn = jQuery(this);
         var originalIcon = btn.html();
         var isCustom = btn.data('is-custom') ? 1 : 0;
-        
         btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin text-xs"></i>');
-        
         jQuery.post(dw_ajax.ajax_url, {
             action: 'dw_theme_add_to_cart',
             nonce: dw_ajax.nonce,
@@ -510,19 +448,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }, function(response) {
             if(response.success) {
                 btn.html('<i class="fas fa-check text-xs"></i>').addClass('bg-green-600 text-white').removeClass('bg-gray-50 text-gray-600 hover:bg-orange-500');
-                if(response.data.count) {
-                    jQuery('#header-cart-count, #header-cart-count-mobile').text(response.data.count).removeClass('hidden').addClass('flex');
-                }
-                setTimeout(function() {
-                    btn.html(originalIcon)
-                        .removeClass('bg-green-600 text-white')
-                        .addClass('bg-gray-50 text-gray-600 hover:bg-orange-500')
-                        .prop('disabled', false);
-                }, 2000);
-            } else {
-                alert('Gagal: ' + (response.data.message || 'Error'));
-                btn.html(originalIcon).prop('disabled', false);
-            }
+                if(response.data.count) { jQuery('#header-cart-count, #header-cart-count-mobile').text(response.data.count).removeClass('hidden').addClass('flex'); }
+                setTimeout(function() { btn.html(originalIcon).removeClass('bg-green-600 text-white').addClass('bg-gray-50 text-gray-600 hover:bg-orange-500').prop('disabled', false); }, 2000);
+            } else { alert('Gagal: ' + (response.data.message || 'Error')); btn.html(originalIcon).prop('disabled', false); }
         });
     });
 });
