@@ -95,7 +95,8 @@ function get_cat_color_prod($cat) {
                     <div class="w-8 h-8 bg-gradient-to-tr from-orange-500 to-amber-400 rounded-lg flex items-center justify-center text-white shadow-lg shadow-orange-200">
                         <i class="fas fa-box-open text-sm"></i>
                     </div>
-                    <span class="font-bold text-lg tracking-tight">Pasar<span class="text-orange-600">Desa</span></span>
+                    <!-- Mengambil nama website dari pengaturan WordPress -->
+                    <span class="font-bold text-lg tracking-tight"><?php echo get_bloginfo( 'name' ); ?></span>
                 </div>
 
                 <!-- Search & Filter Group -->
@@ -184,14 +185,23 @@ function get_cat_color_prod($cat) {
         <!-- GRID LAYOUT -->
         <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
             <?php foreach ($produk_list as $p) : 
-                $link_p = !empty($p->slug_produk) ? home_url('/produk/detail/' . $p->slug_produk) : home_url('/detail-produk/?id=' . $p->id);
+                // --- FIX 1: URL PRODUK (Menyamakan dengan Front Page) ---
+                // Prioritaskan slug yang tersimpan. Jika kosong, buat slug sementara dari nama produk.
+                $slug_produk = !empty($p->slug_produk) ? $p->slug_produk : sanitize_title($p->nama_produk);
+                $link_p = home_url('/produk/detail/' . $slug_produk);
                 
-                // --- LOGIKA GAMBAR PRODUK (Disesuaikan dengan Front Page) ---
+                // --- FIX 2: LOGIKA GAMBAR PRODUK (Disesuaikan dengan Front Page) ---
                 $img_p = 'https://via.placeholder.com/400x400?text=Produk'; 
+                
+                // Cek apakah data foto berupa JSON (array ID) atau String langsung
                 $fotos = !empty($p->foto_produk) ? json_decode($p->foto_produk) : [];
                 
                 // Ambil foto pertama dari array, atau jika bukan array gunakan langsung
-                $foto_utama = (is_array($fotos) && !empty($fotos)) ? $fotos[0] : $p->foto_produk;
+                if (json_last_error() === JSON_ERROR_NONE && is_array($fotos) && !empty($fotos)) {
+                    $foto_utama = $fotos[0];
+                } else {
+                    $foto_utama = $p->foto_produk;
+                }
 
                 if (!empty($foto_utama)) {
                     if (is_numeric($foto_utama)) {
