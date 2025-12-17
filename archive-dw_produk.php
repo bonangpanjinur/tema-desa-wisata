@@ -320,31 +320,46 @@ function get_cat_color_prod($cat) {
                         <div class="mb-8">
                             <label class="text-sm font-bold text-gray-900 block mb-3">Urutkan Berdasarkan</label>
                             <div class="grid grid-cols-2 gap-3">
+                                <!-- Terbaru (Biru) -->
                                 <label class="cursor-pointer">
                                     <input type="radio" name="sort" value="terbaru" <?php checked($urutan, 'terbaru'); ?> class="peer sr-only">
-                                    <div class="px-4 py-3 rounded-xl border border-gray-200 text-center text-sm font-medium text-gray-600 peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:text-orange-700 transition flex flex-col items-center justify-center gap-1 group">
-                                        <i class="fas fa-clock text-lg mb-1 text-gray-400 group-peer-checked:text-orange-500"></i>
+                                    <div class="px-4 py-3 rounded-xl border border-gray-200 hover:bg-gray-50 text-center text-sm font-medium text-gray-600 peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:text-orange-700 transition flex flex-col items-center justify-center gap-2 group">
+                                        <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center group-peer-checked:bg-blue-100 transition">
+                                            <i class="fas fa-clock text-blue-400 group-peer-checked:text-blue-600 text-lg"></i>
+                                        </div>
                                         <span>Terbaru</span>
                                     </div>
                                 </label>
+                                
+                                <!-- Terlaris (Merah/Api) -->
                                 <label class="cursor-pointer">
                                     <input type="radio" name="sort" value="terlaris" <?php checked($urutan, 'terlaris'); ?> class="peer sr-only">
-                                    <div class="px-4 py-3 rounded-xl border border-gray-200 text-center text-sm font-medium text-gray-600 peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:text-orange-700 transition flex flex-col items-center justify-center gap-1 group">
-                                        <i class="fas fa-fire text-lg mb-1 text-gray-400 group-peer-checked:text-orange-500"></i>
+                                    <div class="px-4 py-3 rounded-xl border border-gray-200 hover:bg-gray-50 text-center text-sm font-medium text-gray-600 peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:text-orange-700 transition flex flex-col items-center justify-center gap-2 group">
+                                        <div class="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center group-peer-checked:bg-red-100 transition">
+                                            <i class="fas fa-fire text-red-400 group-peer-checked:text-red-600 text-lg"></i>
+                                        </div>
                                         <span>Terlaris</span>
                                     </div>
                                 </label>
+
+                                <!-- Termurah (Hijau/Tag) -->
                                 <label class="cursor-pointer">
                                     <input type="radio" name="sort" value="termurah" <?php checked($urutan, 'termurah'); ?> class="peer sr-only">
-                                    <div class="px-4 py-3 rounded-xl border border-gray-200 text-center text-sm font-medium text-gray-600 peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:text-orange-700 transition flex flex-col items-center justify-center gap-1 group">
-                                        <i class="fas fa-tag text-lg mb-1 text-gray-400 group-peer-checked:text-orange-500"></i>
+                                    <div class="px-4 py-3 rounded-xl border border-gray-200 hover:bg-gray-50 text-center text-sm font-medium text-gray-600 peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:text-orange-700 transition flex flex-col items-center justify-center gap-2 group">
+                                        <div class="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center group-peer-checked:bg-green-100 transition">
+                                            <i class="fas fa-tag text-green-400 group-peer-checked:text-green-600 text-lg"></i>
+                                        </div>
                                         <span>Termurah</span>
                                     </div>
                                 </label>
+                                
+                                <!-- Termahal (Ungu/Mahkota) -->
                                 <label class="cursor-pointer">
                                     <input type="radio" name="sort" value="termahal" <?php checked($urutan, 'termahal'); ?> class="peer sr-only">
-                                    <div class="px-4 py-3 rounded-xl border border-gray-200 text-center text-sm font-medium text-gray-600 peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:text-orange-700 transition flex flex-col items-center justify-center gap-1 group">
-                                        <i class="fas fa-crown text-lg mb-1 text-gray-400 group-peer-checked:text-orange-500"></i>
+                                    <div class="px-4 py-3 rounded-xl border border-gray-200 hover:bg-gray-50 text-center text-sm font-medium text-gray-600 peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:text-orange-700 transition flex flex-col items-center justify-center gap-2 group">
+                                        <div class="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center group-peer-checked:bg-purple-100 transition">
+                                            <i class="fas fa-crown text-purple-400 group-peer-checked:text-purple-600 text-lg"></i>
+                                        </div>
                                         <span>Termahal</span>
                                     </div>
                                 </label>
