@@ -1,7 +1,7 @@
 <?php
 /**
  * Template Name: Arsip Wisata Modern Clean
- * Description: Layout full-width dengan filter drawer/modal dan desain kartu estetik.
+ * Description: Layout full-width dengan filter drawer/modal dan desain kartu estetik yang konsisten.
  */
 
 get_header();
@@ -45,7 +45,7 @@ switch ($urutan) {
 }
 
 // Pagination
-$items_per_page = 12; // Lebih banyak item untuk grid full width
+$items_per_page = 12; 
 $page = isset($_GET['halaman']) ? intval($_GET['halaman']) : 1;
 $offset = ($page - 1) * $items_per_page;
 
@@ -60,23 +60,11 @@ $wisata_list = $wpdb->get_results($sql);
 $list_kabupaten = $wpdb->get_col("SELECT DISTINCT kabupaten FROM $table_desa WHERE status='aktif' AND kabupaten != '' ORDER BY kabupaten ASC");
 $list_kategori = $wpdb->get_col("SELECT DISTINCT kategori FROM $table_wisata WHERE status='aktif' AND kategori != '' ORDER BY kategori ASC");
 if(empty($list_kategori)) $list_kategori = ['Alam', 'Budaya', 'Religi', 'Kuliner', 'Edukasi'];
-
-// Warna Kategori (Updated: Solid & Jelas)
-function get_cat_color($cat) {
-    $colors = [
-        'Alam'    => 'bg-emerald-600 text-white border-emerald-700 shadow-emerald-200',
-        'Budaya'  => 'bg-amber-600 text-white border-amber-700 shadow-amber-200',
-        'Religi'  => 'bg-purple-600 text-white border-purple-700 shadow-purple-200',
-        'Kuliner' => 'bg-rose-600 text-white border-rose-700 shadow-rose-200',
-        'Edukasi' => 'bg-blue-600 text-white border-blue-700 shadow-blue-200'
-    ];
-    return isset($colors[$cat]) ? $colors[$cat] : 'bg-gray-800 text-white border-gray-900';
-}
 ?>
 
 <div class="bg-[#FAFAFA] min-h-screen font-sans text-gray-800 pb-20 relative overflow-x-hidden">
     
-    <!-- Background Decor (Anti-Monoton) -->
+    <!-- Background Decor -->
     <div class="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-green-50/50 to-transparent -z-10"></div>
     <div class="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-50/30 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 -z-10"></div>
 
@@ -101,7 +89,7 @@ function get_cat_color($cat) {
                                placeholder="Cari destinasi, lokasi...">
                         <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-green-500 transition-colors"></i>
                         
-                        <!-- Hidden Filters (Preserve state) -->
+                        <!-- Hidden Filters -->
                         <?php if($kabupaten): ?><input type="hidden" name="kab" value="<?php echo esc_attr($kabupaten); ?>"><?php endif; ?>
                         <?php if($kategori): ?><input type="hidden" name="kat" value="<?php echo esc_attr($kategori); ?>"><?php endif; ?>
                         <?php if($max_harga): ?><input type="hidden" name="max_price" value="<?php echo esc_attr($max_harga); ?>"><?php endif; ?>
@@ -116,11 +104,6 @@ function get_cat_color($cat) {
                             <span class="w-2 h-2 bg-red-500 rounded-full"></span>
                         <?php endif; ?>
                     </button>
-                </div>
-
-                <!-- User/Cart Actions (Optional) -->
-                <div class="hidden md:flex items-center gap-3">
-                    <!-- Placeholder for future features -->
                 </div>
             </div>
         </div>
@@ -178,74 +161,11 @@ function get_cat_color($cat) {
         <?php if ($wisata_list) : ?>
         <!-- GRID LAYOUT -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            <?php foreach ($wisata_list as $w) : 
-                $link_w = !empty($w->slug) ? home_url('/wisata/detail/' . $w->slug) : home_url('/detail-wisata/?id=' . $w->id);
-                $img_w = !empty($w->foto_utama) ? $w->foto_utama : 'https://via.placeholder.com/600x400?text=Wisata';
-                $rating = ($w->rating_avg > 0) ? $w->rating_avg : 'Baru';
+            <?php foreach ($wisata_list as $w) : ?>
                 
-                // UPDATE: Menampilkan Nama Desa, Fallback ke Kabupaten jika nama desa kosong
-                $lokasi_display = !empty($w->nama_desa) ? 'Desa ' . $w->nama_desa : $w->kabupaten;
-                
-                $cat_class = get_cat_color($w->kategori);
-            ?>
-            
-            <!-- CARD MODERN -->
-            <a href="<?php echo esc_url($link_w); ?>" class="group bg-white rounded-2xl overflow-hidden hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 flex flex-col h-full border border-gray-100 relative">
-                
-                <!-- Image -->
-                <div class="relative aspect-[4/3] overflow-hidden bg-gray-200">
-                    <img src="<?php echo esc_url($img_w); ?>" class="w-full h-full object-cover transition duration-700 group-hover:scale-110 group-hover:rotate-1" alt="<?php echo esc_attr($w->nama_wisata); ?>" loading="lazy">
-                    
-                    <!-- Overlay Gradient -->
-                    <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition duration-300"></div>
+                <!-- PANGGIL PARENT DESIGN: Card Wisata -->
+                <?php get_template_part('template-parts/card', 'wisata', array('item' => $w)); ?>
 
-                    <!-- Category Badge (Updated Style) -->
-                    <?php if(isset($w->kategori)): ?>
-                    <div class="absolute top-3 left-3">
-                        <span class="text-[10px] font-bold px-3 py-1 rounded-full border shadow-lg <?php echo $cat_class; ?> backdrop-blur-sm uppercase tracking-wide">
-                            <?php echo esc_html($w->kategori); ?>
-                        </span>
-                    </div>
-                    <?php endif; ?>
-
-                    <!-- Wishlist/Like Button (Visual Only - Ready for Plugin) -->
-                    <button class="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-white hover:text-red-500 transition btn-wishlist" data-id="<?php echo $w->id; ?>" title="Simpan ke Favorit">
-                        <i class="far fa-heart"></i>
-                    </button>
-                </div>
-
-                <!-- Content -->
-                <div class="p-4 flex flex-col flex-1">
-                    <!-- Rating & Location Row -->
-                    <div class="flex items-center justify-between mb-2 text-xs">
-                        <div class="flex items-center gap-1 text-yellow-500 font-bold bg-yellow-50 px-2 py-0.5 rounded-md">
-                            <i class="fas fa-star"></i> <?php echo $rating; ?>
-                        </div>
-                        <div class="flex items-center gap-1 text-gray-500 font-medium">
-                            <i class="fas fa-map-marker-alt text-green-500"></i> 
-                            <span class="truncate max-w-[120px]"><?php echo esc_html($lokasi_display); ?></span>
-                        </div>
-                    </div>
-
-                    <!-- Title -->
-                    <h3 class="font-bold text-gray-900 text-lg leading-snug mb-3 line-clamp-2 group-hover:text-green-600 transition">
-                        <?php echo esc_html($w->nama_wisata); ?>
-                    </h3>
-
-                    <!-- Divider -->
-                    <div class="mt-auto pt-3 border-t border-dashed border-gray-100 flex items-center justify-between">
-                        <div class="flex flex-col">
-                            <span class="text-[10px] text-gray-400 uppercase font-bold">Mulai dari</span>
-                            <span class="text-green-600 font-bold text-base">
-                                <?php echo ($w->harga_tiket > 0) ? 'Rp ' . number_format($w->harga_tiket, 0, ',', '.') : 'Gratis'; ?>
-                            </span>
-                        </div>
-                        <span class="text-xs font-semibold text-gray-400 group-hover:text-green-600 transition flex items-center gap-1">
-                            Detail <i class="fas fa-chevron-right text-[10px]"></i>
-                        </span>
-                    </div>
-                </div>
-            </a>
             <?php endforeach; ?>
         </div>
 
@@ -269,9 +189,9 @@ function get_cat_color($cat) {
                 <div class="w-32 h-32 bg-gray-100 rounded-full flex items-center justify-center mb-6 animate-pulse">
                     <i class="far fa-map text-5xl text-gray-300"></i>
                 </div>
-                <h3 class="text-xl font-bold text-gray-800">Tidak ditemukan wisata</h3>
+                <h3 class="text-xl font-bold text-gray-800">Wisata Tidak Ditemukan</h3>
                 <p class="text-gray-500 mt-2 mb-6">Coba ganti kata kunci atau reset filter pencarian Anda.</p>
-                <a href="<?php echo home_url('/wisata'); ?>" class="px-6 py-2.5 bg-gray-900 text-white rounded-full font-bold hover:bg-gray-800 transition shadow-lg">
+                <a href="<?php echo home_url('/wisata'); ?>" class="px-6 py-2.5 bg-green-600 text-white rounded-full font-bold hover:bg-green-700 transition shadow-lg">
                     Lihat Semua Wisata
                 </a>
             </div>
@@ -280,7 +200,7 @@ function get_cat_color($cat) {
     </div>
 </div>
 
-<!-- === FILTER DRAWER / MODAL (Hidden by default) === -->
+<!-- === FILTER DRAWER / MODAL === -->
 <div id="filter-drawer" class="fixed inset-0 z-50 hidden transition-opacity duration-300" aria-labelledby="slide-over-title" role="dialog" aria-modal="true">
     <!-- Backdrop -->
     <div class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0" id="filter-backdrop"></div>
@@ -291,7 +211,7 @@ function get_cat_color($cat) {
                 
                 <!-- Header Drawer -->
                 <div class="px-4 py-6 sm:px-6 border-b border-gray-100 flex items-center justify-between">
-                    <h2 class="text-lg font-bold text-gray-900" id="slide-over-title">Filter Pencarian</h2>
+                    <h2 class="text-lg font-bold text-gray-900" id="slide-over-title">Filter Wisata</h2>
                     <button type="button" id="close-filter" class="rounded-md text-gray-400 hover:text-gray-500 focus:outline-none">
                         <i class="fas fa-times text-xl"></i>
                     </button>
@@ -307,24 +227,31 @@ function get_cat_color($cat) {
                         <div class="mb-8">
                             <label class="text-sm font-bold text-gray-900 block mb-3">Urutkan Berdasarkan</label>
                             <div class="grid grid-cols-2 gap-3">
+                                <!-- Terbaru -->
                                 <label class="cursor-pointer">
                                     <input type="radio" name="sort" value="terbaru" <?php checked($urutan, 'terbaru'); ?> class="peer sr-only">
                                     <div class="px-4 py-3 rounded-xl border border-gray-200 text-center text-sm font-medium text-gray-600 peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:text-green-700 transition">
                                         ✨ Terbaru
                                     </div>
                                 </label>
+                                
+                                <!-- Populer -->
                                 <label class="cursor-pointer">
                                     <input type="radio" name="sort" value="terpopuler" <?php checked($urutan, 'terpopuler'); ?> class="peer sr-only">
                                     <div class="px-4 py-3 rounded-xl border border-gray-200 text-center text-sm font-medium text-gray-600 peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:text-green-700 transition">
                                         🔥 Populer
                                     </div>
                                 </label>
+
+                                <!-- Termurah -->
                                 <label class="cursor-pointer">
                                     <input type="radio" name="sort" value="termurah" <?php checked($urutan, 'termurah'); ?> class="peer sr-only">
                                     <div class="px-4 py-3 rounded-xl border border-gray-200 text-center text-sm font-medium text-gray-600 peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:text-green-700 transition">
                                         💰 Termurah
                                     </div>
                                 </label>
+                                
+                                <!-- Termahal -->
                                 <label class="cursor-pointer">
                                     <input type="radio" name="sort" value="termahal" <?php checked($urutan, 'termahal'); ?> class="peer sr-only">
                                     <div class="px-4 py-3 rounded-xl border border-gray-200 text-center text-sm font-medium text-gray-600 peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:text-green-700 transition">
@@ -392,6 +319,7 @@ function get_cat_color($cat) {
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    // Drawer Logic
     const drawer = document.getElementById('filter-drawer');
     const backdrop = document.getElementById('filter-backdrop');
     const panel = document.getElementById('filter-panel');
@@ -409,7 +337,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function openDrawer() {
         drawer.classList.remove('hidden');
-        // Small delay for animation
         setTimeout(() => {
             backdrop.classList.remove('opacity-0');
             panel.classList.remove('translate-x-full');
@@ -427,24 +354,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if(openBtn) openBtn.addEventListener('click', openDrawer);
     if(closeBtn) closeBtn.addEventListener('click', closeDrawer);
     if(backdrop) backdrop.addEventListener('click', closeDrawer);
-    
-    // Wishlist Button Logic (Placeholder for Plugin Integration)
-    const wishlistBtns = document.querySelectorAll('.btn-wishlist');
-    wishlistBtns.forEach(btn => {
-        btn.addEventListener('click', function(e) {
-            e.preventDefault();
-            // Disini logic AJAX ke plugin nanti akan ditempatkan
-            // Contoh sederhana toggle visual:
-            const icon = this.querySelector('i');
-            if (icon.classList.contains('far')) {
-                icon.classList.remove('far');
-                icon.classList.add('fas', 'text-red-500');
-            } else {
-                icon.classList.remove('fas', 'text-red-500');
-                icon.classList.add('far');
-            }
-        });
-    });
 });
 </script>
 
