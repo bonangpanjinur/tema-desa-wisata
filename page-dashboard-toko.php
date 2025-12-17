@@ -31,11 +31,12 @@ if (!$pedagang) {
 }
 
 // --- LOGIC HANDLER (POST REQUESTS) ---
-$message = '';
-$message_type = ''; // success, error
+// Pattern: Post-Redirect-Get (PRG) untuk mencegah submit ulang saat refresh
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
+    $current_url = get_permalink();
+
     // A. TAMBAH / EDIT PRODUK
     if (isset($_POST['action']) && $_POST['action'] === 'save_product') {
         if (!wp_verify_nonce($_POST['_wpnonce'], 'save_product_nonce')) die('Security check failed');
@@ -62,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $attachment_id = isset($_POST['existing_foto']) ? sanitize_text_field($_POST['existing_foto']) : '';
         }
 
-        // 2. Handle Galeri (Multi Upload)
+        // 2. Handle Galeri
         $galeri_ids = [];
         if (isset($_POST['existing_galeri']) && !empty($_POST['existing_galeri'])) {
             $galeri_ids = json_decode(stripslashes($_POST['existing_galeri']), true);
@@ -108,43 +109,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ];
 
         if ($prod_id > 0) {
-            // Update
             $wpdb->update($table_produk, $data, ['id' => $prod_id, 'id_pedagang' => $pedagang->id]);
-            $message = 'Produk berhasil diperbarui.';
         } else {
-            // Insert
             $data['created_at'] = current_time('mysql');
             $wpdb->insert($table_produk, $data);
-            $message = 'Produk berhasil ditambahkan.';
         }
-        $message_type = 'success';
+        
+        // Redirect Sukses
+        wp_safe_redirect(add_query_arg(['tab' => 'produk', 'msg' => 'saved'], $current_url));
+        exit;
     }
 
     // B. HAPUS PRODUK
     if (isset($_POST['action']) && $_POST['action'] === 'delete_product') {
         $del_id = intval($_POST['product_id']);
         $wpdb->delete($table_produk, ['id' => $del_id, 'id_pedagang' => $pedagang->id]);
-        $message = 'Produk berhasil dihapus.';
-        $message_type = 'success';
+        
+        // Redirect Sukses
+        wp_safe_redirect(add_query_arg(['tab' => 'produk', 'msg' => 'deleted'], $current_url));
+        exit;
     }
 
     // C. BELI PAKET
     if (isset($_POST['action']) && $_POST['action'] === 'buy_package') {
         $paket_id = intval($_POST['paket_id']);
-        $paket = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_paket WHERE id = %d", $paket_id));
         
-        if ($paket) {
-            $wpdb->insert($table_pembelian_paket, [
-                'id_pedagang' => $pedagang->id,
-                'id_paket'    => $paket->id,
-                'nama_paket_snapshot' => $paket->nama_paket,
-                'harga_paket' => $paket->harga,
-                'jumlah_transaksi' => $paket->jumlah_transaksi,
-                'status'      => 'pending', 
-                'created_at'  => current_time('mysql')
-            ]);
-            $message = 'Permintaan pembelian paket berhasil. Silakan lakukan pembayaran dan upload bukti bayar di tabel riwayat di bawah.';
-            $message_type = 'success';
+        // Cek apakah ada request pending yang sama untuk mencegah spam klik
+        $existing = $wpdb->get_var($wpdb->prepare(
+            "SELECT id FROM $table_pembelian_paket WHERE id_pedagang = %d AND id_paket = %d AND status = 'pending'",
+            $pedagang->id, $paket_id
+        ));
+
+        if (!$existing) {
+            $paket = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_paket WHERE id = %d", $paket_id));
+            if ($paket) {
+                $wpdb->insert($table_pembelian_paket, [
+                    'id_pedagang' => $pedagang->id,
+                    'id_paket'    => $paket->id,
+                    'nama_paket_snapshot' => $paket->nama_paket,
+                    'harga_paket' => $paket->harga,
+                    'jumlah_transaksi' => $paket->jumlah_transaksi,
+                    'status'      => 'pending', 
+                    'created_at'  => current_time('mysql')
+                ]);
+                
+                // Redirect Sukses
+                wp_safe_redirect(add_query_arg(['tab' => 'paket', 'msg' => 'ordered'], $current_url));
+                exit;
+            }
+        } else {
+            // Redirect Warning (Sudah ada)
+            wp_safe_redirect(add_query_arg(['tab' => 'paket', 'msg' => 'duplicate_order'], $current_url));
+            exit;
         }
     }
 
@@ -155,7 +171,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pembelian_id = intval($_POST['pembelian_id']);
         $check_trx = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_pembelian_paket WHERE id = %d AND id_pedagang = %d", $pembelian_id, $pedagang->id));
         
-        if ($check_trx && $check_trx->status === 'pending') {
+        if ($check_trx) {
             if (!empty($_FILES['bukti_bayar']['name'])) {
                 require_once(ABSPATH . 'wp-admin/includes/image.php');
                 require_once(ABSPATH . 'wp-admin/includes/file.php');
@@ -165,30 +181,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 if (!is_wp_error($attach_id)) {
                     $url_bukti = wp_get_attachment_url($attach_id);
-                    $wpdb->update($table_pembelian_paket, ['url_bukti_bayar' => $url_bukti], ['id' => $pembelian_id]);
-                    $message = 'Bukti pembayaran berhasil diupload. Mohon tunggu verifikasi admin.';
-                    $message_type = 'success';
+                    // Reset status ke pending jika sebelumnya ditolak, agar admin cek lagi
+                    $new_status = ($check_trx->status == 'ditolak') ? 'pending' : $check_trx->status;
+                    
+                    $wpdb->update($table_pembelian_paket, [
+                        'url_bukti_bayar' => $url_bukti,
+                        'status' => $new_status // Reset status jika re-upload
+                    ], ['id' => $pembelian_id]);
+                    
+                    wp_safe_redirect(add_query_arg(['tab' => 'paket', 'msg' => 'uploaded'], $current_url));
+                    exit;
                 } else {
-                    $message = 'Gagal upload gambar: ' . $attach_id->get_error_message();
-                    $message_type = 'error';
+                    wp_safe_redirect(add_query_arg(['tab' => 'paket', 'msg' => 'upload_fail'], $current_url));
+                    exit;
                 }
-            } else {
-                $message = 'Silakan pilih file gambar bukti pembayaran.';
-                $message_type = 'error';
             }
-        } else {
-            $message = 'Transaksi tidak valid atau sudah diproses.';
-            $message_type = 'error';
         }
+        wp_safe_redirect(add_query_arg(['tab' => 'paket', 'msg' => 'error'], $current_url));
+        exit;
     }
 
-    // E. UPDATE TOKO (LENGKAP)
+    // E. UPDATE TOKO
     if (isset($_POST['action']) && $_POST['action'] === 'update_shop') {
         $nama_toko = sanitize_text_field($_POST['nama_toko']);
         $no_wa     = sanitize_text_field($_POST['nomor_wa']);
         $alamat    = sanitize_textarea_field($_POST['alamat_lengkap']);
         
-        // Info Bank
         $nama_bank      = sanitize_text_field($_POST['nama_bank']);
         $no_rekening    = sanitize_text_field($_POST['no_rekening']);
         $atas_nama_rek  = sanitize_text_field($_POST['atas_nama_rekening']);
@@ -197,20 +215,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         require_once(ABSPATH . 'wp-admin/includes/file.php');
         require_once(ABSPATH . 'wp-admin/includes/media.php');
 
-        // 1. Upload Foto Profil Toko
         $foto_profil_url = $pedagang->foto_profil;
         if (!empty($_FILES['foto_profil']['name'])) {
             $attach_id = media_handle_upload('foto_profil', 0);
             if (!is_wp_error($attach_id)) $foto_profil_url = wp_get_attachment_url($attach_id);
         }
 
-        // 2. Upload QRIS Toko
         $qris_url = $pedagang->qris_image_url;
         if (!empty($_FILES['qris_toko']['name'])) {
             $attach_id = media_handle_upload('qris_toko', 0);
-            if (!is_wp_error($attach_id)) {
-                $qris_url = wp_get_attachment_url($attach_id);
-            }
+            if (!is_wp_error($attach_id)) $qris_url = wp_get_attachment_url($attach_id);
         }
 
         $wpdb->update($table_pedagang, [
@@ -224,10 +238,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'qris_image_url' => $qris_url
         ], ['id' => $pedagang->id]);
         
-        $message = 'Pengaturan toko berhasil disimpan.';
-        $message_type = 'success';
-        // Refresh data pedagang
-        $pedagang = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_pedagang WHERE id = %d", $pedagang->id));
+        wp_safe_redirect(add_query_arg(['tab' => 'pengaturan', 'msg' => 'shop_updated'], $current_url));
+        exit;
+    }
+}
+
+// --- SETUP MESSAGE DISPLAY ---
+$message = '';
+$message_type = '';
+
+if (isset($_GET['msg'])) {
+    switch ($_GET['msg']) {
+        case 'saved': $message = 'Produk berhasil disimpan.'; $message_type = 'success'; break;
+        case 'deleted': $message = 'Produk berhasil dihapus.'; $message_type = 'success'; break;
+        case 'ordered': $message = 'Permintaan paket berhasil dibuat. Silakan upload bukti bayar.'; $message_type = 'success'; break;
+        case 'duplicate_order': $message = 'Anda sudah memiliki permintaan paket pending untuk paket ini.'; $message_type = 'warning'; break;
+        case 'uploaded': $message = 'Bukti pembayaran berhasil diupload. Mohon tunggu verifikasi.'; $message_type = 'success'; break;
+        case 'upload_fail': $message = 'Gagal mengupload gambar. Pastikan format sesuai.'; $message_type = 'error'; break;
+        case 'shop_updated': $message = 'Pengaturan toko berhasil disimpan.'; $message_type = 'success'; break;
+        case 'error': $message = 'Terjadi kesalahan sistem.'; $message_type = 'error'; break;
     }
 }
 
@@ -285,7 +314,7 @@ get_header();
     <div class="container mx-auto px-4 py-8">
         
         <?php if($message): ?>
-            <div class="mb-6 p-4 rounded-xl <?php echo $message_type == 'success' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'; ?>">
+            <div class="mb-6 p-4 rounded-xl <?php echo $message_type == 'success' ? 'bg-green-50 text-green-700 border border-green-200' : ($message_type == 'warning' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' : 'bg-red-50 text-red-700 border border-red-200'); ?>">
                 <?php echo esc_html($message); ?>
             </div>
         <?php endif; ?>
@@ -391,7 +420,6 @@ get_header();
                                     <label class="block text-sm font-bold text-gray-700 mb-2">Kategori</label>
                                     <select name="kategori" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors">
                                         <?php 
-                                        // Dinamis Kategori dari DB + Default
                                         $kategori_produk_db = $wpdb->get_col("SELECT DISTINCT kategori FROM $table_produk WHERE kategori IS NOT NULL AND kategori != ''");
                                         $cats_default = ['Makanan', 'Minuman', 'Kerajinan', 'Fashion', 'Pertanian', 'Jasa'];
                                         $cats = array_unique(array_merge($cats_default, $kategori_produk_db));
@@ -666,8 +694,8 @@ get_header();
                                         <?php endif; ?>
                                     </td>
                                     <td class="p-4">
-                                        <?php if($h->status == 'pending'): ?>
-                                            <?php if($h->url_bukti_bayar): ?>
+                                        <?php if($h->status == 'pending' || $h->status == 'ditolak'): ?>
+                                            <?php if($h->url_bukti_bayar && $h->status == 'pending'): ?>
                                                 <a href="<?php echo esc_url($h->url_bukti_bayar); ?>" target="_blank" class="text-blue-600 underline text-xs">Lihat Bukti</a>
                                                 <br><span class="text-[10px] text-gray-400">Menunggu Verifikasi</span>
                                             <?php else: ?>
@@ -676,7 +704,9 @@ get_header();
                                                     <input type="hidden" name="action" value="upload_bukti_paket">
                                                     <input type="hidden" name="pembelian_id" value="<?php echo $h->id; ?>">
                                                     <input type="file" name="bukti_bayar" class="text-[10px]" required accept="image/*">
-                                                    <button type="submit" class="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 w-fit">Upload</button>
+                                                    <button type="submit" class="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700 w-fit">
+                                                        <?php echo ($h->status == 'ditolak') ? 'Upload Ulang' : 'Upload'; ?>
+                                                    </button>
                                                 </form>
                                             <?php endif; ?>
                                         <?php elseif($h->status == 'disetujui'): ?>
