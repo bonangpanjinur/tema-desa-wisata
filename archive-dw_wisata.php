@@ -1,7 +1,7 @@
 <?php
 /**
- * Template Name: Arsip Wisata Elegant
- * Description: Layout modern dengan search di atas, kategori, dan sidebar filter harga/lokasi.
+ * Template Name: Arsip Wisata Modern Clean
+ * Description: Layout full-width dengan filter drawer/modal dan desain kartu estetik.
  */
 
 get_header();
@@ -45,7 +45,7 @@ switch ($urutan) {
 }
 
 // Pagination
-$items_per_page = 9;
+$items_per_page = 12; // Lebih banyak item untuk grid full width
 $page = isset($_GET['halaman']) ? intval($_GET['halaman']) : 1;
 $offset = ($page - 1) * $items_per_page;
 
@@ -60,252 +60,369 @@ $wisata_list = $wpdb->get_results($sql);
 $list_kabupaten = $wpdb->get_col("SELECT DISTINCT kabupaten FROM $table_desa WHERE status='aktif' AND kabupaten != '' ORDER BY kabupaten ASC");
 $list_kategori = $wpdb->get_col("SELECT DISTINCT kategori FROM $table_wisata WHERE status='aktif' AND kategori != '' ORDER BY kategori ASC");
 if(empty($list_kategori)) $list_kategori = ['Alam', 'Budaya', 'Religi', 'Kuliner', 'Edukasi'];
+
+// Warna Kategori (Helper Sederhana untuk Variasi Visual)
+function get_cat_color($cat) {
+    $colors = [
+        'Alam' => 'bg-green-100 text-green-700 border-green-200',
+        'Budaya' => 'bg-orange-100 text-orange-700 border-orange-200',
+        'Religi' => 'bg-purple-100 text-purple-700 border-purple-200',
+        'Kuliner' => 'bg-red-100 text-red-700 border-red-200',
+        'Edukasi' => 'bg-blue-100 text-blue-700 border-blue-200'
+    ];
+    return isset($colors[$cat]) ? $colors[$cat] : 'bg-gray-100 text-gray-700 border-gray-200';
+}
 ?>
 
-<div class="bg-[#F8F9FB] min-h-screen font-sans text-gray-800 pb-20">
+<div class="bg-[#FAFAFA] min-h-screen font-sans text-gray-800 pb-20 relative overflow-x-hidden">
     
-    <!-- === 1. HEADER SEARCH (TOP) === -->
-    <div class="bg-white border-b border-gray-100 sticky top-0 z-50 shadow-sm/50 transition-all duration-300">
+    <!-- Background Decor (Anti-Monoton) -->
+    <div class="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-green-50/50 to-transparent -z-10"></div>
+    <div class="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-50/30 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 -z-10"></div>
+
+    <!-- === 1. TOP HEADER & SEARCH === -->
+    <div class="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-100 transition-all duration-300">
         <div class="container mx-auto px-4 py-4">
-            <form action="" method="GET" class="relative max-w-3xl mx-auto flex items-center">
-                <i class="fas fa-search absolute left-5 text-gray-400 text-lg"></i>
-                <input type="text" name="q" value="<?php echo esc_attr($pencarian); ?>" 
-                       class="w-full pl-14 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-full focus:bg-white focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all outline-none placeholder-gray-400 text-gray-700 shadow-sm" 
-                       placeholder="Cari destinasi wisata impianmu...">
-                <!-- Keep other filters -->
-                <?php if($kabupaten): ?><input type="hidden" name="kab" value="<?php echo esc_attr($kabupaten); ?>"><?php endif; ?>
-                <?php if($kategori): ?><input type="hidden" name="kat" value="<?php echo esc_attr($kategori); ?>"><?php endif; ?>
-                <?php if($max_harga): ?><input type="hidden" name="max_price" value="<?php echo esc_attr($max_harga); ?>"><?php endif; ?>
-            </form>
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                
+                <!-- Logo Area -->
+                <div class="flex items-center gap-2 self-start md:self-center cursor-pointer" onclick="window.location.href='<?php echo home_url('/wisata'); ?>'">
+                    <div class="w-8 h-8 bg-gradient-to-tr from-green-500 to-emerald-400 rounded-lg flex items-center justify-center text-white shadow-lg shadow-green-200">
+                        <i class="fas fa-compass text-sm"></i>
+                    </div>
+                    <span class="font-bold text-lg tracking-tight">Wisata<span class="text-green-600">Desa</span></span>
+                </div>
+
+                <!-- Search & Filter Group -->
+                <div class="w-full md:w-auto flex items-center gap-3 flex-1 md:justify-center max-w-3xl">
+                    <form action="" method="GET" class="relative w-full group">
+                        <input type="text" name="q" value="<?php echo esc_attr($pencarian); ?>" 
+                               class="w-full pl-12 pr-4 py-3 bg-gray-50 hover:bg-white focus:bg-white border border-gray-200 hover:border-gray-300 focus:border-green-500 rounded-full transition-all outline-none text-sm shadow-sm focus:shadow-md focus:ring-4 focus:ring-green-50" 
+                               placeholder="Cari destinasi, lokasi...">
+                        <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-green-500 transition-colors"></i>
+                        
+                        <!-- Hidden Filters (Preserve state) -->
+                        <?php if($kabupaten): ?><input type="hidden" name="kab" value="<?php echo esc_attr($kabupaten); ?>"><?php endif; ?>
+                        <?php if($kategori): ?><input type="hidden" name="kat" value="<?php echo esc_attr($kategori); ?>"><?php endif; ?>
+                        <?php if($max_harga): ?><input type="hidden" name="max_price" value="<?php echo esc_attr($max_harga); ?>"><?php endif; ?>
+                        <?php if($urutan): ?><input type="hidden" name="sort" value="<?php echo esc_attr($urutan); ?>"><?php endif; ?>
+                    </form>
+
+                    <!-- Filter Trigger Button -->
+                    <button type="button" id="open-filter" class="flex-none flex items-center gap-2 px-5 py-3 bg-white border border-gray-200 rounded-full text-sm font-bold text-gray-700 hover:bg-gray-50 hover:border-green-500 hover:text-green-600 transition-all shadow-sm active:scale-95">
+                        <i class="fas fa-sliders-h"></i>
+                        <span class="hidden sm:inline">Filter</span>
+                        <?php if($kabupaten || $max_harga): ?>
+                            <span class="w-2 h-2 bg-red-500 rounded-full"></span>
+                        <?php endif; ?>
+                    </button>
+                </div>
+
+                <!-- User/Cart Actions (Optional) -->
+                <div class="hidden md:flex items-center gap-3">
+                    <!-- Placeholder for future features -->
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="container mx-auto px-4 pt-6">
-        
-        <!-- === 2. CATEGORY BADGES (BELOW SEARCH) === -->
-        <div class="mb-10 flex justify-center">
-            <div class="flex flex-wrap gap-2 justify-center">
-                <a href="?kat=" class="px-4 py-2 rounded-full text-xs font-bold border transition-all duration-200 <?php echo $kategori == '' ? 'bg-green-600 text-white border-green-600 shadow-lg shadow-green-200 transform scale-105' : 'bg-white text-gray-600 border-gray-200 hover:border-green-500 hover:text-green-600'; ?>">
+    <!-- === 2. CATEGORY NAV (SWIPEABLE) === -->
+    <div class="border-b border-gray-100 bg-white/50">
+        <div class="container mx-auto px-4">
+            <div class="flex items-center gap-2 overflow-x-auto py-3 no-scrollbar mask-gradient">
+                <a href="?kat=" class="shrink-0 px-4 py-1.5 rounded-full text-xs font-bold border transition-all duration-300 <?php echo $kategori == '' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400 hover:text-gray-800'; ?>">
                     Semua
                 </a>
-                <?php foreach($list_kategori as $kat): ?>
-                <a href="?kat=<?php echo urlencode($kat); ?>&q=<?php echo urlencode($pencarian); ?>&kab=<?php echo urlencode($kabupaten); ?>" 
-                   class="px-4 py-2 rounded-full text-xs font-bold border transition-all duration-200 <?php echo $kategori == $kat ? 'bg-green-600 text-white border-green-600 shadow-lg shadow-green-200 transform scale-105' : 'bg-white text-gray-600 border-gray-200 hover:border-green-500 hover:text-green-600'; ?>">
+                <?php foreach($list_kategori as $kat): 
+                    $is_active = $kategori == $kat;
+                ?>
+                <a href="?kat=<?php echo urlencode($kat); ?>&q=<?php echo urlencode($pencarian); ?>" 
+                   class="shrink-0 px-4 py-1.5 rounded-full text-xs font-bold border transition-all duration-300 <?php echo $is_active ? 'bg-green-500 text-white border-green-500 shadow-md shadow-green-200' : 'bg-white text-gray-500 border-gray-200 hover:border-green-500 hover:text-green-600'; ?>">
                     <?php echo esc_html($kat); ?>
                 </a>
                 <?php endforeach; ?>
             </div>
         </div>
+    </div>
 
-        <div class="flex flex-col lg:flex-row gap-8 items-start">
+    <!-- === 3. CONTENT GRID === -->
+    <div class="container mx-auto px-4 py-8">
+        
+        <!-- Stats & Active Filters -->
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-8">
+            <h2 class="text-xl md:text-2xl font-bold text-gray-800">
+                <?php echo $pencarian ? 'Hasil pencarian: "'.esc_html($pencarian).'"' : 'Jelajahi Wisata'; ?>
+                <span class="text-sm font-normal text-gray-500 ml-2">(<?php echo $total_items; ?> ditemukan)</span>
+            </h2>
             
-            <!-- === 3. SIDEBAR FILTERS (LEFT) === -->
-            <aside class="w-full lg:w-1/4 lg:sticky lg:top-28 space-y-6">
+            <?php if($kabupaten || $max_harga): ?>
+            <div class="flex items-center gap-2 text-xs">
+                <span class="text-gray-400">Filter Aktif:</span>
+                <?php if($kabupaten): ?>
+                    <span class="px-2 py-1 bg-blue-50 text-blue-600 rounded border border-blue-100 flex items-center gap-1">
+                        <i class="fas fa-map-marker-alt"></i> <?php echo esc_html($kabupaten); ?>
+                        <a href="?kab=&q=<?php echo urlencode($pencarian); ?>&kat=<?php echo urlencode($kategori); ?>" class="hover:text-red-500"><i class="fas fa-times"></i></a>
+                    </span>
+                <?php endif; ?>
+                <?php if($max_harga): ?>
+                    <span class="px-2 py-1 bg-green-50 text-green-600 rounded border border-green-100 flex items-center gap-1">
+                        <i class="fas fa-tag"></i> Max Rp <?php echo number_format($max_harga); ?>
+                        <a href="?max_price=&q=<?php echo urlencode($pencarian); ?>&kat=<?php echo urlencode($kategori); ?>" class="hover:text-red-500"><i class="fas fa-times"></i></a>
+                    </span>
+                <?php endif; ?>
+                <a href="?q=<?php echo urlencode($pencarian); ?>" class="text-red-500 hover:underline ml-2">Hapus Semua</a>
+            </div>
+            <?php endif; ?>
+        </div>
+
+        <?php if ($wisata_list) : ?>
+        <!-- GRID LAYOUT -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <?php foreach ($wisata_list as $w) : 
+                $link_w = !empty($w->slug) ? home_url('/wisata/detail/' . $w->slug) : home_url('/detail-wisata/?id=' . $w->id);
+                $img_w = !empty($w->foto_utama) ? $w->foto_utama : 'https://via.placeholder.com/600x400?text=Wisata';
+                $rating = ($w->rating_avg > 0) ? $w->rating_avg : 'Baru';
+                $lokasi = !empty($w->kabupaten) ? $w->kabupaten : 'Indonesia';
+                $cat_class = get_cat_color($w->kategori);
+            ?>
+            
+            <!-- CARD MODERN -->
+            <a href="<?php echo esc_url($link_w); ?>" class="group bg-white rounded-2xl overflow-hidden hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 flex flex-col h-full border border-gray-100 relative">
                 
-                <!-- Toggle Mobile -->
-                <button id="mobile-filter-toggle" class="lg:hidden w-full flex items-center justify-between bg-white p-4 rounded-xl border border-gray-200 font-bold text-gray-700 shadow-sm">
-                    <span><i class="fas fa-filter mr-2 text-green-500"></i> Filter Pencarian</span>
-                    <i class="fas fa-chevron-down transition-transform duration-300" id="filter-chevron"></i>
-                </button>
+                <!-- Image -->
+                <div class="relative aspect-[4/3] overflow-hidden bg-gray-200">
+                    <img src="<?php echo esc_url($img_w); ?>" class="w-full h-full object-cover transition duration-700 group-hover:scale-110 group-hover:rotate-1" alt="<?php echo esc_attr($w->nama_wisata); ?>" loading="lazy">
+                    
+                    <!-- Overlay Gradient -->
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition duration-300"></div>
 
-                <div id="sidebar-content" class="hidden lg:block space-y-6">
-                    <form action="" method="GET" id="sidebar-form">
-                        <?php if($pencarian): ?><input type="hidden" name="q" value="<?php echo esc_attr($pencarian); ?>"><?php endif; ?>
-                        <?php if($kategori): ?><input type="hidden" name="kat" value="<?php echo esc_attr($kategori); ?>"><?php endif; ?>
+                    <!-- Category Badge -->
+                    <?php if(isset($w->kategori)): ?>
+                    <div class="absolute top-3 left-3">
+                        <span class="text-[10px] font-bold px-2.5 py-1 rounded-full border shadow-sm <?php echo $cat_class; ?> bg-opacity-90 backdrop-blur-sm">
+                            <?php echo esc_html($w->kategori); ?>
+                        </span>
+                    </div>
+                    <?php endif; ?>
 
-                        <!-- A. Filter Harga -->
-                        <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                            <h3 class="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                <span class="w-1 h-5 bg-green-500 rounded-full"></span> Budget Tiket
-                            </h3>
-                            <div class="space-y-3">
-                                <label class="flex items-center cursor-pointer group">
-                                    <input type="radio" name="max_price" value="0" <?php checked($max_harga, 0); ?> onchange="this.form.submit()" class="w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500 cursor-pointer">
-                                    <span class="ml-3 text-sm text-gray-600 group-hover:text-green-600 transition">Semua Harga</span>
+                    <!-- Wishlist/Like Button (Visual Only) -->
+                    <button class="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/30 backdrop-blur-md flex items-center justify-center text-white hover:bg-white hover:text-red-500 transition">
+                        <i class="far fa-heart"></i>
+                    </button>
+                </div>
+
+                <!-- Content -->
+                <div class="p-4 flex flex-col flex-1">
+                    <!-- Rating & Location Row -->
+                    <div class="flex items-center justify-between mb-2 text-xs">
+                        <div class="flex items-center gap-1 text-yellow-500 font-bold bg-yellow-50 px-2 py-0.5 rounded-md">
+                            <i class="fas fa-star"></i> <?php echo $rating; ?>
+                        </div>
+                        <div class="flex items-center gap-1 text-gray-400">
+                            <i class="fas fa-map-marker-alt"></i> <span class="truncate max-w-[80px]"><?php echo esc_html($lokasi); ?></span>
+                        </div>
+                    </div>
+
+                    <!-- Title -->
+                    <h3 class="font-bold text-gray-900 text-lg leading-snug mb-3 line-clamp-2 group-hover:text-green-600 transition">
+                        <?php echo esc_html($w->nama_wisata); ?>
+                    </h3>
+
+                    <!-- Divider -->
+                    <div class="mt-auto pt-3 border-t border-dashed border-gray-100 flex items-center justify-between">
+                        <div class="flex flex-col">
+                            <span class="text-[10px] text-gray-400 uppercase font-bold">Mulai dari</span>
+                            <span class="text-green-600 font-bold text-base">
+                                <?php echo ($w->harga_tiket > 0) ? 'Rp ' . number_format($w->harga_tiket, 0, ',', '.') : 'Gratis'; ?>
+                            </span>
+                        </div>
+                        <span class="text-xs font-semibold text-gray-400 group-hover:text-green-600 transition flex items-center gap-1">
+                            Detail <i class="fas fa-chevron-right text-[10px]"></i>
+                        </span>
+                    </div>
+                </div>
+            </a>
+            <?php endforeach; ?>
+        </div>
+
+        <!-- Pagination -->
+        <?php if ($total_pages > 1): ?>
+        <div class="mt-12 flex justify-center gap-2">
+            <?php for ($i = 1; $i <= $total_pages; $i++): 
+                $active = ($i == $page) ? 'bg-green-600 text-white shadow-lg shadow-green-200' : 'bg-white text-gray-600 border border-gray-200 hover:border-green-500 hover:text-green-600';
+                $url = add_query_arg('halaman', $i);
+            ?>
+            <a href="<?php echo esc_url($url); ?>" class="w-10 h-10 flex items-center justify-center rounded-xl font-bold text-sm transition-all duration-200 <?php echo $active; ?>">
+                <?php echo $i; ?>
+            </a>
+            <?php endfor; ?>
+        </div>
+        <?php endif; ?>
+
+        <?php else: ?>
+            <!-- Empty State -->
+            <div class="flex flex-col items-center justify-center py-20">
+                <div class="w-32 h-32 bg-gray-100 rounded-full flex items-center justify-center mb-6 animate-pulse">
+                    <i class="far fa-map text-5xl text-gray-300"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800">Tidak ditemukan wisata</h3>
+                <p class="text-gray-500 mt-2 mb-6">Coba ganti kata kunci atau reset filter pencarian Anda.</p>
+                <a href="<?php echo home_url('/wisata'); ?>" class="px-6 py-2.5 bg-gray-900 text-white rounded-full font-bold hover:bg-gray-800 transition shadow-lg">
+                    Lihat Semua Wisata
+                </a>
+            </div>
+        <?php endif; ?>
+
+    </div>
+</div>
+
+<!-- === FILTER DRAWER / MODAL (Hidden by default) === -->
+<div id="filter-drawer" class="fixed inset-0 z-50 hidden transition-opacity duration-300" aria-labelledby="slide-over-title" role="dialog" aria-modal="true">
+    <!-- Backdrop -->
+    <div class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0" id="filter-backdrop"></div>
+
+    <div class="absolute inset-y-0 right-0 flex max-w-full pl-10 pointer-events-none">
+        <div class="pointer-events-auto w-screen max-w-md transform transition ease-in-out duration-300 translate-x-full" id="filter-panel">
+            <div class="flex h-full flex-col overflow-y-scroll bg-white shadow-xl">
+                
+                <!-- Header Drawer -->
+                <div class="px-4 py-6 sm:px-6 border-b border-gray-100 flex items-center justify-between">
+                    <h2 class="text-lg font-bold text-gray-900" id="slide-over-title">Filter Pencarian</h2>
+                    <button type="button" id="close-filter" class="rounded-md text-gray-400 hover:text-gray-500 focus:outline-none">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+
+                <!-- Form Filter -->
+                <div class="relative mt-6 flex-1 px-4 sm:px-6">
+                    <form action="" method="GET" id="drawer-form">
+                        <input type="hidden" name="q" value="<?php echo esc_attr($pencarian); ?>">
+                        <input type="hidden" name="kat" value="<?php echo esc_attr($kategori); ?>">
+
+                        <!-- Section: Urutkan -->
+                        <div class="mb-8">
+                            <label class="text-sm font-bold text-gray-900 block mb-3">Urutkan Berdasarkan</label>
+                            <div class="grid grid-cols-2 gap-3">
+                                <label class="cursor-pointer">
+                                    <input type="radio" name="sort" value="terbaru" <?php checked($urutan, 'terbaru'); ?> class="peer sr-only">
+                                    <div class="px-4 py-3 rounded-xl border border-gray-200 text-center text-sm font-medium text-gray-600 peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:text-green-700 transition">
+                                        ✨ Terbaru
+                                    </div>
                                 </label>
-                                <label class="flex items-center cursor-pointer group">
-                                    <input type="radio" name="max_price" value="0.1" <?php checked($max_harga, 0.1); ?> onchange="this.form.submit()" class="w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500 cursor-pointer">
-                                    <span class="ml-3 text-sm text-gray-600 group-hover:text-green-600 transition">Gratis</span>
+                                <label class="cursor-pointer">
+                                    <input type="radio" name="sort" value="terpopuler" <?php checked($urutan, 'terpopuler'); ?> class="peer sr-only">
+                                    <div class="px-4 py-3 rounded-xl border border-gray-200 text-center text-sm font-medium text-gray-600 peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:text-green-700 transition">
+                                        🔥 Populer
+                                    </div>
                                 </label>
-                                <label class="flex items-center cursor-pointer group">
-                                    <input type="radio" name="max_price" value="10000" <?php checked($max_harga, 10000); ?> onchange="this.form.submit()" class="w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500 cursor-pointer">
-                                    <span class="ml-3 text-sm text-gray-600 group-hover:text-green-600 transition">< Rp 10.000</span>
+                                <label class="cursor-pointer">
+                                    <input type="radio" name="sort" value="termurah" <?php checked($urutan, 'termurah'); ?> class="peer sr-only">
+                                    <div class="px-4 py-3 rounded-xl border border-gray-200 text-center text-sm font-medium text-gray-600 peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:text-green-700 transition">
+                                        💰 Termurah
+                                    </div>
                                 </label>
-                                <label class="flex items-center cursor-pointer group">
-                                    <input type="radio" name="max_price" value="25000" <?php checked($max_harga, 25000); ?> onchange="this.form.submit()" class="w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500 cursor-pointer">
-                                    <span class="ml-3 text-sm text-gray-600 group-hover:text-green-600 transition">< Rp 25.000</span>
-                                </label>
-                                <label class="flex items-center cursor-pointer group">
-                                    <input type="radio" name="max_price" value="50000" <?php checked($max_harga, 50000); ?> onchange="this.form.submit()" class="w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500 cursor-pointer">
-                                    <span class="ml-3 text-sm text-gray-600 group-hover:text-green-600 transition">< Rp 50.000</span>
+                                <label class="cursor-pointer">
+                                    <input type="radio" name="sort" value="termahal" <?php checked($urutan, 'termahal'); ?> class="peer sr-only">
+                                    <div class="px-4 py-3 rounded-xl border border-gray-200 text-center text-sm font-medium text-gray-600 peer-checked:border-green-500 peer-checked:bg-green-50 peer-checked:text-green-700 transition">
+                                        💎 Termahal
+                                    </div>
                                 </label>
                             </div>
                         </div>
 
-                        <!-- B. Filter Lokasi -->
-                        <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                            <h3 class="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                <span class="w-1 h-5 bg-blue-500 rounded-full"></span> Lokasi
-                            </h3>
-                            <div class="max-h-60 overflow-y-auto custom-scrollbar pr-2 space-y-2">
-                                <label class="flex items-center cursor-pointer group">
-                                    <input type="radio" name="kab" value="" <?php checked($kabupaten, ''); ?> onchange="this.form.submit()" class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer">
-                                    <span class="ml-3 text-sm text-gray-600 group-hover:text-blue-600 transition">Semua Lokasi</span>
+                        <!-- Section: Budget -->
+                        <div class="mb-8">
+                            <label class="text-sm font-bold text-gray-900 block mb-3">Maksimal Harga Tiket</label>
+                            <input type="range" min="0" max="100000" step="5000" value="<?php echo $max_harga > 0 ? $max_harga : 100000; ?>" 
+                                   class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-500"
+                                   oninput="document.getElementById('price-label').innerText = 'Rp ' + new Intl.NumberFormat('id-ID').format(this.value)">
+                            <div class="flex justify-between mt-2 text-xs font-bold text-gray-500">
+                                <span>Gratis</span>
+                                <span id="price-label" class="text-green-600">Rp <?php echo $max_harga > 0 ? number_format($max_harga,0,',','.') : '100.000+'; ?></span>
+                            </div>
+                            <input type="hidden" name="max_price" value="<?php echo esc_attr($max_harga); ?>" id="input-max-price">
+                        </div>
+
+                        <!-- Section: Lokasi -->
+                        <div class="mb-8">
+                            <label class="text-sm font-bold text-gray-900 block mb-3">Lokasi (Kabupaten)</label>
+                            <div class="space-y-2 max-h-60 overflow-y-auto custom-scrollbar">
+                                <label class="flex items-center p-3 rounded-lg border border-gray-100 hover:bg-gray-50 cursor-pointer transition">
+                                    <input type="radio" name="kab" value="" <?php checked($kabupaten, ''); ?> class="w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500">
+                                    <span class="ml-3 text-sm text-gray-700">Semua Lokasi</span>
                                 </label>
                                 <?php foreach($list_kabupaten as $kab): ?>
-                                <label class="flex items-center cursor-pointer group">
-                                    <input type="radio" name="kab" value="<?php echo esc_attr($kab); ?>" <?php checked($kabupaten, $kab); ?> onchange="this.form.submit()" class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 cursor-pointer">
-                                    <span class="ml-3 text-sm text-gray-600 group-hover:text-blue-600 transition"><?php echo esc_html($kab); ?></span>
+                                <label class="flex items-center p-3 rounded-lg border border-gray-100 hover:bg-gray-50 cursor-pointer transition">
+                                    <input type="radio" name="kab" value="<?php echo esc_attr($kab); ?>" <?php checked($kabupaten, $kab); ?> class="w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500">
+                                    <span class="ml-3 text-sm text-gray-700"><?php echo esc_html($kab); ?></span>
                                 </label>
                                 <?php endforeach; ?>
                             </div>
                         </div>
 
-                        <!-- C. Urutan -->
-                        <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                            <h3 class="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                                <span class="w-1 h-5 bg-orange-500 rounded-full"></span> Urutkan
-                            </h3>
-                            <select name="sort" onchange="this.form.submit()" class="w-full bg-gray-50 border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-green-500 focus:border-green-500 p-2.5">
-                                <option value="terbaru" <?php selected($urutan, 'terbaru'); ?>>Terbaru</option>
-                                <option value="terpopuler" <?php selected($urutan, 'terpopuler'); ?>>Rating Tertinggi</option>
-                                <option value="termurah" <?php selected($urutan, 'termurah'); ?>>Harga Terendah</option>
-                                <option value="termahal" <?php selected($urutan, 'termahal'); ?>>Harga Tertinggi</option>
-                            </select>
+                        <!-- Action Buttons -->
+                        <div class="pt-6 border-t border-gray-100 flex gap-3">
+                            <a href="<?php echo home_url('/wisata'); ?>" class="flex-1 py-3 text-center border border-gray-300 rounded-xl text-gray-700 font-bold hover:bg-gray-50 transition">
+                                Reset
+                            </a>
+                            <button type="submit" class="flex-1 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 shadow-lg shadow-green-200 transition">
+                                Terapkan
+                            </button>
                         </div>
-
-                        <!-- Reset Button -->
-                        <?php if($pencarian || $kabupaten || $kategori || $max_harga > 0): ?>
-                        <a href="<?php echo home_url('/wisata'); ?>" class="block w-full text-center py-3 bg-red-50 text-red-600 font-bold rounded-xl hover:bg-red-100 transition text-sm">
-                            <i class="fas fa-trash-alt mr-2"></i> Reset Filter
-                        </a>
-                        <?php endif; ?>
-
                     </form>
                 </div>
-            </aside>
-
-            <!-- === 4. CONTENT CARDS (RIGHT) === -->
-            <main class="w-full lg:w-3/4">
-                
-                <div class="flex items-center justify-between mb-6">
-                    <p class="text-sm text-gray-500">Menampilkan <span class="font-bold text-gray-900"><?php echo $total_items; ?></span> destinasi wisata</p>
-                </div>
-
-                <?php if ($wisata_list) : ?>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <?php foreach ($wisata_list as $w) : 
-                        $link_w = !empty($w->slug) ? home_url('/wisata/detail/' . $w->slug) : home_url('/detail-wisata/?id=' . $w->id);
-                        $img_w = !empty($w->foto_utama) ? $w->foto_utama : 'https://via.placeholder.com/600x400?text=Wisata';
-                        $rating = ($w->rating_avg > 0) ? $w->rating_avg : 'Baru';
-                        $lokasi = !empty($w->kabupaten) ? $w->kabupaten : 'Indonesia';
-                    ?>
-                    
-                    <!-- CARD ELEGANT -->
-                    <a href="<?php echo esc_url($link_w); ?>" class="group bg-white rounded-2xl overflow-hidden hover:shadow-[0_15px_30px_-5px_rgba(0,0,0,0.1)] transition-all duration-300 flex flex-col h-full border border-gray-100 hover:border-transparent transform hover:-translate-y-1">
-                        
-                        <!-- Image Container -->
-                        <div class="relative h-52 overflow-hidden">
-                            <img src="<?php echo esc_url($img_w); ?>" class="w-full h-full object-cover transition duration-700 group-hover:scale-110" alt="<?php echo esc_attr($w->nama_wisata); ?>">
-                            
-                            <!-- Dark Gradient Overlay -->
-                            <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition duration-300"></div>
-
-                            <!-- Category Badge (Dynamic) -->
-                            <?php if(isset($w->kategori)): ?>
-                            <div class="absolute top-3 left-3">
-                                <span class="bg-white/95 backdrop-blur-md text-gray-800 text-[10px] font-bold px-3 py-1 rounded-full shadow-sm tracking-wide uppercase border border-gray-100 group-hover:border-white">
-                                    <?php echo esc_html($w->kategori); ?>
-                                </span>
-                            </div>
-                            <?php endif; ?>
-
-                            <!-- Rating -->
-                            <div class="absolute bottom-3 right-3 bg-black/60 backdrop-blur-md text-white px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 shadow-lg transform translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition duration-300">
-                                <i class="fas fa-star text-yellow-400 text-[10px]"></i> <?php echo $rating; ?>
-                            </div>
-                        </div>
-
-                        <!-- Content -->
-                        <div class="p-5 flex flex-col flex-1">
-                            <div class="flex items-center gap-1 text-xs text-gray-400 mb-2">
-                                <i class="fas fa-map-marker-alt text-red-400"></i>
-                                <span class="truncate max-w-[150px]"><?php echo esc_html($lokasi); ?></span>
-                            </div>
-
-                            <h3 class="font-bold text-gray-800 text-lg leading-snug mb-3 group-hover:text-green-600 transition line-clamp-2">
-                                <?php echo esc_html($w->nama_wisata); ?>
-                            </h3>
-
-                            <div class="mt-auto pt-4 border-t border-gray-50 flex items-center justify-between">
-                                <div>
-                                    <span class="block text-[10px] text-gray-400 uppercase font-bold tracking-wider">Tiket Masuk</span>
-                                    <span class="text-green-600 font-bold text-base">
-                                        <?php echo ($w->harga_tiket > 0) ? 'Rp ' . number_format($w->harga_tiket, 0, ',', '.') : 'Gratis'; ?>
-                                    </span>
-                                </div>
-                                <span class="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-green-500 group-hover:text-white transition shadow-sm">
-                                    <i class="fas fa-arrow-right text-xs"></i>
-                                </span>
-                            </div>
-                        </div>
-                    </a>
-                    <?php endforeach; ?>
-                </div>
-
-                <!-- Pagination -->
-                <?php if ($total_pages > 1): ?>
-                <div class="mt-12 flex justify-center gap-2">
-                    <?php for ($i = 1; $i <= $total_pages; $i++): 
-                        $active = ($i == $page) ? 'bg-green-600 text-white border-green-600 shadow-lg shadow-green-200' : 'bg-white text-gray-600 border-gray-200 hover:border-green-600 hover:text-green-600';
-                        $url = add_query_arg('halaman', $i);
-                    ?>
-                    <a href="<?php echo esc_url($url); ?>" class="w-10 h-10 flex items-center justify-center rounded-xl border font-bold text-sm transition-all duration-200 <?php echo $active; ?>">
-                        <?php echo $i; ?>
-                    </a>
-                    <?php endfor; ?>
-                </div>
-                <?php endif; ?>
-
-                <?php else: ?>
-                    <div class="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-gray-100 text-center shadow-sm">
-                        <div class="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-4">
-                            <i class="far fa-compass text-3xl text-gray-300"></i>
-                        </div>
-                        <h3 class="text-xl font-bold text-gray-800 mb-2">Belum ada wisata ditemukan</h3>
-                        <p class="text-gray-500 max-w-xs mx-auto mb-6 text-sm">Sesuaikan filter pencarian Anda.</p>
-                        <a href="<?php echo home_url('/wisata'); ?>" class="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg transition text-sm">
-                            Reset
-                        </a>
-                    </div>
-                <?php endif; ?>
-
-            </main>
+            </div>
         </div>
     </div>
 </div>
 
 <style>
-/* Sidebar Scrollbar */
-.custom-scrollbar::-webkit-scrollbar { width: 3px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+/* Utilities */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.mask-gradient { -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent); }
+/* Custom Scrollbar for Drawer */
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
-.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #d1d5db; }
 </style>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    // Mobile toggle logic
-    const toggleBtn = document.getElementById('mobile-filter-toggle');
-    const content = document.getElementById('sidebar-content');
-    const chevron = document.getElementById('filter-chevron');
-
-    if(toggleBtn && content) {
-        toggleBtn.addEventListener('click', () => {
-            content.classList.toggle('hidden');
-            if(chevron) chevron.classList.toggle('rotate-180');
+    const drawer = document.getElementById('filter-drawer');
+    const backdrop = document.getElementById('filter-backdrop');
+    const panel = document.getElementById('filter-panel');
+    const openBtn = document.getElementById('open-filter');
+    const closeBtn = document.getElementById('close-filter');
+    
+    // Range Slider Logic Sync
+    const rangeInput = document.querySelector('input[type="range"]');
+    const hiddenInput = document.getElementById('input-max-price');
+    if(rangeInput) {
+        rangeInput.addEventListener('change', (e) => {
+            hiddenInput.value = e.target.value;
         });
     }
+
+    function openDrawer() {
+        drawer.classList.remove('hidden');
+        // Small delay for animation
+        setTimeout(() => {
+            backdrop.classList.remove('opacity-0');
+            panel.classList.remove('translate-x-full');
+        }, 10);
+    }
+
+    function closeDrawer() {
+        backdrop.classList.add('opacity-0');
+        panel.classList.add('translate-x-full');
+        setTimeout(() => {
+            drawer.classList.add('hidden');
+        }, 300);
+    }
+
+    if(openBtn) openBtn.addEventListener('click', openDrawer);
+    if(closeBtn) closeBtn.addEventListener('click', closeDrawer);
+    if(backdrop) backdrop.addEventListener('click', closeDrawer);
 });
 </script>
 
