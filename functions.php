@@ -17,7 +17,7 @@ function dw_scripts() {
 	wp_enqueue_style( 'dw-main-style', get_template_directory_uri() . '/assets/css/main.css', array(), '1.0.3' );
     wp_enqueue_style( 'font-awesome', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css', array(), '6.4.0' );
     
-    // Tailwind (CDN untuk development, sebaiknya di-compile untuk production)
+    // Tailwind (CDN untuk development)
     wp_enqueue_script( 'tailwind', 'https://cdn.tailwindcss.com', array(), '3.3.0', false );
 
 	wp_enqueue_script( 'dw-main-script', get_template_directory_uri() . '/assets/js/main.js', array('jquery'), '1.0.0', true );
@@ -30,7 +30,7 @@ function dw_scripts() {
 }
 add_action( 'wp_enqueue_scripts', 'dw_scripts' );
 
-// Registrasi Query Var (Agar WordPress mengenali parameter custom kita di URL)
+// Registrasi Query Var
 function dw_query_vars( $vars ) {
     $vars[] = 'dw_slug';      // Untuk Wisata
     $vars[] = 'dw_slug_toko'; // Untuk Toko
@@ -39,10 +39,9 @@ function dw_query_vars( $vars ) {
 }
 add_filter( 'query_vars', 'dw_query_vars' );
 
-// Rewrite Rules Custom (Aturan URL Cantik)
+// Rewrite Rules Custom
 function dw_rewrite_rules() {
     // 1. Profil Desa: sadesa.site/@nama-desa
-    // Menangkap karakter setelah @ sebagai dw_slug_desa
     add_rewrite_rule(
         '^@([^/]*)/?',
         'index.php?pagename=profil-desa&dw_slug_desa=$matches[1]',
@@ -251,13 +250,10 @@ function dw_ajax_login_handler() {
     if (is_wp_error($user)) {
         wp_send_json_error(array('message' => $user->get_error_message()));
     } else {
-        // Cek Role untuk Redirect
         $redirect_url = home_url('/akun-saya');
         if (in_array('administrator', (array) $user->roles)) {
             $redirect_url = admin_url();
         } 
-        // Anda bisa menambahkan logika redirect custom berdasarkan role desa/pedagang disini
-        
         wp_send_json_success(array('redirect_url' => $redirect_url));
     }
 }
@@ -271,34 +267,28 @@ function dw_ajax_register_handler() {
     $username = sanitize_user($_POST['username']);
     $email    = sanitize_email($_POST['email']);
     $password = $_POST['password'];
-    $role     = sanitize_text_field($_POST['role']); // 'pembeli', 'pedagang', 'pengelola_desa'
+    $role     = sanitize_text_field($_POST['role']); 
 
-    // Validasi
     if (username_exists($username) || email_exists($email)) {
         wp_send_json_error(array('message' => 'Username atau Email sudah terdaftar.'));
     }
 
-    // Create User
     $user_id = wp_create_user($username, $password, $email);
 
     if (is_wp_error($user_id)) {
         wp_send_json_error(array('message' => $user_id->get_error_message()));
     } else {
-        // Set Role
         $user = new WP_User($user_id);
-        $user->set_role('subscriber'); // Default WP role
+        $user->set_role('subscriber'); 
         
-        // Simpan Role Custom di User Meta
         update_user_meta($user_id, 'dw_role', $role);
 
-        // Jika dia mendaftar sebagai Pedagang atau Desa, kita bisa inisialisasi data kosong di tabel terkait
         global $wpdb;
         if ($role === 'pengelola_desa') {
-            // Insert data awal ke tabel desa (status pending)
             $wpdb->insert($wpdb->prefix . 'dw_desa', array(
                 'id_user_desa' => $user_id,
                 'nama_desa'    => 'Desa Baru (Pending)',
-                'slug_desa'    => 'desa-baru-' . $user_id, // Slug sementara
+                'slug_desa'    => 'desa-baru-' . $user_id, 
                 'status'       => 'pending'
             ));
         } elseif ($role === 'pedagang') {
@@ -310,7 +300,6 @@ function dw_ajax_register_handler() {
             ));
         }
 
-        // Auto Login setelah register
         wp_set_current_user($user_id);
         wp_set_auth_cookie($user_id);
 
@@ -336,7 +325,6 @@ function dw_ajax_add_to_cart_handler() {
     $jenis   = sanitize_text_field($_POST['jenis']); // 'produk' atau 'tiket'
     $qty     = intval($_POST['qty']);
 
-    // Cek apakah item sudah ada di keranjang user
     $where = array('id_user' => $user_id, 'jenis_item' => $jenis);
     if ($jenis === 'produk') {
         $where['id_produk'] = $item_id;
@@ -344,9 +332,6 @@ function dw_ajax_add_to_cart_handler() {
         $where['id_wisata'] = $item_id;
     }
 
-    // Query cek exist
-    // Sederhana: delete dulu lalu insert baru atau update qty. Kita pakai logika update/insert
-    // Agar simpel, kita query dulu
     $query_cek = "SELECT id, qty FROM $table_keranjang WHERE id_user = $user_id AND jenis_item = '$jenis' AND " . ($jenis == 'produk' ? "id_produk = $item_id" : "id_wisata = $item_id");
     $existing = $wpdb->get_row($query_cek);
 
@@ -365,7 +350,6 @@ function dw_ajax_add_to_cart_handler() {
         $wpdb->insert($table_keranjang, $data_insert);
     }
 
-    // Hitung total item di keranjang
     $count = $wpdb->get_var("SELECT SUM(qty) FROM $table_keranjang WHERE id_user = $user_id");
 
     wp_send_json_success(array('message' => 'Berhasil ditambahkan ke keranjang', 'cart_count' => $count));
@@ -378,17 +362,21 @@ add_action('wp_ajax_dw_add_to_cart', 'dw_ajax_add_to_cart_handler');
  * ============================================================================
  */
 
-// Format Rupiah
-function dw_format_rupiah($angka) {
-    return 'Rp ' . number_format($angka, 0, ',', '.');
+// Format Rupiah (Wrapped to check if already defined by plugin)
+if ( ! function_exists( 'dw_format_rupiah' ) ) {
+    function dw_format_rupiah($angka) {
+        return 'Rp ' . number_format($angka, 0, ',', '.');
+    }
 }
 
 // Get Cart Count Global
-function dw_get_cart_count() {
-    if (!is_user_logged_in()) return 0;
-    global $wpdb;
-    $user_id = get_current_user_id();
-    $count = $wpdb->get_var("SELECT SUM(qty) FROM {$wpdb->prefix}dw_keranjang WHERE id_user = $user_id");
-    return $count ? $count : 0;
+if ( ! function_exists( 'dw_get_cart_count' ) ) {
+    function dw_get_cart_count() {
+        if (!is_user_logged_in()) return 0;
+        global $wpdb;
+        $user_id = get_current_user_id();
+        $count = $wpdb->get_var("SELECT SUM(qty) FROM {$wpdb->prefix}dw_keranjang WHERE id_user = $user_id");
+        return $count ? $count : 0;
+    }
 }
 ?>
