@@ -320,7 +320,7 @@ get_header();
                                         <input type="hidden" name="existing_foto" value="<?php echo esc_attr($p_data->foto_utama); ?>">
                                     </div>
                                 <?php endif; ?>
-                                <input type="file" name="foto_utama" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100 accept="image/*"">
+                                <input type="file" name="foto_utama" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100" accept="image/*">
                                 <p class="text-xs text-gray-400 mt-1">Format: JPG, PNG. Maks 2MB.</p>
                             </div>
 
