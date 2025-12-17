@@ -1,217 +1,167 @@
 <?php
 /**
- * Functions and definitions
+ * Functions and definitions for Tema Desa Wisata
+ * Integrasi Penuh dengan Desa Wisata Core DB
  */
 
-if ( ! function_exists( 'dw_setup' ) ) :
-	function dw_setup() {
-		add_theme_support( 'title-tag' );
-		add_theme_support( 'post-thumbnails' );
-        add_theme_support( 'woocommerce' );
-	}
-endif;
-add_action( 'after_setup_theme', 'dw_setup' );
-
-function dw_scripts() {
-	wp_enqueue_style( 'dw-style', get_stylesheet_uri() );
-	wp_enqueue_style( 'dw-main-style', get_template_directory_uri() . '/assets/css/main.css', array(), '1.0.3' );
-    wp_enqueue_style( 'font-awesome', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css', array(), '6.4.0' );
-    
-    // Tailwind (CDN untuk development)
-    wp_enqueue_script( 'tailwind', 'https://cdn.tailwindcss.com', array(), '3.3.0', false );
-
-	wp_enqueue_script( 'dw-main-script', get_template_directory_uri() . '/assets/js/main.js', array('jquery'), '1.0.0', true );
-
-    // Lokalisasi script untuk AJAX
-    wp_localize_script('dw-main-script', 'dw_ajax', array(
-        'ajax_url' => admin_url('admin-ajax.php'),
-        'nonce'    => wp_create_nonce('dw_nonce') 
-    ));
+if (!defined('ABSPATH')) {
+    exit;
 }
-add_action( 'wp_enqueue_scripts', 'dw_scripts' );
-
-// Registrasi Query Var
-function dw_query_vars( $vars ) {
-    $vars[] = 'dw_slug';      // Untuk Wisata
-    $vars[] = 'dw_slug_toko'; // Untuk Toko
-    $vars[] = 'dw_slug_desa'; // Untuk Desa
-    return $vars;
-}
-add_filter( 'query_vars', 'dw_query_vars' );
-
-// Rewrite Rules Custom
-function dw_rewrite_rules() {
-    // 1. Profil Desa: sadesa.site/@nama-desa
-    add_rewrite_rule(
-        '^@([^/]*)/?',
-        'index.php?pagename=profil-desa&dw_slug_desa=$matches[1]',
-        'top'
-    );
-
-    // 2. Detail Wisata: sadesa.site/wisata/detail/slug-wisata
-    add_rewrite_rule(
-        '^wisata/detail/([^/]*)/?',
-        'index.php?pagename=detail-wisata&dw_slug=$matches[1]',
-        'top'
-    );
-
-    // 3. Profil Toko: sadesa.site/toko/slug-toko
-    add_rewrite_rule(
-        '^toko/([^/]*)/?',
-        'index.php?pagename=profil-toko&dw_slug_toko=$matches[1]',
-        'top'
-    );
-}
-add_action( 'init', 'dw_rewrite_rules' );
-
 
 /**
  * ============================================================================
- * FUNGSI DATABASE & INSTALASI (SETUP TABEL)
+ * 1. SESSION START (Wajib untuk Cart)
+ * ============================================================================
+ */
+function dw_theme_start_session() {
+    if (!session_id() && !headers_sent()) {
+        session_start();
+    }
+}
+add_action('init', 'dw_theme_start_session', 1);
+
+/**
+ * ============================================================================
+ * 2. SETUP DASAR THEME
+ * ============================================================================
+ */
+function tema_desa_wisata_setup() {
+    add_theme_support('title-tag');
+    add_theme_support('post-thumbnails');
+    add_theme_support('custom-logo');
+    add_theme_support('woocommerce');
+    
+    register_nav_menus(array(
+        'primary' => __('Primary Menu', 'tema-desa-wisata'),
+        'footer'  => __('Footer Menu', 'tema-desa-wisata'),
+    ));
+}
+add_action('after_setup_theme', 'tema_desa_wisata_setup');
+
+/**
+ * ============================================================================
+ * 3. ENQUEUE SCRIPTS & STYLES
+ * ============================================================================
+ */
+function tema_desa_wisata_scripts() {
+    // Styles
+    wp_enqueue_style('main-style', get_template_directory_uri() . '/assets/css/main.css', array(), '1.0.0');
+    wp_enqueue_style('theme-style', get_stylesheet_uri());
+    wp_enqueue_style( 'font-awesome', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css', array(), '6.4.0' );
+    wp_enqueue_script( 'tailwind', 'https://cdn.tailwindcss.com', array(), '3.3.0', false );
+    
+    // Scripts
+    wp_enqueue_script('jquery');
+    wp_enqueue_script('main-script', get_template_directory_uri() . '/assets/js/main.js', array('jquery'), '1.0.0', true);
+    // Pastikan path ajax-cart.js benar
+    wp_enqueue_script('ajax-cart', get_template_directory_uri() . '/assets/js/ajax-cart.js', array('jquery'), '1.0.0', true);
+
+    // Localize Script untuk AJAX Cart
+    wp_localize_script('main-script', 'dw_ajax', array(
+        'ajax_url'     => admin_url('admin-ajax.php'),
+        'nonce'        => wp_create_nonce('dw_cart_nonce'),
+        'site_url'     => home_url(),
+        'checkout_url' => home_url('/checkout')
+    ));
+    // Support legacy script handle jika ada
+    wp_localize_script('ajax-cart', 'dw_ajax_data', array(
+        'ajax_url'     => admin_url('admin-ajax.php'),
+        'nonce'        => wp_create_nonce('dw_cart_nonce'),
+        'site_url'     => home_url()
+    ));
+}
+add_action('wp_enqueue_scripts', 'tema_desa_wisata_scripts');
+
+/**
+ * ============================================================================
+ * 4. CUSTOM URL & REWRITE RULES (SOLUSI 404)
+ * ============================================================================
+ */
+
+// A. Daftarkan variable query baru
+function dw_register_query_vars( $vars ) {
+    $vars[] = 'dw_slug';      // Untuk Wisata
+    $vars[] = 'dw_slug_toko'; // Untuk Profil Toko
+    $vars[] = 'dw_slug_desa'; // Untuk Profil Desa
+    return $vars;
+}
+add_filter( 'query_vars', 'dw_register_query_vars' );
+
+// B. Tambahkan Aturan Rewrite URL
+function dw_add_rewrite_rules() {
+    // 1. Profil Desa: sadesa.site/@nama-desa
+    // Mengarahkan ke index.php dengan query var khusus, bukan pagename
+    add_rewrite_rule(
+        '^@([^/]*)/?',
+        'index.php?dw_slug_desa=$matches[1]',
+        'top'
+    );
+
+    // 2. Profil Toko: sadesa.site/toko/nama-toko
+    add_rewrite_rule(
+        '^toko/([^/]*)/?',
+        'index.php?dw_slug_toko=$matches[1]',
+        'top'
+    );
+
+    // 3. Detail Wisata: sadesa.site/wisata/detail/judul-wisata
+    add_rewrite_rule(
+        '^wisata/detail/([^/]*)/?',
+        'index.php?dw_slug=$matches[1]', // Menggunakan dw_slug agar tidak bentrok dengan post type default
+        'top'
+    );
+    
+    // 4. Detail Produk: sadesa.site/produk/detail/judul-produk
+    add_rewrite_rule(
+        '^produk/detail/([^/]*)/?',
+        'index.php?pagename=detail-produk&dw_slug=$matches[1]',
+        'top'
+    );
+}
+add_action( 'init', 'dw_add_rewrite_rules' );
+
+// C. Template Loader (Mencegah 404 dengan memuat file template secara paksa)
+function dw_template_include( $template ) {
+    // Jika ada query var dw_slug_desa, muat page-profil-desa.php
+    if ( get_query_var( 'dw_slug_desa' ) ) {
+        $new_template = locate_template( array( 'page-profil-desa.php' ) );
+        if ( '' != $new_template ) {
+            return $new_template;
+        }
+    }
+
+    // Jika ada query var dw_slug_toko, muat page-profil-toko.php
+    if ( get_query_var( 'dw_slug_toko' ) ) {
+        $new_template = locate_template( array( 'page-profil-toko.php' ) );
+        if ( '' != $new_template ) {
+            return $new_template;
+        }
+    }
+
+    // Jika ada query var dw_slug (untuk wisata), muat page-detail-wisata.php
+    if ( get_query_var( 'dw_slug' ) ) {
+        $new_template = locate_template( array( 'page-detail-wisata.php' ) );
+        if ( '' != $new_template ) {
+            return $new_template;
+        }
+    }
+
+    return $template;
+}
+add_filter( 'template_include', 'dw_template_include' );
+
+/**
+ * ============================================================================
+ * 5. DATABASE SETUP (Dijalankan sekali saat switch theme)
  * ============================================================================
  */
 function dw_create_tables() {
     global $wpdb;
     $charset_collate = $wpdb->get_charset_collate();
-
     require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
+    $table_prefix = $wpdb->prefix . 'dw_'; 
 
-    $table_prefix = $wpdb->prefix . 'dw_'; // Prefix khusus tema: wp_dw_
-
-    // 1. Tabel Desa
-    $sql_desa = "CREATE TABLE {$table_prefix}desa (
-        id BIGINT(20) NOT NULL AUTO_INCREMENT,
-        id_user_desa BIGINT(20) UNSIGNED NOT NULL,
-        nama_desa VARCHAR(255) NOT NULL,
-        slug_desa VARCHAR(255) NOT NULL,
-        deskripsi TEXT,
-        foto VARCHAR(255) DEFAULT NULL,
-        persentase_komisi_penjualan DECIMAL(5,2) DEFAULT 0,
-        no_rekening_desa VARCHAR(50) DEFAULT NULL,
-        nama_bank_desa VARCHAR(100) DEFAULT NULL,
-        atas_nama_rekening_desa VARCHAR(100) DEFAULT NULL,
-        qris_image_url_desa VARCHAR(255) DEFAULT NULL,
-        website_desa VARCHAR(255) DEFAULT NULL,
-        status ENUM('aktif','pending') DEFAULT 'pending',
-        provinsi VARCHAR(100),
-        kabupaten VARCHAR(100),
-        kecamatan VARCHAR(100),
-        kelurahan VARCHAR(100),
-        api_provinsi_id VARCHAR(20),
-        api_kabupaten_id VARCHAR(20),
-        api_kecamatan_id VARCHAR(20),
-        api_kelurahan_id VARCHAR(20),
-        alamat_lengkap TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        PRIMARY KEY  (id),
-        KEY id_user_desa (id_user_desa),
-        KEY slug_desa (slug_desa),
-        KEY idx_lokasi (api_kabupaten_id)
-    ) $charset_collate;";
-    dbDelta( $sql_desa );
-
-    // 2. Tabel Wisata
-    $sql_wisata = "CREATE TABLE {$table_prefix}wisata (
-        id BIGINT(20) NOT NULL AUTO_INCREMENT,
-        id_desa BIGINT(20) NOT NULL,
-        nama_wisata VARCHAR(255) NOT NULL,
-        slug VARCHAR(255) NOT NULL,
-        deskripsi TEXT,
-        harga_tiket DECIMAL(15,2) DEFAULT 0,
-        jam_buka VARCHAR(100),
-        foto_utama VARCHAR(255),
-        foto_galeri TEXT, 
-        rating_avg DECIMAL(3,2) DEFAULT 0,
-        status ENUM('aktif','nonaktif') DEFAULT 'aktif',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        PRIMARY KEY  (id),
-        KEY id_desa (id_desa),
-        KEY slug (slug)
-    ) $charset_collate;";
-    dbDelta( $sql_wisata );
-
-    // 3. Tabel Pedagang (UMKM/Toko)
-    $sql_pedagang = "CREATE TABLE {$table_prefix}pedagang (
-        id BIGINT(20) NOT NULL AUTO_INCREMENT,
-        id_user_pedagang BIGINT(20) UNSIGNED NOT NULL,
-        id_desa BIGINT(20) DEFAULT NULL, 
-        nama_toko VARCHAR(255) NOT NULL,
-        slug_toko VARCHAR(255) NOT NULL,
-        nama_pemilik VARCHAR(255),
-        deskripsi_toko TEXT,
-        foto_profil VARCHAR(255),
-        no_hp_wa VARCHAR(20),
-        alamat_toko TEXT,
-        status_akun ENUM('aktif','pending','suspend') DEFAULT 'pending',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        PRIMARY KEY  (id),
-        KEY id_user_pedagang (id_user_pedagang),
-        KEY id_desa (id_desa),
-        KEY slug_toko (slug_toko)
-    ) $charset_collate;";
-    dbDelta( $sql_pedagang );
-
-     // 4. Tabel Produk
-     $sql_produk = "CREATE TABLE {$table_prefix}produk (
-        id BIGINT(20) NOT NULL AUTO_INCREMENT,
-        id_pedagang BIGINT(20) NOT NULL,
-        nama_produk VARCHAR(255) NOT NULL,
-        slug_produk VARCHAR(255) NOT NULL,
-        deskripsi_produk TEXT,
-        harga DECIMAL(15,2) NOT NULL,
-        stok INT DEFAULT 0,
-        foto_produk VARCHAR(255),
-        kategori VARCHAR(100),
-        terjual INT DEFAULT 0,
-        status ENUM('aktif','habis','nonaktif') DEFAULT 'aktif',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        PRIMARY KEY  (id),
-        KEY id_pedagang (id_pedagang),
-        KEY slug_produk (slug_produk)
-    ) $charset_collate;";
-    dbDelta( $sql_produk );
-
-    // 5. Tabel Transaksi
-    $sql_transaksi = "CREATE TABLE {$table_prefix}transaksi (
-        id BIGINT(20) NOT NULL AUTO_INCREMENT,
-        kode_transaksi VARCHAR(50) NOT NULL UNIQUE,
-        id_user_pembeli BIGINT(20) UNSIGNED NOT NULL,
-        total_belanja DECIMAL(15,2) NOT NULL,
-        status_pembayaran ENUM('pending','success','failed','expired') DEFAULT 'pending',
-        snap_token VARCHAR(255),
-        payment_url TEXT,
-        tanggal_transaksi DATETIME DEFAULT CURRENT_TIMESTAMP,
-        metode_pembayaran VARCHAR(50),
-        detail_pengiriman TEXT, 
-        PRIMARY KEY  (id),
-        KEY id_user_pembeli (id_user_pembeli)
-    ) $charset_collate;";
-    dbDelta( $sql_transaksi );
-
-    // 6. Tabel Detail Transaksi (Item Belanja)
-    $sql_detail_transaksi = "CREATE TABLE {$table_prefix}detail_transaksi (
-        id BIGINT(20) NOT NULL AUTO_INCREMENT,
-        id_transaksi BIGINT(20) NOT NULL,
-        id_produk BIGINT(20) DEFAULT NULL, 
-        id_wisata BIGINT(20) DEFAULT NULL, 
-        jenis_item ENUM('produk','tiket') NOT NULL,
-        nama_item VARCHAR(255) NOT NULL,
-        harga_satuan DECIMAL(15,2) NOT NULL,
-        qty INT NOT NULL,
-        subtotal DECIMAL(15,2) NOT NULL,
-        catatan_pembeli TEXT,
-        status_pesanan ENUM('menunggu_pembayaran','diproses','dikirim','selesai','dibatalkan') DEFAULT 'menunggu_pembayaran',
-        no_resi VARCHAR(100),
-        PRIMARY KEY  (id),
-        KEY id_transaksi (id_transaksi)
-    ) $charset_collate;";
-    dbDelta( $sql_detail_transaksi );
-    
-    // 7. Tabel Keranjang (Cart)
+    // Tabel Keranjang (Hanya contoh, tabel lain dianggap sudah ada dari plugin Core)
     $sql_keranjang = "CREATE TABLE {$table_prefix}keranjang (
         id BIGINT(20) NOT NULL AUTO_INCREMENT,
         id_user BIGINT(20) UNSIGNED NOT NULL,
@@ -225,158 +175,167 @@ function dw_create_tables() {
     ) $charset_collate;";
     dbDelta( $sql_keranjang );
 }
-
-// Jalankan pembuatan tabel saat tema diaktifkan
 add_action('after_switch_theme', 'dw_create_tables');
 
 /**
  * ============================================================================
- * FUNGSI AJAX HANDLERS
+ * 6. HELPER FUNCTIONS (Dengan Pengecekan agar tidak Crash)
  * ============================================================================
  */
 
-// 1. Handler Login
-function dw_ajax_login_handler() {
-    check_ajax_referer('dw_nonce', 'security');
-    
-    $creds = array(
-        'user_login'    => sanitize_text_field($_POST['username']),
-        'user_password' => $_POST['password'],
-        'remember'      => true
-    );
+// Format Rupiah
+if ( ! function_exists( 'dw_format_rupiah' ) ) {
+    function dw_format_rupiah($angka) {
+        return 'Rp ' . number_format((float)$angka, 0, ',', '.');
+    }
+}
 
-    $user = wp_signon($creds, false);
+// Get Cart Items
+if (!function_exists('dw_get_cart_items')) {
+    function dw_get_cart_items() {
+        return isset($_SESSION['dw_cart']) ? $_SESSION['dw_cart'] : array();
+    }
+}
 
-    if (is_wp_error($user)) {
-        wp_send_json_error(array('message' => $user->get_error_message()));
-    } else {
-        $redirect_url = home_url('/akun-saya');
-        if (in_array('administrator', (array) $user->roles)) {
-            $redirect_url = admin_url();
-        } 
-        wp_send_json_success(array('redirect_url' => $redirect_url));
+// Get Cart Total
+if (!function_exists('dw_get_cart_total')) {
+    function dw_get_cart_total() {
+        $items = dw_get_cart_items();
+        $total = 0;
+        if(is_array($items)) {
+            foreach ($items as $item) {
+                $total += $item['price'] * $item['quantity'];
+            }
+        }
+        return $total;
+    }
+}
+
+// Get Cart Count Global (Untuk Header)
+if ( ! function_exists( 'dw_get_cart_count' ) ) {
+    function dw_get_cart_count() {
+        // Cek session dulu
+        if (isset($_SESSION['dw_cart'])) {
+            return count($_SESSION['dw_cart']);
+        }
+        // Jika user login dan ingin cek DB (opsional)
+        if (is_user_logged_in()) {
+            global $wpdb;
+            $user_id = get_current_user_id();
+            $table = $wpdb->prefix . 'dw_keranjang';
+            if($wpdb->get_var("SHOW TABLES LIKE '$table'") == $table) {
+                $count = $wpdb->get_var("SELECT SUM(qty) FROM $table WHERE id_user = $user_id");
+                return $count ? $count : 0;
+            }
+        }
+        return 0;
+    }
+}
+
+/**
+ * ============================================================================
+ * 7. AJAX HANDLERS
+ * ============================================================================
+ */
+
+// Add To Cart (Session Based)
+if (!function_exists('dw_ajax_add_to_cart')) {
+    function dw_ajax_add_to_cart() {
+        // Cek nonce
+        if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'dw_cart_nonce')) {
+            wp_send_json_error(['message' => 'Security check failed']);
+        }
+
+        $product_id = intval($_POST['product_id']);
+        $quantity   = intval($_POST['quantity']);
+        $is_custom_db = isset($_POST['is_custom_db']) ? true : false;
+
+        if (!$product_id) wp_send_json_error(['message' => 'Produk tidak valid']);
+
+        $product_name  = 'Produk';
+        $product_price = 0;
+        $product_image = '';
+
+        // Ambil data produk
+        if ($is_custom_db) {
+            global $wpdb;
+            $tbl_prod = $wpdb->prefix . 'dw_produk';
+            $prod = $wpdb->get_row($wpdb->prepare("SELECT * FROM $tbl_prod WHERE id = %d", $product_id));
+            
+            if($prod) {
+                $product_name  = $prod->nama_produk;
+                $product_price = $prod->harga;
+                $product_image = $prod->foto_utama;
+            }
+        } else {
+            // Fallback ke Post Type (Wisata tiket misalnya)
+            $table_wisata = $wpdb->prefix . 'dw_wisata';
+            $wisata = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_wisata WHERE id = %d", $product_id));
+            if($wisata) {
+                $product_name = $wisata->nama_wisata;
+                $product_price = $wisata->harga_tiket;
+                $product_image = $wisata->foto_utama;
+            }
+        }
+
+        if (!isset($_SESSION['dw_cart'])) $_SESSION['dw_cart'] = [];
+
+        // Cek apakah produk sudah ada di cart
+        $found = false;
+        foreach ($_SESSION['dw_cart'] as &$item) {
+            if ($item['product_id'] == $product_id) {
+                $item['quantity'] += $quantity;
+                $found = true;
+                break;
+            }
+        }
+
+        // Jika belum ada, tambahkan baru
+        if (!$found) {
+            $_SESSION['dw_cart'][] = [
+                'product_id' => $product_id,
+                'name'       => $product_name,
+                'price'      => $product_price,
+                'image'      => $product_image,
+                'quantity'   => $quantity
+            ];
+        }
+
+        wp_send_json_success(['message' => 'Berhasil masuk keranjang', 'count' => count($_SESSION['dw_cart'])]);
+    }
+}
+add_action('wp_ajax_dw_theme_add_to_cart', 'dw_ajax_add_to_cart');
+add_action('wp_ajax_nopriv_dw_theme_add_to_cart', 'dw_ajax_add_to_cart');
+
+// AJAX Login (Supaya tidak error jika file page-login.php memanggilnya)
+if (!function_exists('dw_ajax_login_handler')) {
+    function dw_ajax_login_handler() {
+        check_ajax_referer('dw_nonce', 'security');
+        $creds = array(
+            'user_login'    => sanitize_text_field($_POST['username']),
+            'user_password' => $_POST['password'],
+            'remember'      => true
+        );
+        $user = wp_signon($creds, false);
+        if (is_wp_error($user)) {
+            wp_send_json_error(array('message' => $user->get_error_message()));
+        } else {
+            wp_send_json_success(array('redirect_url' => home_url('/akun-saya')));
+        }
     }
 }
 add_action('wp_ajax_dw_login', 'dw_ajax_login_handler');
 add_action('wp_ajax_nopriv_dw_login', 'dw_ajax_login_handler');
 
-// 2. Handler Register
-function dw_ajax_register_handler() {
-    check_ajax_referer('dw_nonce', 'security');
-
-    $username = sanitize_user($_POST['username']);
-    $email    = sanitize_email($_POST['email']);
-    $password = $_POST['password'];
-    $role     = sanitize_text_field($_POST['role']); 
-
-    if (username_exists($username) || email_exists($email)) {
-        wp_send_json_error(array('message' => 'Username atau Email sudah terdaftar.'));
+// Login Redirect
+function dw_custom_login_redirect_final($redirect_to, $request, $user) {
+    if (isset($user->roles) && is_array($user->roles)) {
+        if (in_array('pedagang', $user->roles)) return home_url('/dashboard-toko');
+        elseif (in_array('admin_desa', $user->roles)) return home_url('/dashboard-desa');
+        elseif (in_array('administrator', $user->roles)) return admin_url();
     }
-
-    $user_id = wp_create_user($username, $password, $email);
-
-    if (is_wp_error($user_id)) {
-        wp_send_json_error(array('message' => $user_id->get_error_message()));
-    } else {
-        $user = new WP_User($user_id);
-        $user->set_role('subscriber'); 
-        
-        update_user_meta($user_id, 'dw_role', $role);
-
-        global $wpdb;
-        if ($role === 'pengelola_desa') {
-            $wpdb->insert($wpdb->prefix . 'dw_desa', array(
-                'id_user_desa' => $user_id,
-                'nama_desa'    => 'Desa Baru (Pending)',
-                'slug_desa'    => 'desa-baru-' . $user_id, 
-                'status'       => 'pending'
-            ));
-        } elseif ($role === 'pedagang') {
-            $wpdb->insert($wpdb->prefix . 'dw_pedagang', array(
-                'id_user_pedagang' => $user_id,
-                'nama_toko'        => 'Toko Baru',
-                'slug_toko'        => 'toko-baru-' . $user_id,
-                'status_akun'      => 'pending'
-            ));
-        }
-
-        wp_set_current_user($user_id);
-        wp_set_auth_cookie($user_id);
-
-        wp_send_json_success(array('redirect_url' => home_url('/akun-saya')));
-    }
+    return home_url('/akun-saya');
 }
-add_action('wp_ajax_dw_register', 'dw_ajax_register_handler');
-add_action('wp_ajax_nopriv_dw_register', 'dw_ajax_register_handler');
+add_filter('login_redirect', 'dw_custom_login_redirect_final', 10, 3);
 
-// 3. Handler Add to Cart
-function dw_ajax_add_to_cart_handler() {
-    check_ajax_referer('dw_nonce', 'security');
-
-    if (!is_user_logged_in()) {
-        wp_send_json_error(array('message' => 'Silakan login terlebih dahulu.'));
-    }
-
-    global $wpdb;
-    $table_keranjang = $wpdb->prefix . 'dw_keranjang';
-    $user_id = get_current_user_id();
-    
-    $item_id = intval($_POST['item_id']);
-    $jenis   = sanitize_text_field($_POST['jenis']); // 'produk' atau 'tiket'
-    $qty     = intval($_POST['qty']);
-
-    $where = array('id_user' => $user_id, 'jenis_item' => $jenis);
-    if ($jenis === 'produk') {
-        $where['id_produk'] = $item_id;
-    } else {
-        $where['id_wisata'] = $item_id;
-    }
-
-    $query_cek = "SELECT id, qty FROM $table_keranjang WHERE id_user = $user_id AND jenis_item = '$jenis' AND " . ($jenis == 'produk' ? "id_produk = $item_id" : "id_wisata = $item_id");
-    $existing = $wpdb->get_row($query_cek);
-
-    if ($existing) {
-        $new_qty = $existing->qty + $qty;
-        $wpdb->update($table_keranjang, array('qty' => $new_qty), array('id' => $existing->id));
-    } else {
-        $data_insert = array(
-            'id_user' => $user_id,
-            'jenis_item' => $jenis,
-            'qty' => $qty
-        );
-        if ($jenis === 'produk') $data_insert['id_produk'] = $item_id;
-        else $data_insert['id_wisata'] = $item_id;
-
-        $wpdb->insert($table_keranjang, $data_insert);
-    }
-
-    $count = $wpdb->get_var("SELECT SUM(qty) FROM $table_keranjang WHERE id_user = $user_id");
-
-    wp_send_json_success(array('message' => 'Berhasil ditambahkan ke keranjang', 'cart_count' => $count));
-}
-add_action('wp_ajax_dw_add_to_cart', 'dw_ajax_add_to_cart_handler');
-
-/**
- * ============================================================================
- * FUNGSI HELPER
- * ============================================================================
- */
-
-// Format Rupiah (Wrapped to check if already defined by plugin)
-if ( ! function_exists( 'dw_format_rupiah' ) ) {
-    function dw_format_rupiah($angka) {
-        return 'Rp ' . number_format($angka, 0, ',', '.');
-    }
-}
-
-// Get Cart Count Global
-if ( ! function_exists( 'dw_get_cart_count' ) ) {
-    function dw_get_cart_count() {
-        if (!is_user_logged_in()) return 0;
-        global $wpdb;
-        $user_id = get_current_user_id();
-        $count = $wpdb->get_var("SELECT SUM(qty) FROM {$wpdb->prefix}dw_keranjang WHERE id_user = $user_id");
-        return $count ? $count : 0;
-    }
-}
 ?>
