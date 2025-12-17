@@ -1,18 +1,19 @@
 <?php
-/* Template Name: Halaman Akun Saya */
+/**
+ * Template Name: Halaman Akun Saya
+ */
 
-// Redirect jika belum login
 if (!is_user_logged_in()) {
     wp_redirect(home_url('/login'));
     exit;
 }
 
+get_header();
 $current_user = wp_get_current_user();
-get_header(); 
 ?>
 
 <!-- Container Responsif -->
-<div class="max-w-4xl mx-auto">
+<div class="max-w-4xl mx-auto px-4 py-8">
 
     <!-- Header Profil -->
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6 flex flex-col md:flex-row items-center md:items-start gap-6 relative overflow-hidden">
@@ -49,20 +50,31 @@ get_header();
         <!-- Menu Transaksi -->
         <a href="<?php echo home_url('/transaksi'); ?>" class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition hover:-translate-y-1 group">
             <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-xl mb-3 group-hover:bg-blue-600 group-hover:text-white transition">
-                <i class="fas fa-shopping-bag"></i>
+                <i class="fas fa-receipt"></i>
             </div>
-            <h3 class="font-bold text-gray-800 mb-1">Pesanan Saya</h3>
+            <h3 class="font-bold text-gray-800 mb-1">Riwayat Transaksi</h3>
             <p class="text-xs text-gray-500">Lihat riwayat belanja & status</p>
         </a>
 
         <!-- Menu Favorit -->
-        <a href="#" class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition hover:-translate-y-1 group">
-            <div class="w-12 h-12 bg-pink-50 text-pink-500 rounded-xl flex items-center justify-center text-xl mb-3 group-hover:bg-pink-500 group-hover:text-white transition">
+        <a href="<?php echo home_url('/favorit'); ?>" class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition hover:-translate-y-1 group">
+            <div class="w-12 h-12 bg-red-50 text-red-500 rounded-xl flex items-center justify-center text-xl mb-3 group-hover:bg-red-500 group-hover:text-white transition">
                 <i class="fas fa-heart"></i>
             </div>
-            <h3 class="font-bold text-gray-800 mb-1">Favorit</h3>
+            <h3 class="font-bold text-gray-800 mb-1">Favorit Saya</h3>
             <p class="text-xs text-gray-500">Wisata & produk tersimpan</p>
         </a>
+
+        <!-- Jika Pedagang / Admin Desa -->
+        <?php if (in_array('pedagang', (array) $current_user->roles) || in_array('admin_desa', (array) $current_user->roles)) : ?>
+        <a href="<?php echo home_url('/dashboard-toko'); ?>" class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition hover:-translate-y-1 group">
+            <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-xl mb-3 group-hover:bg-blue-600 group-hover:text-white transition">
+                <i class="fas fa-store"></i>
+            </div>
+            <h3 class="font-bold text-gray-800 mb-1">Kelola Toko</h3>
+            <p class="text-xs text-gray-500">Atur produk & pesanan</p>
+        </a>
+        <?php endif; ?>
 
         <!-- Menu Alamat -->
         <a href="#" class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition hover:-translate-y-1 group">
@@ -74,7 +86,7 @@ get_header();
         </a>
 
          <!-- Menu Bantuan -->
-         <a href="#" class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition hover:-translate-y-1 group">
+         <a href="<?php echo home_url('/tentang'); ?>" class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition hover:-translate-y-1 group">
             <div class="w-12 h-12 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center text-xl mb-3 group-hover:bg-purple-600 group-hover:text-white transition">
                 <i class="fas fa-headset"></i>
             </div>

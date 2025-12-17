@@ -1,90 +1,67 @@
-</main>
-        <!-- MAIN CONTENT END -->
+<?php
+/**
+ * The template for displaying the footer
+ */
+?>
 
-        <!-- DESKTOP FOOTER (Hidden on Mobile) -->
-        <footer class="hidden md:block bg-white border-t border-gray-200 pt-10 pb-6 mt-auto">
-            <div class="container mx-auto px-4">
-                <div class="grid grid-cols-4 gap-8 mb-8">
-                    <div>
-                        <div class="flex items-center gap-2 mb-4">
-                            <i class="fas fa-leaf text-emerald-600 text-2xl"></i>
-                            <span class="font-bold text-xl text-gray-800"><?php bloginfo('name'); ?></span>
-                        </div>
-                        <p class="text-gray-500 text-sm leading-relaxed">Platform digital untuk menjelajahi keindahan desa wisata dan mendukung produk UMKM lokal.</p>
-                    </div>
-                    <div>
-                        <h4 class="font-bold text-gray-800 mb-4">Navigasi</h4>
-                        <ul class="space-y-2 text-sm text-gray-600">
-                            <li><a href="<?php echo home_url('/wisata'); ?>" class="hover:text-emerald-600">Jelajah Wisata</a></li>
-                            <li><a href="<?php echo home_url('/produk'); ?>" class="hover:text-emerald-600">Produk Desa</a></li>
-                            <li><a href="<?php echo home_url('/tentang'); ?>" class="hover:text-emerald-600">Tentang Kami</a></li>
-                        </ul>
-                    </div>
-                    <div>
-                        <h4 class="font-bold text-gray-800 mb-4">Bantuan</h4>
-                        <ul class="space-y-2 text-sm text-gray-600">
-                            <li><a href="#" class="hover:text-emerald-600">Cara Pembelian</a></li>
-                            <li><a href="#" class="hover:text-emerald-600">Hubungi Kami</a></li>
-                            <li><a href="#" class="hover:text-emerald-600">Syarat & Ketentuan</a></li>
-                        </ul>
-                    </div>
-                    <div>
-                        <h4 class="font-bold text-gray-800 mb-4">Unduh Aplikasi</h4>
-                        <div class="flex gap-2">
-                            <button class="bg-gray-900 text-white px-3 py-2 rounded-lg text-xs flex items-center gap-2 hover:bg-gray-800">
-                                <i class="fab fa-google-play text-lg"></i>
-                                <div class="text-left">
-                                    <span class="block text-[8px] uppercase">Get it on</span>
-                                    <span class="font-bold">Google Play</span>
-                                </div>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                <div class="border-t border-gray-100 pt-6 text-center text-sm text-gray-400">
-                    &copy; <?php echo date('Y'); ?> <?php bloginfo('name'); ?>. All rights reserved.
-                </div>
-            </div>
-        </footer>
+<!-- === FOOTER DESKTOP (Sederhana) === -->
+<footer class="bg-white border-t border-gray-100 pt-10 pb-24 md:pb-10 mt-auto">
+    <div class="container mx-auto px-4">
+        <div class="text-center text-gray-500 text-sm">
+            &copy; <?php echo date('Y'); ?> <?php bloginfo('name'); ?>. All rights reserved.
+        </div>
+    </div>
+</footer>
 
-        <!-- MOBILE BOTTOM NAVIGATION (Fixed) -->
-        <nav class="md:hidden bg-white border-t border-gray-200 px-4 py-2 flex justify-between items-end fixed bottom-0 left-0 right-0 z-50 w-full shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-            
-            <!-- 1. Beranda -->
-            <a href="<?php echo home_url(); ?>" class="flex flex-col items-center gap-1 <?php echo is_front_page() ? 'text-primary' : 'text-gray-400 hover:text-primary'; ?> transition w-16 p-1">
-                <i class="fas fa-home text-lg"></i>
-                <span class="text-[10px] font-medium">Beranda</span>
-            </a>
-            
-            <!-- 2. Jelajah -->
-            <a href="<?php echo home_url('/wisata'); ?>" class="flex flex-col items-center gap-1 <?php echo is_page('wisata') ? 'text-primary' : 'text-gray-400 hover:text-primary'; ?> transition w-16 p-1">
-                <i class="fas fa-compass text-lg"></i>
-                <span class="text-[10px] font-medium">Jelajah</span>
-            </a>
-            
-            <!-- 3. Produk (Center Featured) -->
-            <div class="relative -top-6 w-16 flex flex-col items-center">
-                <a href="<?php echo home_url('/produk'); ?>" class="bg-primary text-white w-12 h-12 rounded-full flex items-center justify-center shadow-lg border-4 border-gray-50 transform active:scale-95 transition">
-                    <i class="fas fa-box-open text-lg"></i>
-                </a>
-                <span class="text-[10px] font-medium text-primary mt-1">Produk</span>
-            </div>
-            
-            <!-- 4. Transaksi -->
-            <a href="<?php echo home_url('/transaksi'); ?>" class="flex flex-col items-center gap-1 <?php echo is_page('transaksi') ? 'text-primary' : 'text-gray-400 hover:text-primary'; ?> transition w-16 p-1">
-                <i class="fas fa-receipt text-lg"></i>
-                <span class="text-[10px] font-medium">Transaksi</span>
-            </a>
-            
-            <!-- 5. Akun -->
-            <a href="<?php echo is_user_logged_in() ? home_url('/akun-saya') : home_url('/login'); ?>" class="flex flex-col items-center gap-1 <?php echo is_page('akun-saya') ? 'text-primary' : 'text-gray-400 hover:text-primary'; ?> transition w-16 p-1">
-                <i class="fas fa-user text-lg"></i>
-                <span class="text-[10px] font-medium">Akun</span>
-            </a>
-        </nav>
+<!-- === MOBILE BOTTOM NAVIGATION (FIXED) === -->
+<div class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 pb-safe">
+    <div class="grid grid-cols-5 h-16">
+        <!-- Home -->
+        <a href="<?php echo home_url('/'); ?>" class="flex flex-col items-center justify-center text-gray-400 hover:text-green-600 <?php echo is_front_page() ? 'text-green-600' : ''; ?>">
+            <i class="fas fa-home text-lg mb-1"></i>
+            <span class="text-[10px] font-medium">Beranda</span>
+        </a>
 
-    </div> <!-- End of Main Wrapper -->
+        <!-- Wisata -->
+        <a href="<?php echo home_url('/wisata'); ?>" class="flex flex-col items-center justify-center text-gray-400 hover:text-green-600 <?php echo is_page('wisata') || is_post_type_archive('dw_wisata') ? 'text-green-600' : ''; ?>">
+            <i class="fas fa-compass text-lg mb-1"></i>
+            <span class="text-[10px] font-medium">Wisata</span>
+        </a>
 
-    <?php wp_footer(); ?>
+        <!-- Tengah (Cart/Scan) -->
+        <div class="relative flex justify-center items-end pb-2">
+            <a href="<?php echo home_url('/cart'); ?>" class="absolute -top-5 w-14 h-14 bg-green-600 rounded-full flex items-center justify-center text-white shadow-lg shadow-green-200 border-4 border-white transform transition active:scale-95">
+                <i class="fas fa-shopping-basket text-xl"></i>
+                <?php 
+                $cart_count = function_exists('dw_get_cart_count') ? dw_get_cart_count() : 0;
+                if($cart_count > 0): 
+                ?>
+                <span class="absolute top-0 right-0 w-4 h-4 bg-red-500 text-white text-[9px] font-bold flex items-center justify-center rounded-full border-2 border-green-600">
+                    <?php echo $cart_count; ?>
+                </span>
+                <?php endif; ?>
+            </a>
+        </div>
+
+        <!-- Favorit (Pengganti Transaksi) -->
+        <a href="<?php echo home_url('/favorit'); ?>" class="flex flex-col items-center justify-center text-gray-400 hover:text-green-600 <?php echo get_query_var('dw_is_favorit') ? 'text-green-600' : ''; ?>">
+            <i class="fas fa-heart text-lg mb-1"></i>
+            <span class="text-[10px] font-medium">Favorit</span>
+        </a>
+
+        <!-- Akun -->
+        <a href="<?php echo home_url('/akun-saya'); ?>" class="flex flex-col items-center justify-center text-gray-400 hover:text-green-600 <?php echo is_page('akun-saya') ? 'text-green-600' : ''; ?>">
+            <i class="fas fa-user text-lg mb-1"></i>
+            <span class="text-[10px] font-medium">Akun</span>
+        </a>
+    </div>
+</div>
+
+<style>
+/* Safe area for iPhone home bar */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+</style>
+
+<?php wp_footer(); ?>
 </body>
 </html>
