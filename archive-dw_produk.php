@@ -19,6 +19,7 @@ $max_harga  = isset($_GET['max_price']) ? intval($_GET['max_price']) : 0;
 $urutan     = isset($_GET['sort']) ? sanitize_text_field($_GET['sort']) : 'terbaru';
 
 // --- 2. QUERY BUILDER ---
+// Pastikan nama tabel benar dan ada prefix wp_
 $sql = "SELECT p.*, pd.nama_toko, pd.slug_toko, d.kabupaten, d.nama_desa 
         FROM $table_produk p 
         LEFT JOIN $table_pedagang pd ON p.id_pedagang = pd.id
@@ -58,9 +59,10 @@ $total_pages = ceil($total_items / $items_per_page);
 $sql .= $wpdb->prepare(" LIMIT %d OFFSET %d", $items_per_page, $offset);
 $produk_list = $wpdb->get_results($sql);
 
-// Data Filter Dinamis
+// Data Filter Dinamis (Gunakan DISTINCT agar efisien)
 $list_kabupaten = $wpdb->get_col("SELECT DISTINCT kabupaten FROM $table_desa WHERE status='aktif' AND kabupaten != '' ORDER BY kabupaten ASC");
 $list_kategori = $wpdb->get_col("SELECT DISTINCT kategori FROM $table_produk WHERE status='aktif' AND kategori != '' ORDER BY kategori ASC");
+
 if(empty($list_kategori)) $list_kategori = ['Makanan', 'Minuman', 'Kerajinan', 'Fashion', 'Pertanian'];
 
 // Warna Kategori (Style Wisata)
@@ -184,24 +186,43 @@ function get_cat_color_prod($cat) {
             <?php foreach ($produk_list as $p) : 
                 $link_p = !empty($p->slug_produk) ? home_url('/produk/detail/' . $p->slug_produk) : home_url('/detail-produk/?id=' . $p->id);
                 
-                // --- FIX GAMBAR PRODUK ---
-                // Cek apakah foto_produk berisi ID attachment (angka) atau URL string
-                $img_p = 'https://via.placeholder.com/400x400?text=Produk'; // Default
-                if (!empty($p->foto_produk)) {
-                    if (is_numeric($p->foto_produk)) {
-                        // Jika berupa ID, ambil URL-nya
-                        $img_src = wp_get_attachment_image_src($p->foto_produk, 'medium'); // atau 'large'
+                // --- FIX LOGIKA GAMBAR PRODUK ---
+                // Inisialisasi default
+                $img_p = 'https://via.placeholder.com/400x400?text=Produk'; 
+                $foto_raw = $p->foto_produk;
+                $foto_id = null;
+
+                if (!empty($foto_raw)) {
+                    // Cek 1: Apakah JSON string? (biasanya dari multiple upload)
+                    $json_decoded = json_decode($foto_raw, true);
+                    if (json_last_error() === JSON_ERROR_NONE && is_array($json_decoded) && !empty($json_decoded)) {
+                        $foto_id = $json_decoded[0]; // Ambil foto pertama
+                    }
+                    // Cek 2: Apakah Serialized Array?
+                    elseif (is_serialized($foto_raw)) {
+                        $unserialized = unserialize($foto_raw);
+                        if (is_array($unserialized) && !empty($unserialized)) {
+                            $foto_id = $unserialized[0];
+                        }
+                    }
+                    // Cek 3: Anggap single value
+                    else {
+                        $foto_id = $foto_raw;
+                    }
+
+                    // Resolusi ke URL
+                    if (is_numeric($foto_id)) {
+                        $img_src = wp_get_attachment_image_src($foto_id, 'medium_large'); 
                         if ($img_src) {
                             $img_p = $img_src[0];
                         }
-                    } else {
-                        // Jika berupa URL string
-                        $img_p = $p->foto_produk;
+                    } elseif (filter_var($foto_id, FILTER_VALIDATE_URL)) {
+                        $img_p = $foto_id;
                     }
                 }
                 
                 $lokasi = !empty($p->nama_desa) ? 'Desa ' . $p->nama_desa : ($p->kabupaten ?: 'Indonesia');
-                $rating = ($p->rating_avg > 0) ? $p->rating_avg : '4.5';
+                $rating = isset($p->rating_avg) && $p->rating_avg > 0 ? $p->rating_avg : '4.5';
                 $cat_class = get_cat_color_prod($p->kategori);
             ?>
             
@@ -211,7 +232,7 @@ function get_cat_color_prod($cat) {
                 <!-- Image Wrapper -->
                 <div class="relative aspect-square overflow-hidden bg-gray-200">
                     <a href="<?php echo esc_url($link_p); ?>" class="block w-full h-full">
-                        <img src="<?php echo esc_url($img_p); ?>" class="w-full h-full object-cover transition duration-700 group-hover:scale-110 group-hover:rotate-1" alt="<?php echo esc_attr($p->nama_produk); ?>" loading="lazy">
+                        <img src="<?php echo esc_url($img_p); ?>" class="w-full h-full object-cover transition duration-700 group-hover:scale-110 group-hover:rotate-1" alt="<?php echo esc_attr($p->nama_produk); ?>" loading="lazy" onerror="this.src='https://via.placeholder.com/400x400?text=No+Image';">
                         
                         <!-- Overlay Gradient -->
                         <div class="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition duration-300"></div>
@@ -499,9 +520,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 setTimeout(function() {
                     btn.html(originalIcon)
-                       .removeClass('bg-green-600 text-white')
-                       .addClass('bg-gray-50 text-gray-600 hover:bg-orange-500')
-                       .prop('disabled', false);
+                        .removeClass('bg-green-600 text-white')
+                        .addClass('bg-gray-50 text-gray-600 hover:bg-orange-500')
+                        .prop('disabled', false);
                 }, 2000);
             } else {
                 alert('Gagal: ' + (response.data.message || 'Error'));
