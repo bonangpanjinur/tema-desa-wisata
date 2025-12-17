@@ -40,32 +40,19 @@ $query_wisata = "
 $list_wisata = $wpdb->get_results($query_wisata);
 
 // --- C. PRODUK ---
+// FIX: Gunakan query yang sama dengan archive agar konsisten
 $query_produk = "
-    SELECT p.*, ped.nama_toko 
+    SELECT p.*, ped.nama_toko, ped.slug_toko, d.kabupaten, d.nama_desa 
     FROM $table_produk p
     LEFT JOIN $table_pedagang ped ON p.id_pedagang = ped.id
+    LEFT JOIN $table_desa d ON ped.id_desa = d.id
     WHERE p.status = 'aktif' AND p.stok > 0
     ORDER BY p.created_at DESC
     LIMIT 10
 ";
 $list_produk = $wpdb->get_results($query_produk);
 
-// --- D. KATEGORI (Untuk Filter) ---
-$kategori_wisata_db = $wpdb->get_col("SELECT DISTINCT kategori FROM $table_wisata WHERE kategori IS NOT NULL AND kategori != ''");
-$kategori_wisata_clean = [];
-if($kategori_wisata_db) {
-    foreach($kategori_wisata_db as $kat) {
-        $kategori_wisata_clean[sanitize_title($kat)] = ucfirst($kat);
-    }
-}
-
-$kategori_produk_db = $wpdb->get_col("SELECT DISTINCT kategori FROM $table_produk WHERE kategori IS NOT NULL AND kategori != ''");
-$kategori_produk_clean = [];
-if($kategori_produk_db) {
-    foreach($kategori_produk_db as $kat) {
-        $kategori_produk_clean[sanitize_title($kat)] = ucfirst($kat);
-    }
-}
+// --- D. KATEGORI (Untuk Filter - jika diperlukan di masa depan) ---
 ?>
 
 <!-- SECTION 1: HERO CAROUSEL -->
@@ -137,24 +124,14 @@ if($kategori_produk_db) {
         <a href="<?php echo home_url('/wisata'); ?>" class="text-primary text-xs font-bold hover:underline">Lihat Semua</a>
     </div>
 
-    <!-- Filter Pin Wisata -->
-    <div class="sticky top-16 z-30 bg-gray-50/95 backdrop-blur-sm py-2 mb-4">
-        <div class="flex gap-2 overflow-x-auto hide-scroll px-4 md:px-0 pb-2 snap-x">
-            <button onclick="filterContent('wisata', 'all', this)" class="cat-pin-wisata snap-start px-4 py-1.5 rounded-full text-xs font-bold bg-primary text-white shadow-sm border border-transparent whitespace-nowrap transition-all active-pin">Semua</button>
-            <?php foreach($kategori_wisata_clean as $slug => $label): ?>
-            <button onclick="filterContent('wisata', '<?php echo $slug; ?>', this)" class="cat-pin-wisata snap-start px-4 py-1.5 rounded-full text-xs font-bold bg-white text-gray-600 border border-gray-200 hover:border-primary hover:text-primary whitespace-nowrap transition-all">
-                <?php echo esc_html($label); ?>
-            </button>
-            <?php endforeach; ?>
-        </div>
-    </div>
-
     <!-- Grid / Scroll Wisata -->
     <div id="wisata-container" class="flex md:grid md:grid-cols-4 gap-4 overflow-x-auto md:overflow-visible px-4 md:px-0 pb-6 md:pb-0 hide-scroll snap-x snap-mandatory">
         <?php if (!empty($list_wisata)) : ?>
-            <?php foreach($list_wisata as $wisata): ?>
-                <!-- PANGGIL CARD WISATA -->
-                <?php get_template_part('template-parts/card', 'wisata', array('item' => $wisata)); ?>
+            <?php foreach($list_wisata as $w): ?>
+                <div class="wisata-item min-w-[75vw] md:min-w-0 md:w-auto flex-shrink-0 snap-center">
+                    <!-- PANGGIL CARD WISATA -->
+                    <?php get_template_part('template-parts/card', 'wisata', array('item' => $w)); ?>
+                </div>
             <?php endforeach; ?>
         <?php else: ?>
             <div class="col-span-full py-10 text-center text-gray-400 bg-white rounded-xl border border-dashed border-gray-200">Belum ada data wisata.</div>
@@ -172,22 +149,10 @@ if($kategori_produk_db) {
         <a href="<?php echo home_url('/produk'); ?>" class="text-primary text-xs font-bold hover:underline">Lihat Semua</a>
     </div>
 
-    <!-- Filter Pin Produk -->
-    <div class="sticky top-16 z-30 bg-gray-50/95 backdrop-blur-sm py-2 mb-4">
-        <div class="flex gap-2 overflow-x-auto hide-scroll pb-2 snap-x">
-            <button onclick="filterContent('produk', 'all', this)" class="cat-pin-produk snap-start px-4 py-1.5 rounded-full text-xs font-bold bg-primary text-white shadow-sm border border-transparent whitespace-nowrap transition-all active-pin">Semua</button>
-            <?php foreach($kategori_produk_clean as $slug => $label): ?>
-            <button onclick="filterContent('produk', '<?php echo $slug; ?>', this)" class="cat-pin-produk snap-start px-4 py-1.5 rounded-full text-xs font-bold bg-white text-gray-600 border border-gray-200 hover:border-primary hover:text-primary whitespace-nowrap transition-all">
-                <?php echo esc_html($label); ?>
-            </button>
-            <?php endforeach; ?>
-        </div>
-    </div>
-
     <div id="produk-container" class="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-6">
-        <?php foreach($list_produk as $produk): ?>
+        <?php foreach($list_produk as $p): ?>
             <!-- PANGGIL CARD PRODUK -->
-            <?php get_template_part('template-parts/card', 'produk', array('item' => $produk)); ?>
+            <?php get_template_part('template-parts/card', 'produk', array('item' => $p)); ?>
         <?php endforeach; ?>
     </div>
 </div>
@@ -212,41 +177,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-function filterContent(type, category, btn) {
-    const pinClass = type === 'wisata' ? '.cat-pin-wisata' : '.cat-pin-produk';
-    const itemClass = type === 'wisata' ? '.wisata-item' : '.produk-item';
-    document.querySelectorAll(pinClass).forEach(b => {
-        b.classList.remove('bg-primary', 'text-white', 'active-pin');
-        b.classList.add('bg-white', 'text-gray-600', 'border-gray-200');
-    });
-    btn.classList.remove('bg-white', 'text-gray-600', 'border-gray-200');
-    btn.classList.add('bg-primary', 'text-white', 'active-pin');
-    document.querySelectorAll(itemClass).forEach(item => {
-        // Ambil kategori item dari atribut data-category yang di-set di template part (jika ada)
-        // NOTE: Pastikan template-parts/card-produk.php dan card-wisata.php memiliki atribut data-category di wrapper utamanya
-        // agar script filter front-end ini bisa bekerja.
-        // Jika card di-load via template part, kita perlu memastikan wrapper tersebut memiliki atribut ini.
-        // Karena template part adalah komponen mandiri, cara terbaik untuk filter front-page ini adalah
-        // membungkus pemanggilan get_template_part dengan div wrapper yang memiliki data-category
-        // ATAU memodifikasi template part untuk menerima argumen class/attr tambahan.
-        
-        // Namun, agar konsisten dengan permintaan "jangan ubah kode yang sudah ada", 
-        // filter JS front-page ini sebenarnya bergantung pada struktur HTML spesifik (class .produk-item data-category="...").
-        // Karena kita mengganti konten loop dengan get_template_part, struktur HTML mungkin berubah.
-        
-        // SOLUSI: Saya akan update sedikit JS ini agar mencari atribut data-category pada elemen anak pertama jika wrapper luar tidak punya,
-        // ATAU kita update template-parts agar menyertakan data-category. 
-        // (Lihat file template-parts di atas, saya sudah menambahkan data-category pada div utama).
-        
-        if (category === 'all' || item.dataset.category === category) {
-            item.style.display = 'block'; // Atau 'flex' tergantung layout
-        } else {
-            item.style.display = 'none';
-        }
-    });
-}
-
-// Re-init Add to Cart listener for front page items
+// Re-init Add to Cart listener for front page items (karena dipanggil via template part)
 jQuery(document).ready(function($) {
     $(document).on('click', '.btn-add-to-cart', function(e) {
         e.preventDefault();
@@ -264,13 +195,13 @@ jQuery(document).ready(function($) {
             is_custom_db: isCustom
         }, function(response) {
             if(response.success) {
-                btn.html('<i class="fas fa-check text-xs"></i>').addClass('bg-green-600 text-white').removeClass('bg-primary');
-                setTimeout(function() {
-                    btn.html(originalIcon).removeClass('bg-green-600 text-white').addClass('bg-primary').prop('disabled', false);
-                }, 2000);
+                btn.html('<i class="fas fa-check text-xs"></i>').addClass('bg-green-600 text-white').removeClass('bg-gray-50 text-gray-600 hover:bg-orange-500');
                 if(response.data.count) {
                     $('#header-cart-count, #header-cart-count-mobile').text(response.data.count).removeClass('hidden').addClass('flex');
                 }
+                setTimeout(function() {
+                    btn.html(originalIcon).removeClass('bg-green-600 text-white').addClass('bg-gray-50 text-gray-600 hover:bg-orange-500').prop('disabled', false);
+                }, 2000);
             } else {
                 alert('Gagal: ' + (response.data.message || 'Error'));
                 btn.html(originalIcon).prop('disabled', false);

@@ -33,7 +33,9 @@ if ( ! empty( $raw_foto ) ) {
     }
 }
 
+// LOGIKA LOKASI: Prioritas Nama Desa -> Kabupaten -> Default
 $lokasi   = ! empty( $w->nama_desa ) ? 'Desa ' . $w->nama_desa : ( $w->kabupaten ?? 'Indonesia' );
+
 $rating   = isset( $w->rating_avg ) && $w->rating_avg > 0 ? $w->rating_avg : '4.8';
 $kategori = $w->kategori ?? 'Alam';
 $harga    = $w->harga_tiket ?? 0;
@@ -46,10 +48,11 @@ $cat_colors = [
     'Religi'  => 'bg-yellow-100 text-yellow-700 border-yellow-200',
 ];
 $cat_class  = $cat_colors[ $kategori ] ?? 'bg-gray-100 text-gray-700 border-gray-200';
+$cat_slug   = sanitize_title($kategori);
 ?>
 
-<!-- CARD DESIGN START -->
-<div class="group bg-white rounded-2xl overflow-hidden hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 flex flex-col h-full border border-gray-100 relative">
+<!-- CARD DESIGN START (VISUALLY IDENTICAL) -->
+<div class="wisata-item min-w-[75vw] md:min-w-0 md:w-auto flex-shrink-0 snap-center group bg-white rounded-2xl overflow-hidden hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 flex flex-col h-full border border-gray-100 relative" data-category="<?php echo esc_attr($cat_slug); ?>">
     
     <!-- Image Wrapper (Aspect Ratio 4:3) -->
     <div class="relative aspect-[4/3] overflow-hidden bg-gray-100">
@@ -80,7 +83,7 @@ $cat_class  = $cat_colors[ $kategori ] ?? 'bg-gray-100 text-gray-700 border-gray
             </div>
             <div class="flex items-center gap-1 text-gray-500 font-medium">
                 <i class="fas fa-map-marker-alt text-red-400"></i> 
-                <span class="truncate max-w-[80px] sm:max-w-[120px]"><?php echo esc_html( $lokasi ); ?></span>
+                <span class="truncate max-w-[120px] sm:max-w-[120px]"><?php echo esc_html( $lokasi ); ?></span>
             </div>
         </div>
 

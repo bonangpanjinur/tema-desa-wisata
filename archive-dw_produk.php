@@ -19,6 +19,7 @@ $max_harga  = isset($_GET['max_price']) ? intval($_GET['max_price']) : 0;
 $urutan     = isset($_GET['sort']) ? sanitize_text_field($_GET['sort']) : 'terbaru';
 
 // --- 2. QUERY BUILDER ---
+// PERBAIKAN QUERY: JOIN tabel desa via pedagang untuk mendapatkan nama_desa yang benar
 $sql = "SELECT p.*, pd.nama_toko, pd.slug_toko, d.kabupaten, d.nama_desa 
         FROM $table_produk p 
         LEFT JOIN $table_pedagang pd ON p.id_pedagang = pd.id
@@ -408,4 +409,4 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 
-<?php get_footer(); ?>  
+<?php get_footer(); ?>

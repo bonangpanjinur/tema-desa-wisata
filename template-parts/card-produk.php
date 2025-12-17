@@ -46,7 +46,9 @@ if ( ! empty( $raw_foto ) ) {
 }
 
 // --- 3. DATA PENDUKUNG ---
+// LOGIKA LOKASI: Prioritas Nama Desa -> Kabupaten -> Default
 $lokasi    = ! empty( $p->nama_desa ) ? 'Desa ' . $p->nama_desa : ( $p->kabupaten ?? 'Indonesia' );
+
 $rating    = isset( $p->rating_avg ) && $p->rating_avg > 0 ? $p->rating_avg : '4.5';
 $kategori  = $p->kategori ?? 'Umum';
 $terjual   = $p->terjual ?? 0;
@@ -62,10 +64,11 @@ $cat_colors = [
     'Pertanian' => 'bg-green-100 text-green-700 border-green-200',
 ];
 $cat_class  = $cat_colors[ $kategori ] ?? 'bg-gray-100 text-gray-700 border-gray-200';
+$cat_slug   = sanitize_title($kategori);
 ?>
 
-<!-- START CARD DESIGN -->
-<div class="group bg-white rounded-2xl overflow-hidden hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 flex flex-col h-full border border-gray-100 relative">
+<!-- CARD DESIGN START -->
+<div class="produk-item group bg-white rounded-2xl overflow-hidden hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 flex flex-col h-full border border-gray-100 relative" data-category="<?php echo esc_attr($cat_slug); ?>">
     
     <!-- Image Wrapper -->
     <div class="relative aspect-square overflow-hidden bg-gray-100">
