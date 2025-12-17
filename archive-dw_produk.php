@@ -79,11 +79,11 @@ function get_cat_color_prod($cat) {
 
 <div class="bg-[#FAFAFA] min-h-screen font-sans text-gray-800 pb-20 relative overflow-x-hidden">
     
-    <!-- Background Decor (Sama dengan Wisata) -->
+    <!-- Background Decor (Sama dengan Wisata tapi nuansa Orange) -->
     <div class="absolute top-0 left-0 w-full h-[500px] bg-gradient-to-b from-orange-50/50 to-transparent -z-10"></div>
     <div class="absolute top-0 right-0 w-[500px] h-[500px] bg-yellow-50/30 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 -z-10"></div>
 
-    <!-- === 1. TOP HEADER & SEARCH === -->
+    <!-- === 1. TOP HEADER & SEARCH (PERSIS ARSIP WISATA) === -->
     <div class="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-100 transition-all duration-300">
         <div class="container mx-auto px-4 py-4">
             <div class="flex flex-col md:flex-row items-center justify-between gap-4">
@@ -101,7 +101,7 @@ function get_cat_color_prod($cat) {
                     <form action="" method="GET" class="relative w-full group">
                         <input type="text" name="q" value="<?php echo esc_attr($pencarian); ?>" 
                                class="w-full pl-12 pr-4 py-3 bg-gray-50 hover:bg-white focus:bg-white border border-gray-200 hover:border-gray-300 focus:border-orange-500 rounded-full transition-all outline-none text-sm shadow-sm focus:shadow-md focus:ring-4 focus:ring-orange-50" 
-                               placeholder="Cari produk, toko...">
+                               placeholder="Cari produk desa...">
                         <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-orange-500 transition-colors"></i>
                         
                         <!-- Hidden Filters -->
@@ -120,10 +120,10 @@ function get_cat_color_prod($cat) {
                         <?php endif; ?>
                     </button>
                 </div>
-                
-                <!-- User/Cart Actions (Optional - Placeholder to match Wisata layout) -->
+
+                <!-- User/Cart Actions (Optional - Menyesuaikan Layout Wisata) -->
                 <div class="hidden md:flex items-center gap-3">
-                    <!-- Placeholder -->
+                     <!-- Cart Button Placeholder jika diperlukan -->
                 </div>
             </div>
         </div>
