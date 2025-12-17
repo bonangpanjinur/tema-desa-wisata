@@ -384,12 +384,12 @@ get_header();
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div class="md:col-span-2">
                                     <label class="block text-sm font-bold text-gray-700 mb-2">Nama Produk</label>
-                                    <input type="text" name="nama_produk" class="w-full border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500" required value="<?php echo $p_data ? esc_attr($p_data->nama_produk) : ''; ?>">
+                                    <input type="text" name="nama_produk" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors" required value="<?php echo $p_data ? esc_attr($p_data->nama_produk) : ''; ?>">
                                 </div>
                                 
                                 <div>
                                     <label class="block text-sm font-bold text-gray-700 mb-2">Kategori</label>
-                                    <select name="kategori" class="w-full border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500">
+                                    <select name="kategori" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors">
                                         <?php 
                                         $cats = ['Makanan', 'Minuman', 'Kerajinan', 'Fashion', 'Pertanian', 'Jasa'];
                                         foreach($cats as $c) {
@@ -402,19 +402,19 @@ get_header();
 
                                 <div>
                                     <label class="block text-sm font-bold text-gray-700 mb-2">Stok Awal</label>
-                                    <input type="number" name="stok" class="w-full border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500" required value="<?php echo $p_data ? esc_attr($p_data->stok) : '1'; ?>">
+                                    <input type="number" name="stok" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors" required value="<?php echo $p_data ? esc_attr($p_data->stok) : '1'; ?>">
                                 </div>
 
                                 <div>
                                     <label class="block text-sm font-bold text-gray-700 mb-2">Harga (Rp)</label>
-                                    <input type="number" name="harga" class="w-full border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500" required value="<?php echo $p_data ? esc_attr($p_data->harga) : ''; ?>">
+                                    <input type="number" name="harga" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors" required value="<?php echo $p_data ? esc_attr($p_data->harga) : ''; ?>">
                                 </div>
                             </div>
 
                             <!-- Detail Info -->
                             <div>
                                 <label class="block text-sm font-bold text-gray-700 mb-2">Deskripsi Produk</label>
-                                <textarea name="deskripsi" rows="5" class="w-full border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"><?php echo $p_data ? esc_textarea($p_data->deskripsi) : ''; ?></textarea>
+                                <textarea name="deskripsi" rows="5" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors"><?php echo $p_data ? esc_textarea($p_data->deskripsi) : ''; ?></textarea>
                             </div>
 
                             <!-- Media -->
@@ -700,12 +700,12 @@ get_header();
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div class="md:col-span-2">
                                     <label class="block text-sm font-bold text-gray-700 mb-2">Nama Toko</label>
-                                    <input type="text" name="nama_toko" value="<?php echo esc_attr($pedagang->nama_toko); ?>" class="w-full border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500">
+                                    <input type="text" name="nama_toko" value="<?php echo esc_attr($pedagang->nama_toko); ?>" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors">
                                 </div>
                                 
                                 <div>
                                     <label class="block text-sm font-bold text-gray-700 mb-2">Nomor WhatsApp (Aktif)</label>
-                                    <input type="text" name="nomor_wa" value="<?php echo esc_attr($pedagang->nomor_wa); ?>" class="w-full border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500">
+                                    <input type="text" name="nomor_wa" value="<?php echo esc_attr($pedagang->nomor_wa); ?>" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors">
                                 </div>
 
                                 <div>
@@ -720,7 +720,7 @@ get_header();
 
                                 <div class="md:col-span-2">
                                     <label class="block text-sm font-bold text-gray-700 mb-2">Alamat Lengkap Toko</label>
-                                    <textarea name="alamat_lengkap" rows="3" class="w-full border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"><?php echo esc_textarea($pedagang->alamat_lengkap); ?></textarea>
+                                    <textarea name="alamat_lengkap" rows="3" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors"><?php echo esc_textarea($pedagang->alamat_lengkap); ?></textarea>
                                 </div>
                             </div>
                         </div>
@@ -733,15 +733,15 @@ get_header();
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
                                     <label class="block text-sm font-bold text-gray-700 mb-2">Nama Bank</label>
-                                    <input type="text" name="nama_bank" value="<?php echo esc_attr($pedagang->nama_bank); ?>" placeholder="Contoh: BCA / Mandiri" class="w-full border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500">
+                                    <input type="text" name="nama_bank" value="<?php echo esc_attr($pedagang->nama_bank); ?>" placeholder="Contoh: BCA / Mandiri" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors">
                                 </div>
                                 <div>
                                     <label class="block text-sm font-bold text-gray-700 mb-2">Nomor Rekening</label>
-                                    <input type="text" name="no_rekening" value="<?php echo esc_attr($pedagang->no_rekening); ?>" class="w-full border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500">
+                                    <input type="text" name="no_rekening" value="<?php echo esc_attr($pedagang->no_rekening); ?>" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors">
                                 </div>
                                 <div class="md:col-span-2">
                                     <label class="block text-sm font-bold text-gray-700 mb-2">Atas Nama Rekening</label>
-                                    <input type="text" name="atas_nama_rekening" value="<?php echo esc_attr($pedagang->atas_nama_rekening); ?>" class="w-full border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500">
+                                    <input type="text" name="atas_nama_rekening" value="<?php echo esc_attr($pedagang->atas_nama_rekening); ?>" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors">
                                 </div>
 
                                 <div class="md:col-span-2">

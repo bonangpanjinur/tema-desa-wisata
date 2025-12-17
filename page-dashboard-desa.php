@@ -327,12 +327,12 @@ get_header();
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div class="md:col-span-2">
                                     <label class="block text-sm font-bold text-gray-700 mb-2">Nama Wisata</label>
-                                    <input type="text" name="nama_wisata" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500" required value="<?php echo $w_data ? esc_attr($w_data->nama_wisata) : ''; ?>">
+                                    <input type="text" name="nama_wisata" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" required value="<?php echo $w_data ? esc_attr($w_data->nama_wisata) : ''; ?>">
                                 </div>
                                 
                                 <div>
                                     <label class="block text-sm font-bold text-gray-700 mb-2">Kategori</label>
-                                    <select name="kategori" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500">
+                                    <select name="kategori" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors">
                                         <?php 
                                         $cats = ['Alam', 'Budaya', 'Edukasi', 'Religi', 'Kuliner', 'Buatan', 'Sejarah'];
                                         foreach($cats as $c) {
@@ -345,7 +345,7 @@ get_header();
 
                                 <div>
                                     <label class="block text-sm font-bold text-gray-700 mb-2">Harga Tiket (Rp)</label>
-                                    <input type="number" name="harga_tiket" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500" value="<?php echo $w_data ? esc_attr($w_data->harga_tiket) : '0'; ?>">
+                                    <input type="number" name="harga_tiket" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" value="<?php echo $w_data ? esc_attr($w_data->harga_tiket) : '0'; ?>">
                                     <p class="text-xs text-gray-400 mt-1">Isi 0 jika gratis.</p>
                                 </div>
                             </div>
@@ -353,27 +353,27 @@ get_header();
                             <!-- Detail Info -->
                             <div>
                                 <label class="block text-sm font-bold text-gray-700 mb-2">Deskripsi Lengkap</label>
-                                <textarea name="deskripsi" rows="5" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"><?php echo $w_data ? esc_textarea($w_data->deskripsi) : ''; ?></textarea>
+                                <textarea name="deskripsi" rows="5" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"><?php echo $w_data ? esc_textarea($w_data->deskripsi) : ''; ?></textarea>
                             </div>
 
                             <div>
                                 <label class="block text-sm font-bold text-gray-700 mb-2">Fasilitas (Pisahkan dengan koma)</label>
-                                <input type="text" name="fasilitas" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Toilet, Parkir, Musholla, Spot Foto" value="<?php echo $w_data ? esc_attr($w_data->fasilitas) : ''; ?>">
+                                <input type="text" name="fasilitas" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Toilet, Parkir, Musholla, Spot Foto" value="<?php echo $w_data ? esc_attr($w_data->fasilitas) : ''; ?>">
                             </div>
 
                             <!-- Operasional & Kontak -->
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <div>
                                     <label class="block text-sm font-bold text-gray-700 mb-2">Jam Buka</label>
-                                    <input type="text" name="jam_buka" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="08:00 - 17:00" value="<?php echo $w_data ? esc_attr($w_data->jam_buka) : ''; ?>">
+                                    <input type="text" name="jam_buka" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="08:00 - 17:00" value="<?php echo $w_data ? esc_attr($w_data->jam_buka) : ''; ?>">
                                 </div>
                                 <div>
                                     <label class="block text-sm font-bold text-gray-700 mb-2">Kontak Pengelola</label>
-                                    <input type="text" name="kontak_pengelola" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Nomor WA/Telp" value="<?php echo $w_data ? esc_attr($w_data->kontak_pengelola) : ''; ?>">
+                                    <input type="text" name="kontak_pengelola" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="Nomor WA/Telp" value="<?php echo $w_data ? esc_attr($w_data->kontak_pengelola) : ''; ?>">
                                 </div>
                                 <div>
                                     <label class="block text-sm font-bold text-gray-700 mb-2">Link Google Maps</label>
-                                    <input type="text" name="lokasi_maps" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="https://maps.app.goo.gl/..." value="<?php echo $w_data ? esc_attr($w_data->lokasi_maps) : ''; ?>">
+                                    <input type="text" name="lokasi_maps" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors" placeholder="https://maps.app.goo.gl/..." value="<?php echo $w_data ? esc_attr($w_data->lokasi_maps) : ''; ?>">
                                 </div>
                             </div>
 
@@ -560,7 +560,7 @@ get_header();
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div class="md:col-span-2">
                                         <label class="block text-sm font-bold text-gray-700 mb-2">Nama Desa</label>
-                                        <input type="text" name="nama_desa" value="<?php echo esc_attr($desa->nama_desa); ?>" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500">
+                                        <input type="text" name="nama_desa" value="<?php echo esc_attr($desa->nama_desa); ?>" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors">
                                     </div>
                                     
                                     <div>
@@ -575,12 +575,12 @@ get_header();
 
                                     <div>
                                         <label class="block text-sm font-bold text-gray-700 mb-2">Alamat Kantor Desa</label>
-                                        <textarea name="alamat_lengkap" rows="3" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"><?php echo esc_textarea($desa->alamat_lengkap); ?></textarea>
+                                        <textarea name="alamat_lengkap" rows="3" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"><?php echo esc_textarea($desa->alamat_lengkap); ?></textarea>
                                     </div>
                                     
                                     <div class="md:col-span-2">
                                         <label class="block text-sm font-bold text-gray-700 mb-2">Deskripsi Singkat</label>
-                                        <textarea name="deskripsi" rows="4" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"><?php echo esc_textarea($desa->deskripsi); ?></textarea>
+                                        <textarea name="deskripsi" rows="4" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"><?php echo esc_textarea($desa->deskripsi); ?></textarea>
                                     </div>
                                 </div>
                             </div>
@@ -593,15 +593,15 @@ get_header();
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
                                         <label class="block text-sm font-bold text-gray-700 mb-2">Nama Bank</label>
-                                        <input type="text" name="nama_bank_desa" value="<?php echo esc_attr($desa->nama_bank_desa); ?>" placeholder="Contoh: Bank BJB / BRI" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500">
+                                        <input type="text" name="nama_bank_desa" value="<?php echo esc_attr($desa->nama_bank_desa); ?>" placeholder="Contoh: Bank BJB / BRI" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors">
                                     </div>
                                     <div>
                                         <label class="block text-sm font-bold text-gray-700 mb-2">Nomor Rekening</label>
-                                        <input type="text" name="no_rekening_desa" value="<?php echo esc_attr($desa->no_rekening_desa); ?>" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500">
+                                        <input type="text" name="no_rekening_desa" value="<?php echo esc_attr($desa->no_rekening_desa); ?>" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors">
                                     </div>
                                     <div class="md:col-span-2">
                                         <label class="block text-sm font-bold text-gray-700 mb-2">Atas Nama Rekening</label>
-                                        <input type="text" name="atas_nama_rekening_desa" value="<?php echo esc_attr($desa->atas_nama_rekening_desa); ?>" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500">
+                                        <input type="text" name="atas_nama_rekening_desa" value="<?php echo esc_attr($desa->atas_nama_rekening_desa); ?>" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 bg-white focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors">
                                     </div>
 
                                     <div class="md:col-span-2">
