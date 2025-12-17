@@ -17,7 +17,8 @@
                         <div class="w-8 h-8 bg-gradient-to-tr from-orange-500 to-amber-400 rounded-lg flex items-center justify-center text-white shadow-md">
                             <i class="fas fa-store text-sm"></i>
                         </div>
-                        <span class="font-bold text-xl tracking-tight">Pasar<span class="text-orange-600">Desa</span></span>
+                        <!-- NAMA WEBSITE DINAMIS -->
+                        <span class="font-bold text-xl tracking-tight"><?php echo get_bloginfo('name'); ?></span>
                     </div>
                     <p class="text-gray-500 text-sm leading-relaxed">
                         Platform digital yang menghubungkan potensi UMKM desa dengan pasar nasional. Belanja produk asli desa, dukung ekonomi lokal.
