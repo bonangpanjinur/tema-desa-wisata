@@ -658,6 +658,12 @@ get_header();
                                         <span class="px-2 py-1 rounded text-xs font-bold capitalize <?php echo $h->status == 'disetujui' ? 'bg-green-100 text-green-700' : ($h->status == 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'); ?>">
                                             <?php echo $h->status; ?>
                                         </span>
+                                        <?php if($h->status == 'ditolak' && !empty($h->catatan_admin)): ?>
+                                            <div class="mt-1 text-xs text-red-600 bg-red-50 p-2 rounded border border-red-100 max-w-xs">
+                                                <strong>Alasan:</strong><br>
+                                                <?php echo esc_html($h->catatan_admin); ?>
+                                            </div>
+                                        <?php endif; ?>
                                     </td>
                                     <td class="p-4">
                                         <?php if($h->status == 'pending'): ?>
