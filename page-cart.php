@@ -5,8 +5,10 @@
 
 get_header(); 
 
-// 1. Ambil data keranjang
-$cart_items = function_exists('dw_get_cart_items') ? dw_get_cart_items() : []; 
+// 1. Ambil data keranjang (Pastikan user login/guest handled by plugin logic)
+$user_id = get_current_user_id();
+// Menggunakan fungsi dw_get_user_cart dari includes/cart.php
+$cart_items = function_exists('dw_get_user_cart') ? dw_get_user_cart($user_id) : []; 
 $total_belanja = 0;
 ?>
 
@@ -31,12 +33,9 @@ $total_belanja = 0;
                     <div class="w-32 h-32 bg-orange-50 rounded-full flex items-center justify-center">
                         <i class="fas fa-shopping-basket text-5xl text-orange-300"></i>
                     </div>
-                    <div class="absolute -bottom-2 -right-2 bg-white p-2 rounded-full shadow-md">
-                        <i class="fas fa-search text-orange-500"></i>
-                    </div>
                 </div>
                 <h3 class="text-xl font-bold text-gray-800 mb-2">Keranjang Belanja Kosong</h3>
-                <p class="text-gray-500 mb-8 max-w-md mx-auto">Tampaknya Anda belum menambahkan produk apapun. Yuk, dukung UMKM desa dengan mulai berbelanja!</p>
+                <p class="text-gray-500 mb-8 max-w-md mx-auto">Tampaknya Anda belum menambahkan produk apapun.</p>
                 <a href="<?php echo home_url('/produk'); ?>" class="group px-8 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-orange-600 transition-all duration-300 shadow-lg hover:shadow-orange-200 flex items-center gap-2">
                     <i class="fas fa-store"></i> Mulai Belanja
                 </a>
@@ -47,7 +46,7 @@ $total_belanja = 0;
                 
                 <!-- KOLOM KIRI: Daftar Item -->
                 <div class="lg:col-span-2 space-y-4">
-                    <!-- Header List (Optional for Desktop) -->
+                    <!-- Header List -->
                     <div class="hidden md:grid grid-cols-12 gap-4 px-4 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">
                         <div class="col-span-6">Produk</div>
                         <div class="col-span-3 text-center">Jumlah</div>
@@ -55,54 +54,58 @@ $total_belanja = 0;
                     </div>
 
                     <?php foreach ($cart_items as $item) : 
-                        $subtotal = $item['price'] * $item['qty'];
-                        $total_belanja += $subtotal;
+                        // FIX: Mapping Key Sesuai includes/cart.php
+                        $product_id = isset($item['productId']) ? $item['productId'] : (isset($item['product_id']) ? $item['product_id'] : 0);
+                        $qty = isset($item['quantity']) ? $item['quantity'] : (isset($item['qty']) ? $item['qty'] : 1);
+                        $price = isset($item['price']) ? $item['price'] : 0;
+                        $name = isset($item['name']) ? $item['name'] : 'Produk Tanpa Nama';
                         
-                        // Handle Gambar dengan Fallback yang aman
-                        $img_src = get_template_directory_uri() . '/assets/img/placeholder.png'; // Default theme placeholder
-                        if (!empty($item['foto_utama'])) {
-                            if (is_numeric($item['foto_utama'])) {
-                                $att = wp_get_attachment_image_src($item['foto_utama'], 'thumbnail');
-                                if ($att) $img_src = $att[0];
-                            } else {
-                                $img_src = $item['foto_utama'];
-                            }
-                        }
+                        // FIX: Ambil URL Gambar Langsung
+                        $img_src = !empty($item['image']) ? $item['image'] : 'https://via.placeholder.com/150?text=No+Image';
+                        
+                        // FIX: Ambil Nama Toko dari array nested
+                        $shop_name = isset($item['toko']['nama_toko']) ? $item['toko']['nama_toko'] : 'Toko Desa';
+
+                        $subtotal = $price * $qty;
+                        $total_belanja += $subtotal;
                     ?>
                     
                     <!-- ITEM CARD -->
                     <div class="cart-item-row group bg-white p-4 rounded-2xl shadow-sm border border-gray-100 transition-all hover:shadow-md relative overflow-hidden" 
-                         data-cart-id="<?php echo esc_attr($item['id']); ?>" 
-                         data-product-id="<?php echo esc_attr($item['id_produk']); ?>">
+                         data-cart-id="<?php echo esc_attr($item['id'] ?? ''); ?>" 
+                         data-product-id="<?php echo esc_attr($product_id); ?>">
                         
                         <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
                             
-                            <!-- 1. Info Produk (Mobile & Desktop) -->
+                            <!-- 1. Info Produk -->
                             <div class="col-span-1 md:col-span-6 flex gap-4">
                                 <!-- Gambar -->
-                                <div class="w-20 h-20 md:w-24 md:h-24 bg-gray-50 rounded-xl overflow-hidden flex-shrink-0 border border-gray-100">
-                                    <a href="<?php echo get_permalink($item['id_produk']); ?>">
-                                        <img src="<?php echo esc_url($img_src); ?>" alt="<?php echo esc_attr($item['nama_produk']); ?>" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110">
+                                <div class="w-20 h-20 md:w-24 md:h-24 bg-gray-50 rounded-xl overflow-hidden flex-shrink-0 border border-gray-100 relative">
+                                    <a href="<?php echo get_permalink($product_id); ?>">
+                                        <img src="<?php echo esc_url($img_src); ?>" 
+                                             alt="<?php echo esc_attr($name); ?>" 
+                                             class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                             onerror="this.src='https://via.placeholder.com/150?text=Err';">
                                     </a>
                                 </div>
                                 
                                 <!-- Detail -->
                                 <div class="flex-1 min-w-0 flex flex-col justify-center">
-                                    <a href="<?php echo get_permalink($item['id_produk']); ?>" class="block">
+                                    <a href="<?php echo get_permalink($product_id); ?>" class="block">
                                         <h3 class="font-bold text-gray-800 text-sm md:text-base leading-tight mb-1 line-clamp-2 hover:text-orange-600 transition-colors">
-                                            <?php echo esc_html($item['nama_produk']); ?>
+                                            <?php echo esc_html($name); ?>
                                         </h3>
                                     </a>
                                     
                                     <!-- Nama Toko -->
                                     <div class="flex items-center gap-1 text-xs text-gray-500 mb-2">
                                         <i class="fas fa-store text-orange-400"></i> 
-                                        <span><?php echo esc_html($item['nama_toko']); ?></span>
+                                        <span><?php echo esc_html($shop_name); ?></span>
                                     </div>
 
-                                    <!-- Harga Satuan (Tampil di Mobile, hidden di layout grid desktop jika mau strict, tapi bagus ditampilkan) -->
+                                    <!-- Harga Satuan -->
                                     <div class="text-xs text-gray-400">
-                                        @ Rp <?php echo number_format($item['price'], 0, ',', '.'); ?>
+                                        @ Rp <?php echo number_format($price, 0, ',', '.'); ?>
                                     </div>
                                 </div>
                             </div>
@@ -114,7 +117,7 @@ $total_belanja = 0;
                                     <button class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-orange-600 hover:bg-white rounded-l-lg transition-all qty-btn minus">
                                         <i class="fas fa-minus text-xs"></i>
                                     </button>
-                                    <input type="number" value="<?php echo esc_attr($item['qty']); ?>" class="w-10 text-center bg-transparent border-none text-sm font-bold text-gray-700 p-0 focus:ring-0 qty-input" readonly>
+                                    <input type="number" value="<?php echo esc_attr($qty); ?>" class="w-10 text-center bg-transparent border-none text-sm font-bold text-gray-700 p-0 focus:ring-0 qty-input" readonly>
                                     <button class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-orange-600 hover:bg-white rounded-r-lg transition-all qty-btn plus">
                                         <i class="fas fa-plus text-xs"></i>
                                     </button>
@@ -130,8 +133,7 @@ $total_belanja = 0;
                                     </div>
                                 </div>
                                 
-                                <!-- Tombol Hapus (Absolute di Desktop, Flex di Mobile) -->
-                                <button class="delete-cart-item ml-4 text-gray-300 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition-all duration-200" title="Hapus dari keranjang">
+                                <button class="delete-cart-item ml-4 text-gray-300 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition-all duration-200" title="Hapus">
                                     <i class="fas fa-trash-alt"></i>
                                 </button>
                             </div>
