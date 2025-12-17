@@ -1,7 +1,7 @@
 <?php
 /**
  * Template Name: Detail Wisata Custom
- * Description: Halaman detail wisata lengkap dengan Galeri, Peta, dan Rekomendasi Wisata Lain.
+ * Description: Halaman detail wisata dengan fitur galeri, peta, ulasan, dan sticky nav.
  */
 
 get_header();
@@ -9,15 +9,21 @@ get_header();
 global $wpdb;
 $table_wisata = $wpdb->prefix . 'dw_wisata';
 $table_desa   = $wpdb->prefix . 'dw_desa';
-
-// ============================================================================
-// 1. LOGIKA UTAMA: AMBIL DATA WISATA
-// ============================================================================
-$slug = get_query_var('dw_slug');
-$id_param = isset($_GET['id']) ? intval($_GET['id']) : 0;
+$table_ulasan = $wpdb->prefix . 'dw_ulasan';
 
 $wisata = null;
 
+// ============================================================================
+// 1. LOGIKA PENGAMBILAN DATA (SLUG vs ID)
+// ============================================================================
+
+// Coba tangkap Slug dari URL (Rewrite Rule: /wisata/detail/slug)
+$slug = get_query_var('dw_slug');
+
+// Coba tangkap ID (Fallback: ?id=1)
+$id_param = isset($_GET['id']) ? intval($_GET['id']) : 0;
+
+// Query Data Utama (JOIN dengan tabel desa untuk ambil slug & nama desa)
 if (!empty($slug)) {
     $wisata = $wpdb->get_row($wpdb->prepare("
         SELECT w.*, d.nama_desa, d.kabupaten, d.slug_desa, d.id as id_desa
@@ -34,346 +40,504 @@ if (!empty($slug)) {
     ", $id_param));
 }
 
-// Handler Jika Tidak Ditemukan
+// ============================================================================
+// 2. ERROR HANDLER (JIKA TIDAK DITEMUKAN)
+// ============================================================================
 if (!$wisata) {
-    echo '<div class="min-h-[70vh] flex flex-col items-center justify-center text-center p-6 bg-gray-50">';
-    echo '<div class="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center mb-4"><i class="far fa-sad-tear text-3xl text-gray-400"></i></div>';
+    echo '<div class="min-h-[60vh] flex flex-col items-center justify-center text-center p-4 bg-gray-50">';
+    echo '<div class="text-6xl text-gray-300 mb-4"><i class="fas fa-map-signs"></i></div>';
     echo '<h1 class="text-2xl font-bold text-gray-800 mb-2">Wisata Tidak Ditemukan</h1>';
-    echo '<p class="text-gray-500 mb-6">Mungkin tautan rusak atau wisata ini sudah tidak aktif.</p>';
-    echo '<a href="'.home_url('/').'" class="bg-primary text-white px-8 py-3 rounded-full font-bold hover:bg-green-700 transition shadow-lg">Kembali ke Beranda</a>';
+    echo '<p class="text-gray-500 mb-6">Mungkin tautan rusak atau destinasi ini sudah tidak aktif.</p>';
+    echo '<a href="'.home_url('/').'" class="bg-primary text-white px-6 py-3 rounded-xl font-bold hover:bg-green-700 transition shadow-lg shadow-primary/30">Kembali ke Beranda</a>';
     echo '</div>';
     get_footer();
     exit;
 }
 
 // ============================================================================
-// 2. LOGIKA TAMBAHAN: GALERI & RELATED
+// 3. PERSIAPAN DATA PENDUKUNG
 // ============================================================================
 
-// A. Parse Galeri Foto
-$gallery = [];
-if (!empty($wisata->foto_galeri)) {
-    $decoded = json_decode($wisata->foto_galeri, true);
-    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-        $gallery = $decoded;
-    } else {
-        // Fallback jika format comma separated
-        $gallery = array_filter(explode(',', $wisata->foto_galeri));
-    }
+// A. Ulasan (Ambil 5 terbaru)
+$ulasan_list = [];
+if ($wpdb->get_var("SHOW TABLES LIKE '$table_ulasan'") == $table_ulasan) {
+    $ulasan_list = $wpdb->get_results($wpdb->prepare("
+        SELECT u.*, users.display_name 
+        FROM $table_ulasan u
+        LEFT JOIN {$wpdb->users} users ON u.user_id = users.ID
+        WHERE u.target_id = %d AND u.target_type = 'wisata' AND u.status_moderasi = 'disetujui'
+        ORDER BY u.created_at DESC LIMIT 5
+    ", $wisata->id));
 }
 
-// B. Ambil Wisata Lain di Desa yang Sama (Related)
-$related_wisata = $wpdb->get_results($wpdb->prepare(
-    "SELECT * FROM $table_wisata WHERE id_desa = %d AND id != %d AND status = 'aktif' ORDER BY RAND() LIMIT 3",
-    $wisata->id_desa,
-    $wisata->id
-));
-
-// C. Link Profil Desa
+// B. Link Profil Desa (URL Cantik - UPDATE)
 $link_desa = '#';
 if (!empty($wisata->slug_desa)) {
+    // UPDATE: Menggunakan format /@namadesa
     $link_desa = home_url('/@' . $wisata->slug_desa);
 } elseif (!empty($wisata->id_desa)) {
+    // Fallback ID
     $link_desa = home_url('/profil-desa/?id=' . $wisata->id_desa);
 }
 
-// Variabel Tampilan
+$lokasi_html = !empty($wisata->nama_desa) 
+    ? '<a href="'.esc_url($link_desa).'" class="hover:text-primary hover:underline font-bold text-gray-900 transition">Desa ' . esc_html($wisata->nama_desa) . '</a>, ' . esc_html($wisata->kabupaten) 
+    : esc_html($wisata->kabupaten);
+
+// C. Fasilitas (JSON Decode)
+$fasilitas = [];
+if (!empty($wisata->fasilitas)) {
+    $json_test = json_decode($wisata->fasilitas);
+    if (json_last_error() === JSON_ERROR_NONE && is_array($json_test)) {
+        $fasilitas = $json_test;
+    } else {
+        $fasilitas = explode(',', $wisata->fasilitas); // Support legacy format
+    }
+}
+
+// D. Galeri Gambar
 $img_hero = !empty($wisata->foto_utama) ? $wisata->foto_utama : 'https://via.placeholder.com/1200x600?text=Wisata+Desa';
-$rating = $wisata->rating_avg > 0 ? $wisata->rating_avg : 'Baru';
+$gallery_images = [];
+if (!empty($img_hero)) $gallery_images[] = $img_hero;
+
+if (!empty($wisata->galeri)) {
+    $decoded_gallery = json_decode($wisata->galeri);
+    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded_gallery)) {
+        foreach($decoded_gallery as $g_img) {
+            if ($g_img != $img_hero) $gallery_images[] = $g_img;
+        }
+    }
+}
+
+// E. Data Lain
+$harga_tiket = $wisata->harga_tiket;
+$jam_buka = !empty($wisata->jam_buka) ? $wisata->jam_buka : '08:00 - 17:00';
+$rating = $wisata->rating_avg > 0 ? $wisata->rating_avg : '4.8';
+
+// F. Link WhatsApp
+$wa_link = '#';
+if (!empty($wisata->kontak_pengelola)) {
+    $wa_num = preg_replace('/^0/', '62', preg_replace('/[^0-9]/', '', $wisata->kontak_pengelola));
+    $wa_text = urlencode("Halo, saya tertarik berkunjung ke " . $wisata->nama_wisata . ". Boleh info lebih lanjut?");
+    $wa_link = "https://wa.me/{$wa_num}?text={$wa_text}";
+}
 ?>
 
-<!-- === HERO IMAGE & HEADER === -->
-<div class="bg-white pb-10">
-    <!-- Hero Image Full Width dengan Overlay -->
-    <div class="relative h-[300px] md:h-[500px] w-full group overflow-hidden">
-        <img src="<?php echo esc_url($img_hero); ?>" class="w-full h-full object-cover transition duration-700 group-hover:scale-105" alt="<?php echo esc_attr($wisata->nama_wisata); ?>">
-        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+<!-- ============================================================================
+     4. TAMPILAN HALAMAN (HERO & GALLERY)
+     ============================================================================ -->
+<div class="bg-white pt-4 pb-8">
+    <div class="container mx-auto px-4">
         
-        <div class="absolute bottom-0 left-0 w-full p-4 md:p-10">
-            <div class="container mx-auto">
-                <div class="flex flex-col md:flex-row items-end justify-between gap-4">
-                    <div class="text-white max-w-3xl">
-                        <div class="flex items-center gap-2 mb-3">
-                            <span class="bg-primary px-3 py-1 rounded-full text-xs font-bold shadow-lg">
-                                <i class="fas fa-check-circle mr-1"></i> Terverifikasi
-                            </span>
-                            <span class="bg-black/30 backdrop-blur px-3 py-1 rounded-full text-xs font-bold border border-white/20">
-                                <i class="fas fa-star text-yellow-400 mr-1"></i> <?php echo $rating; ?>
-                            </span>
+        <!-- Breadcrumb -->
+        <div class="flex items-center gap-2 text-xs text-gray-500 mb-4 overflow-x-auto whitespace-nowrap pb-2 no-scrollbar">
+            <a href="<?php echo home_url('/'); ?>" class="hover:text-primary transition">Beranda</a>
+            <i class="fas fa-chevron-right text-[10px] text-gray-300"></i>
+            <a href="<?php echo home_url('/wisata'); ?>" class="hover:text-primary transition">Wisata</a>
+            <i class="fas fa-chevron-right text-[10px] text-gray-300"></i>
+            <span class="text-gray-800 font-medium truncate"><?php echo esc_html($wisata->nama_wisata); ?></span>
+        </div>
+
+        <!-- Header Info -->
+        <div class="mb-6">
+            <h1 class="text-2xl md:text-3xl lg:text-4xl font-extrabold text-gray-900 mb-3 leading-tight"><?php echo esc_html($wisata->nama_wisata); ?></h1>
+            <div class="flex flex-wrap items-center gap-3 text-sm text-gray-600">
+                <span class="flex items-center gap-1.5 text-gray-800">
+                    <i class="fas fa-map-marker-alt text-red-500"></i> <?php echo $lokasi_html; ?>
+                </span>
+                <span class="text-gray-300">|</span>
+                <span class="flex items-center gap-1.5 font-medium"><i class="fas fa-star text-yellow-400"></i> <?php echo $rating; ?></span>
+                <span class="text-gray-300">|</span>
+                <span class="bg-green-50 text-green-700 text-xs px-2.5 py-1 rounded-full font-bold border border-green-100 uppercase tracking-wide"><?php echo esc_html(!empty($wisata->kategori) ? $wisata->kategori : 'Wisata'); ?></span>
+            </div>
+        </div>
+
+        <!-- Gallery Grid (Desktop & Mobile) -->
+        <div class="relative h-[250px] md:h-[480px] rounded-2xl overflow-hidden shadow-sm border border-gray-100 bg-gray-100">
+            <?php if (count($gallery_images) >= 3) : ?>
+                <!-- Grid 3 Gambar -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-2 h-full">
+                    <div class="md:col-span-3 h-full relative overflow-hidden group cursor-pointer" onclick="openLightbox(0)">
+                        <img src="<?php echo esc_url($gallery_images[0]); ?>" class="w-full h-full object-cover transition duration-700 group-hover:scale-105" alt="Main Photo">
+                        <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition"></div>
+                    </div>
+                    <div class="hidden md:flex flex-col gap-2 h-full">
+                        <div class="h-1/2 relative overflow-hidden group cursor-pointer" onclick="openLightbox(1)">
+                            <img src="<?php echo esc_url($gallery_images[1]); ?>" class="w-full h-full object-cover transition duration-500 group-hover:scale-110" alt="Photo 2">
                         </div>
-                        <h1 class="text-3xl md:text-5xl font-extrabold mb-2 leading-tight"><?php echo esc_html($wisata->nama_wisata); ?></h1>
-                        <p class="text-gray-200 flex items-center gap-2 text-sm md:text-base">
-                            <i class="fas fa-map-marker-alt text-red-500"></i>
-                            <?php echo esc_html($wisata->kabupaten); ?>
-                        </p>
+                        <div class="h-1/2 relative overflow-hidden group cursor-pointer" onclick="openLightbox(2)">
+                            <img src="<?php echo esc_url($gallery_images[2]); ?>" class="w-full h-full object-cover transition duration-500 group-hover:scale-110" alt="Photo 3">
+                            <?php if (count($gallery_images) > 3) : ?>
+                            <div class="absolute inset-0 bg-black/50 flex items-center justify-center hover:bg-black/40 transition backdrop-blur-[1px]">
+                                <span class="text-white font-bold text-sm border border-white/50 px-3 py-1 rounded-lg">
+                                    +<?php echo count($gallery_images) - 3; ?> Foto
+                                </span>
+                            </div>
+                            <?php endif; ?>
+                        </div>
                     </div>
                 </div>
-            </div>
+            <?php else : ?>
+                <!-- Single Image / Kurang dari 3 -->
+                <div class="w-full h-full relative group cursor-pointer" onclick="openLightbox(0)">
+                    <img src="<?php echo esc_url($gallery_images[0]); ?>" class="w-full h-full object-cover transition duration-700 group-hover:scale-105" alt="Main Photo">
+                    <?php if (count($gallery_images) > 1) : ?>
+                        <div class="absolute bottom-4 right-4 bg-black/60 text-white px-3 py-1.5 rounded-lg text-xs font-bold backdrop-blur-md flex items-center gap-2">
+                            <i class="fas fa-images"></i> Lihat <?php echo count($gallery_images); ?> Foto
+                        </div>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+            
+            <!-- Mobile Gallery Button -->
+            <button onclick="openLightbox(0)" class="md:hidden absolute bottom-3 right-3 bg-white/90 text-gray-900 px-3 py-1.5 rounded-lg text-xs font-bold shadow-md flex items-center gap-2 z-10 border border-gray-200">
+                <i class="fas fa-th"></i> Galeri
+            </button>
+        </div>
+
+    </div>
+</div>
+
+<!-- ============================================================================
+     5. STICKY NAVIGATION
+     ============================================================================ -->
+<div class="sticky top-[60px] md:top-[0px] z-30 bg-white border-b border-gray-200 shadow-sm transition-all duration-300" id="sticky-tabs">
+    <div class="container mx-auto px-4">
+        <div class="flex gap-6 md:gap-8 text-sm font-medium text-gray-500 overflow-x-auto no-scrollbar scroll-smooth">
+            <a href="#tentang" class="py-4 border-b-2 border-primary text-primary font-bold whitespace-nowrap sub-nav-link active" data-target="tentang">Tentang</a>
+            <a href="#harga" class="py-4 border-b-2 border-transparent hover:text-primary hover:border-gray-300 transition whitespace-nowrap sub-nav-link" data-target="harga">Tiket</a>
+            <?php if (!empty($fasilitas)) : ?>
+            <a href="#fasilitas" class="py-4 border-b-2 border-transparent hover:text-primary hover:border-gray-300 transition whitespace-nowrap sub-nav-link" data-target="fasilitas">Fasilitas</a>
+            <?php endif; ?>
+            <a href="#lokasi" class="py-4 border-b-2 border-transparent hover:text-primary hover:border-gray-300 transition whitespace-nowrap sub-nav-link" data-target="lokasi">Lokasi</a>
+            <a href="#ulasan" class="py-4 border-b-2 border-transparent hover:text-primary hover:border-gray-300 transition whitespace-nowrap sub-nav-link" data-target="ulasan">Ulasan</a>
         </div>
     </div>
+</div>
 
-    <!-- Breadcrumb & Navigasi -->
-    <div class="border-b border-gray-100 bg-white sticky top-0 z-40 shadow-sm">
-        <div class="container mx-auto px-4 py-4 flex items-center justify-between">
-            <div class="flex items-center gap-2 text-xs text-gray-500 overflow-x-auto whitespace-nowrap">
-                <a href="<?php echo home_url('/'); ?>" class="hover:text-primary">Beranda</a>
-                <i class="fas fa-chevron-right text-[10px] text-gray-300"></i>
-                <a href="<?php echo home_url('/wisata'); ?>" class="hover:text-primary">Wisata</a>
-                <i class="fas fa-chevron-right text-[10px] text-gray-300"></i>
-                <span class="text-gray-800 font-medium truncate"><?php echo esc_html($wisata->nama_wisata); ?></span>
-            </div>
+<!-- ============================================================================
+     6. MAIN CONTENT (2 Columns)
+     ============================================================================ -->
+<div class="bg-gray-50 min-h-screen py-8">
+    <div class="container mx-auto px-4">
+        <div class="flex flex-col lg:flex-row gap-8 lg:gap-12">
             
-            <div class="hidden md:flex gap-4 text-sm font-bold text-gray-600">
-                <a href="#deskripsi" class="hover:text-primary transition">Deskripsi</a>
-                <a href="#galeri" class="hover:text-primary transition">Galeri</a>
-                <a href="#lokasi" class="hover:text-primary transition">Lokasi</a>
-                <a href="#related" class="hover:text-primary transition">Lainnya</a>
-            </div>
-        </div>
-    </div>
-
-    <!-- === MAIN CONTENT === -->
-    <div class="container mx-auto px-4 py-10">
-        <div class="flex flex-col lg:flex-row gap-10">
-            
-            <!-- KOLOM KIRI (KONTEN UTAMA) -->
-            <div class="w-full lg:w-2/3 space-y-10">
+            <!-- KOLOM KIRI (Konten Utama) -->
+            <div class="w-full lg:w-2/3 space-y-8">
                 
-                <!-- Section Deskripsi -->
-                <div id="deskripsi" class="bg-white rounded-2xl p-6 md:p-8 border border-gray-100 shadow-sm">
-                    <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-sm"><i class="fas fa-align-left"></i></div>
-                        Tentang Wisata
+                <!-- Section: TENTANG -->
+                <div id="tentang" class="scroll-mt-32 content-section bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                    <h2 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2 border-b border-gray-100 pb-3">
+                        <i class="far fa-file-alt text-primary"></i> Tentang Tempat Ini
                     </h2>
-                    <div class="prose prose-lg max-w-none text-gray-600 leading-relaxed text-justify">
+                    <div class="prose prose-green prose-sm md:prose-base max-w-none text-gray-600 leading-relaxed">
                         <?php echo wpautop(esc_html($wisata->deskripsi)); ?>
                     </div>
+                </div>
 
-                    <!-- Fasilitas (Mockup/Simulasi jika belum ada kolom spesifik) -->
-                    <div class="mt-8 pt-8 border-t border-gray-100">
-                        <h3 class="font-bold text-gray-800 mb-4 text-sm uppercase tracking-wide">Fasilitas Umum</h3>
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div class="flex items-center gap-2 text-gray-600 text-sm p-3 bg-gray-50 rounded-lg">
-                                <i class="fas fa-parking text-primary w-5"></i> Parkir Luas
+                <!-- Section: HARGA TIKET -->
+                <div id="harga" class="scroll-mt-32 content-section bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                    <h2 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2 border-b border-gray-100 pb-3">
+                        <i class="fas fa-ticket-alt text-primary"></i> Informasi Tiket
+                    </h2>
+                    <div class="flex items-center justify-between bg-green-50 p-4 rounded-xl border border-green-100">
+                        <div>
+                            <p class="text-xs text-gray-500 mb-1 uppercase tracking-wide font-bold">Harga Masuk</p>
+                            <div class="text-2xl font-bold text-primary">
+                                <?php echo ($harga_tiket > 0) ? 'Rp ' . number_format($harga_tiket, 0, ',', '.') : 'Gratis'; ?>
                             </div>
-                            <div class="flex items-center gap-2 text-gray-600 text-sm p-3 bg-gray-50 rounded-lg">
-                                <i class="fas fa-mosque text-primary w-5"></i> Musholla
-                            </div>
-                            <div class="flex items-center gap-2 text-gray-600 text-sm p-3 bg-gray-50 rounded-lg">
-                                <i class="fas fa-toilet text-primary w-5"></i> Toilet
-                            </div>
-                            <div class="flex items-center gap-2 text-gray-600 text-sm p-3 bg-gray-50 rounded-lg">
-                                <i class="fas fa-utensils text-primary w-5"></i> Kantin
-                            </div>
+                            <p class="text-[10px] text-gray-400 mt-1">*Harga per orang</p>
+                        </div>
+                        <div class="text-right">
+                            <span class="block text-xs font-bold text-green-700 bg-white px-3 py-1 rounded-full shadow-sm">
+                                Tiket Tersedia
+                            </span>
                         </div>
                     </div>
                 </div>
 
-                <!-- Section Galeri -->
-                <?php if (!empty($gallery)): ?>
-                <div id="galeri">
-                    <h2 class="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center text-sm"><i class="far fa-images"></i></div>
-                        Galeri Foto
+                <!-- Section: FASILITAS -->
+                <?php if (!empty($fasilitas)) : ?>
+                <div id="fasilitas" class="scroll-mt-32 content-section bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                    <h2 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2 border-b border-gray-100 pb-3">
+                        <i class="fas fa-concierge-bell text-primary"></i> Fasilitas
                     </h2>
-                    <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-                        <!-- Foto Utama (Zoomable) -->
-                        <a href="<?php echo esc_url($img_hero); ?>" target="_blank" class="block col-span-2 row-span-2 relative rounded-xl overflow-hidden group h-[300px] md:h-[400px]">
-                            <img src="<?php echo esc_url($img_hero); ?>" class="w-full h-full object-cover transition duration-500 group-hover:scale-105">
-                            <div class="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition"></div>
-                        </a>
-                        <!-- Foto Tambahan -->
-                        <?php foreach($gallery as $img): ?>
-                        <a href="<?php echo esc_url($img); ?>" target="_blank" class="block relative rounded-xl overflow-hidden group h-[145px] md:h-[195px]">
-                            <img src="<?php echo esc_url($img); ?>" class="w-full h-full object-cover transition duration-500 group-hover:scale-110">
-                        </a>
+                    <div class="grid grid-cols-2 gap-3">
+                        <?php foreach ($fasilitas as $f) : if(trim($f) == '') continue; ?>
+                            <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100 hover:border-green-200 transition">
+                                <i class="fas fa-check-circle text-green-500"></i>
+                                <span class="text-sm font-medium text-gray-700"><?php echo esc_html(trim($f)); ?></span>
+                            </div>
                         <?php endforeach; ?>
                     </div>
                 </div>
                 <?php endif; ?>
 
-            </div>
-
-            <!-- KOLOM KANAN (SIDEBAR) -->
-            <div class="w-full lg:w-1/3">
-                <div class="sticky top-24 space-y-6">
+                <!-- Section: LOKASI -->
+                <div id="lokasi" class="scroll-mt-32 content-section bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                    <h2 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2 border-b border-gray-100 pb-3">
+                        <i class="fas fa-map-marked-alt text-primary"></i> Lokasi
+                    </h2>
+                    <p class="text-gray-600 mb-4 text-sm flex items-start gap-2">
+                        <i class="fas fa-map-pin mt-1 text-red-500"></i> 
+                        <?php echo $lokasi_html; ?>
+                    </p>
                     
-                    <!-- Kartu Pemesanan / Info -->
-                    <div class="bg-white rounded-2xl shadow-xl shadow-gray-200/50 border border-gray-100 p-6 relative overflow-hidden">
-                        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary to-green-300"></div>
-                        
-                        <div class="mb-6">
-                            <span class="block text-gray-500 text-xs font-bold uppercase tracking-wider mb-1">Harga Tiket Masuk</span>
-                            <div class="flex items-baseline gap-1">
-                                <span class="text-3xl font-extrabold text-primary">
-                                    <?php echo ($wisata->harga_tiket > 0) ? 'Rp '.number_format($wisata->harga_tiket, 0, ',', '.') : 'Gratis'; ?>
-                                </span>
-                                <?php if($wisata->harga_tiket > 0): ?><span class="text-gray-400 text-sm">/ orang</span><?php endif; ?>
-                            </div>
-                        </div>
-
-                        <div class="space-y-4 mb-6">
-                            <div class="flex items-start gap-3 text-sm">
-                                <i class="far fa-clock text-gray-400 mt-1 w-5 text-center"></i>
-                                <div>
-                                    <span class="font-bold text-gray-700 block">Jam Operasional</span>
-                                    <span class="text-gray-500"><?php echo esc_html($wisata->jam_buka ?: 'Setiap Hari (08:00 - 17:00)'); ?></span>
-                                </div>
-                            </div>
-                            <div class="flex items-start gap-3 text-sm">
-                                <i class="fas fa-map-pin text-gray-400 mt-1 w-5 text-center"></i>
-                                <div>
-                                    <span class="font-bold text-gray-700 block">Lokasi</span>
-                                    <span class="text-gray-500"><?php echo esc_html($wisata->kabupaten); ?>, <?php echo esc_html($wisata->provinsi ?: 'Jawa Tengah'); ?></span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Tombol Aksi -->
-                        <div class="space-y-3">
-                            <button onclick="dw_add_to_cart(<?php echo $wisata->id; ?>, 'tiket')" class="w-full bg-primary text-white font-bold py-3.5 rounded-xl hover:bg-green-700 transition shadow-lg shadow-green-200 active:scale-95 transform duration-150 flex items-center justify-center gap-2">
-                                <i class="fas fa-ticket-alt"></i> Pesan Tiket Sekarang
-                            </button>
-                            
-                            <a href="https://wa.me/?text=Halo,%20saya%20tertarik%20dengan%20wisata%20<?php echo urlencode($wisata->nama_wisata); ?>" target="_blank" class="w-full bg-white text-gray-700 font-bold py-3 rounded-xl border border-gray-200 hover:bg-gray-50 transition flex items-center justify-center gap-2">
-                                <i class="fab fa-whatsapp text-green-500 text-lg"></i> Tanya Pengelola
-                            </a>
-                        </div>
-                    </div>
-
-                    <!-- Widget Profil Desa -->
-                    <div class="bg-gray-900 rounded-2xl p-6 text-white relative overflow-hidden group">
-                        <!-- Dekorasi -->
-                        <div class="absolute -top-10 -right-10 w-40 h-40 bg-blue-500 rounded-full blur-[60px] opacity-20 group-hover:opacity-30 transition"></div>
-                        
-                        <h3 class="font-bold text-sm text-gray-400 uppercase tracking-widest mb-4 relative z-10">Dikelola Oleh</h3>
-                        <div class="flex items-center gap-4 mb-6 relative z-10">
-                            <div class="w-14 h-14 bg-white/10 rounded-full flex items-center justify-center text-2xl backdrop-blur-sm border border-white/10">
-                                <i class="fas fa-landmark text-blue-300"></i>
-                            </div>
-                            <div>
-                                <p class="font-bold text-lg leading-tight">Desa <?php echo esc_html($wisata->nama_desa); ?></p>
-                                <a href="<?php echo esc_url($link_desa); ?>" class="text-blue-300 text-xs hover:text-white transition flex items-center gap-1 mt-1">
-                                    Kunjungi Profil <i class="fas fa-arrow-right text-[10px]"></i>
+                    <div class="relative w-full h-[250px] bg-gray-100 rounded-xl overflow-hidden group border border-gray-200">
+                        <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:16px_16px]"></div>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-10">
+                            <?php if (!empty($wisata->lokasi_maps)) : ?>
+                                <a href="<?php echo esc_url($wisata->lokasi_maps); ?>" target="_blank" class="bg-white hover:bg-gray-50 text-gray-800 px-6 py-3 rounded-full font-bold shadow-lg transition transform hover:-translate-y-1 flex items-center gap-2 border border-gray-200">
+                                    <span class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center text-red-500"><i class="fas fa-location-arrow"></i></span>
+                                    Buka Google Maps
                                 </a>
+                            <?php else : ?>
+                                <span class="text-gray-400 font-medium bg-white/60 px-4 py-2 rounded-lg border border-gray-200 text-sm">Peta belum tersedia</span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section: ULASAN -->
+                <div id="ulasan" class="scroll-mt-32 content-section">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-lg font-bold text-gray-900">Ulasan Pengunjung</h2>
+                    </div>
+
+                    <?php if (!empty($ulasan_list)) : ?>
+                        <div class="space-y-4">
+                            <?php foreach ($ulasan_list as $ulasan) : ?>
+                            <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <div class="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 font-bold text-sm border border-gray-200">
+                                        <?php echo substr(esc_html($ulasan->display_name ?: 'A'), 0, 1); ?>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-bold text-gray-800 text-sm"><?php echo esc_html($ulasan->display_name ?: 'Pengunjung'); ?></h4>
+                                        <div class="flex text-yellow-400 text-[10px] gap-0.5">
+                                            <?php for($i=1; $i<=5; $i++) echo ($i <= $ulasan->rating) ? '<i class="fas fa-star"></i>' : '<i class="far fa-star text-gray-300"></i>'; ?>
+                                        </div>
+                                    </div>
+                                    <span class="ml-auto text-[10px] text-gray-400 bg-gray-50 px-2 py-1 rounded-full"><?php echo date('d M Y', strtotime($ulasan->created_at)); ?></span>
+                                </div>
+                                <p class="text-gray-600 text-sm leading-relaxed mt-2 pl-[52px]"><?php echo esc_html($ulasan->komentar); ?></p>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php else : ?>
+                        <div class="bg-white p-8 rounded-2xl border border-gray-100 text-center shadow-sm">
+                            <div class="w-14 h-14 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3 text-gray-300">
+                                <i class="far fa-comment-alt text-xl"></i>
+                            </div>
+                            <p class="text-gray-500 text-sm font-medium">Belum ada ulasan</p>
+                            <p class="text-xs text-gray-400">Jadilah yang pertama mengulas tempat ini.</p>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+            </div>
+
+            <!-- KOLOM KANAN (Sidebar Sticky - Desktop Only) -->
+            <div class="hidden lg:block w-full lg:w-1/3 relative">
+                <div class="sticky top-28 space-y-6">
+                    
+                    <!-- Card Info -->
+                    <div class="bg-white rounded-2xl shadow-lg shadow-gray-100 border border-gray-100 overflow-hidden">
+                        <div class="p-6">
+                            <div class="flex items-center justify-between mb-6 pb-6 border-b border-gray-100">
+                                <div>
+                                    <span class="text-xs text-gray-400 uppercase font-bold">Harga Tiket</span>
+                                    <div class="text-2xl font-bold text-primary mt-1">
+                                        <?php echo ($harga_tiket > 0) ? 'Rp ' . number_format($harga_tiket, 0, ',', '.') : 'Gratis'; ?>
+                                    </div>
+                                </div>
+                                <div class="w-10 h-10 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center">
+                                    <i class="fas fa-tag"></i>
+                                </div>
+                            </div>
+
+                            <div class="space-y-4">
+                                <div class="flex items-center gap-3 text-sm text-gray-600">
+                                    <i class="far fa-clock text-gray-400 w-5 text-center"></i>
+                                    <span>Buka: <span class="font-bold text-gray-800"><?php echo esc_html($jam_buka); ?> WIB</span></span>
+                                </div>
+                                <div class="flex items-center gap-3 text-sm text-gray-600">
+                                    <i class="fas fa-map-marker-alt text-gray-400 w-5 text-center"></i>
+                                    <span class="truncate"><?php echo $lokasi_html; ?></span>
+                                </div>
+                            </div>
+
+                            <div class="mt-6 pt-6 border-t border-gray-100 space-y-3">
+                                <?php if (!empty($wisata->kontak_pengelola)) : ?>
+                                <a href="<?php echo esc_url($wa_link); ?>" target="_blank" class="flex items-center justify-center w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 rounded-xl transition shadow-lg shadow-green-100 gap-2 transform active:scale-95">
+                                    <i class="fab fa-whatsapp text-lg"></i> Hubungi Pengelola
+                                </a>
+                                <?php else: ?>
+                                <button disabled class="w-full bg-gray-100 text-gray-400 font-bold py-3.5 rounded-xl cursor-not-allowed">Kontak Tidak Tersedia</button>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Peta Lokasi -->
-                    <?php if($wisata->kabupaten): ?>
-                    <div id="lokasi" class="bg-white p-2 rounded-2xl border border-gray-100 shadow-sm">
-                        <div class="rounded-xl overflow-hidden h-64 relative bg-gray-100">
-                             <iframe 
-                                width="100%" 
-                                height="100%" 
-                                frameborder="0" 
-                                style="border:0" 
-                                src="https://maps.google.com/maps?q=<?php echo urlencode($wisata->nama_wisata . ' ' . $wisata->kabupaten); ?>&output=embed" 
-                                allowfullscreen 
-                                loading="lazy">
-                            </iframe>
-                            <a href="https://maps.google.com/?q=<?php echo urlencode($wisata->nama_wisata . ' ' . $wisata->kabupaten); ?>" target="_blank" class="absolute bottom-3 right-3 bg-white text-gray-800 text-xs font-bold px-3 py-1.5 rounded-lg shadow-md hover:bg-gray-50">
-                                <i class="fas fa-external-link-alt mr-1"></i> Buka Maps
-                            </a>
-                        </div>
-                    </div>
-                    <?php endif; ?>
-
                 </div>
             </div>
+
         </div>
-
-        <!-- === RELATED WISATA (WISATA LAINNYA) === -->
-        <?php if($related_wisata): ?>
-        <div id="related" class="mt-16 pt-10 border-t border-gray-200">
-            <div class="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-                <div>
-                    <h2 class="text-2xl font-bold text-gray-900">Wisata Lainnya di Desa <?php echo esc_html($wisata->nama_desa); ?></h2>
-                    <p class="text-gray-500 text-sm mt-1">Jelajahi keindahan lain di sekitar lokasi ini.</p>
-                </div>
-                <a href="<?php echo esc_url($link_desa); ?>" class="text-primary font-bold text-sm hover:underline">Lihat Semua <i class="fas fa-arrow-right ml-1"></i></a>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <?php foreach($related_wisata as $rw): 
-                    $link_rw = !empty($rw->slug) ? home_url('/wisata/detail/' . $rw->slug) : home_url('/detail-wisata/?id=' . $rw->id);
-                    $img_rw = !empty($rw->foto_utama) ? $rw->foto_utama : 'https://via.placeholder.com/600x400';
-                ?>
-                <a href="<?php echo esc_url($link_rw); ?>" class="group bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-xl transition duration-300">
-                    <div class="h-48 overflow-hidden relative">
-                        <img src="<?php echo esc_url($img_rw); ?>" class="w-full h-full object-cover group-hover:scale-110 transition duration-500">
-                        <div class="absolute top-2 right-2 bg-white/90 backdrop-blur px-2 py-1 rounded text-xs font-bold text-gray-800">
-                            <i class="fas fa-star text-yellow-400"></i> <?php echo ($rw->rating_avg > 0) ? $rw->rating_avg : 'Baru'; ?>
-                        </div>
-                    </div>
-                    <div class="p-5">
-                        <h3 class="font-bold text-gray-800 mb-2 truncate group-hover:text-primary transition"><?php echo esc_html($rw->nama_wisata); ?></h3>
-                        <div class="flex items-center justify-between text-sm mt-3 pt-3 border-t border-gray-50">
-                            <span class="text-primary font-bold"><?php echo ($rw->harga_tiket > 0) ? 'Rp '.number_format($rw->harga_tiket) : 'Gratis'; ?></span>
-                            <span class="text-gray-400 text-xs">Detail <i class="fas fa-chevron-right text-[10px]"></i></span>
-                        </div>
-                    </div>
-                </a>
-                <?php endforeach; ?>
-            </div>
-        </div>
-        <?php endif; ?>
-
     </div>
 </div>
 
+<!-- ============================================================================
+     7. MOBILE FLOATING ACTION BAR
+     ============================================================================ -->
+<div class="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-50 shadow-[0_-4px_20px_-1px_rgba(0,0,0,0.1)] pb-safe">
+    <div class="flex gap-3 items-center">
+        <div class="flex-1">
+            <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Harga Tiket</div>
+            <div class="font-extrabold text-primary text-lg leading-tight">
+                <?php echo ($harga_tiket > 0) ? 'Rp ' . number_format($harga_tiket, 0, ',', '.') : 'Gratis'; ?>
+            </div>
+        </div>
+        <div class="flex-none">
+            <?php if (!empty($wisata->kontak_pengelola)) : ?>
+            <a href="<?php echo esc_url($wa_link); ?>" class="flex items-center justify-center bg-green-600 active:bg-green-700 text-white font-bold py-3 px-6 rounded-xl shadow-md text-sm gap-2">
+                <i class="fab fa-whatsapp text-lg"></i> Hubungi
+            </a>
+            <?php else: ?>
+            <button disabled class="bg-gray-100 text-gray-400 font-bold py-3 px-6 rounded-xl text-sm border border-gray-200">Kontak N/A</button>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================================================
+     8. LIGHTBOX MODAL
+     ============================================================================ -->
+<div id="lightbox-modal" class="fixed inset-0 z-[60] bg-black/95 hidden flex flex-col items-center justify-center transition-opacity duration-300 opacity-0 touch-none">
+    <button onclick="closeLightbox()" class="absolute top-6 right-6 text-white/70 hover:text-white p-2 z-50 bg-white/10 rounded-full w-10 h-10 flex items-center justify-center backdrop-blur-md">
+        <i class="fas fa-times text-xl"></i>
+    </button>
+    <div class="flex-1 w-full h-full flex items-center justify-center px-2 md:px-10 py-16 relative">
+        <img id="lightbox-img" src="" class="max-w-full max-h-full object-contain shadow-2xl transition-transform duration-300 select-none">
+        
+        <!-- Navigation Buttons -->
+        <button onclick="prevImage()" class="hidden md:block absolute left-6 text-white/50 hover:text-white p-4 text-4xl focus:outline-none bg-black/20 rounded-full h-16 w-16 hover:bg-black/40 flex items-center justify-center transition"><i class="fas fa-chevron-left"></i></button>
+        <button onclick="nextImage()" class="hidden md:block absolute right-6 text-white/50 hover:text-white p-4 text-4xl focus:outline-none bg-black/20 rounded-full h-16 w-16 hover:bg-black/40 flex items-center justify-center transition"><i class="fas fa-chevron-right"></i></button>
+        
+        <!-- Click zones for mobile -->
+        <div class="md:hidden absolute inset-y-0 left-0 w-1/3 z-10" onclick="prevImage()"></div>
+        <div class="md:hidden absolute inset-y-0 right-0 w-1/3 z-10" onclick="nextImage()"></div>
+    </div>
+
+    <!-- Thumbnails -->
+    <div class="w-full bg-black/80 backdrop-blur-md p-4 flex gap-2 overflow-x-auto justify-center hide-scroll absolute bottom-0 left-0 h-24 items-center z-20">
+        <?php foreach ($gallery_images as $idx => $img) : ?>
+            <img src="<?php echo esc_url($img); ?>" onclick="showImage(<?php echo $idx; ?>)" class="h-14 w-20 object-cover rounded cursor-pointer opacity-40 hover:opacity-100 transition border-2 border-transparent lightbox-thumb flex-shrink-0" data-index="<?php echo $idx; ?>">
+        <?php endforeach; ?>
+    </div>
+</div>
+
+<!-- ============================================================================
+     9. JAVASCRIPT
+     ============================================================================ -->
 <script>
-// Fungsi Sederhana Add To Cart
-function dw_add_to_cart(id, jenis) {
-    if(!window.dw_ajax) {
-        alert('Maaf, sistem sedang memuat. Coba refresh halaman.');
-        return;
-    }
+document.addEventListener('DOMContentLoaded', () => {
+    // A. Sticky Nav Logic
+    const sections = document.querySelectorAll('.content-section');
+    const navLinks = document.querySelectorAll('.sub-nav-link');
+    const stickyHeader = document.getElementById('sticky-tabs');
+    const headerHeight = stickyHeader ? stickyHeader.offsetHeight + 100 : 150;
 
-    // Efek loading tombol (opsional, bisa dikembangkan)
-    const btn = event.currentTarget;
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Memproses...';
-    btn.disabled = true;
-
-    jQuery.ajax({
-        url: dw_ajax.ajax_url,
-        type: 'post',
-        data: {
-            action: 'dw_add_to_cart',
-            security: dw_ajax.nonce,
-            item_id: id,
-            jenis: jenis, 
-            qty: 1
-        },
-        success: function(response) {
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-            
-            if(response.success) {
-                // Tampilkan notifikasi sukses yang lebih bagus (misal SweetAlert jika ada, atau alert biasa)
-                alert('Berhasil! Tiket telah ditambahkan ke keranjang.');
-                
-                // Update counter keranjang di header
-                if(jQuery('.cart-count').length) {
-                    jQuery('.cart-count').text(response.data.cart_count);
-                    jQuery('.cart-count').addClass('animate-bounce'); // Efek visual
-                }
-            } else {
-                alert(response.data.message);
-                if(response.data.message.includes('login')) {
-                    window.location.href = '<?php echo home_url("/login"); ?>';
-                }
+    navLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const targetId = this.getAttribute('href').substring(1);
+            const targetSection = document.getElementById(targetId);
+            if(targetSection) {
+                const offsetTop = targetSection.offsetTop - headerHeight;
+                window.scrollTo({ top: offsetTop, behavior: 'smooth' });
             }
-        },
-        error: function() {
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-            alert('Terjadi kesalahan koneksi. Periksa internet Anda.');
+        });
+    });
+
+    // B. Scroll Spy (Highlight Nav Active)
+    window.addEventListener('scroll', () => {
+        let current = '';
+        const scrollPosition = window.scrollY + headerHeight + 50; 
+        sections.forEach(section => {
+            const sectionTop = section.offsetTop;
+            const sectionHeight = section.clientHeight;
+            if (scrollPosition >= sectionTop) current = section.getAttribute('id');
+        });
+        navLinks.forEach(link => {
+            link.classList.remove('border-primary', 'text-primary');
+            link.classList.add('border-transparent');
+            if (link.dataset.target === current) {
+                link.classList.remove('border-transparent');
+                link.classList.add('border-primary', 'text-primary');
+                link.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            }
+        });
+    });
+});
+
+// C. Lightbox Logic
+const galleryImages = <?php echo json_encode($gallery_images); ?>;
+let currentIndex = 0;
+const lightbox = document.getElementById('lightbox-modal');
+const lightboxImg = document.getElementById('lightbox-img');
+
+function openLightbox(index) {
+    if(galleryImages.length === 0) return;
+    currentIndex = index;
+    updateLightboxImage();
+    lightbox.classList.remove('hidden');
+    void lightbox.offsetWidth; // Trigger reflow for transition
+    lightbox.classList.remove('opacity-0');
+    document.body.style.overflow = 'hidden'; 
+}
+
+function closeLightbox() {
+    lightbox.classList.add('opacity-0');
+    setTimeout(() => {
+        lightbox.classList.add('hidden');
+        document.body.style.overflow = ''; 
+    }, 300);
+}
+
+function updateLightboxImage() {
+    lightboxImg.src = galleryImages[currentIndex];
+    // Update active thumb
+    document.querySelectorAll('.lightbox-thumb').forEach((thumb, idx) => {
+        if(idx === currentIndex) {
+            thumb.classList.remove('opacity-40', 'border-transparent');
+            thumb.classList.add('opacity-100', 'border-white');
+            thumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        } else {
+            thumb.classList.add('opacity-40', 'border-transparent');
+            thumb.classList.remove('opacity-100', 'border-white');
         }
     });
 }
+
+function showImage(index) { currentIndex = index; updateLightboxImage(); }
+function nextImage(e) { if(e) e.stopPropagation(); currentIndex = (currentIndex + 1) % galleryImages.length; updateLightboxImage(); }
+function prevImage(e) { if(e) e.stopPropagation(); currentIndex = (currentIndex - 1 + galleryImages.length) % galleryImages.length; updateLightboxImage(); }
+
+// Keyboard Support
+document.addEventListener('keydown', function(e) {
+    if (lightbox.classList.contains('hidden')) return;
+    if (e.key === 'Escape') closeLightbox();
+    if (e.key === 'ArrowRight') nextImage();
+    if (e.key === 'ArrowLeft') prevImage();
+});
 </script>
+
+<style>
+/* Utilities specific for this page */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+.scroll-mt-32 { scroll-margin-top: 140px; }
+</style>
 
 <?php get_footer(); ?>
