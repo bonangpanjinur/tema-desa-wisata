@@ -120,6 +120,11 @@ function get_cat_color_prod($cat) {
                         <?php endif; ?>
                     </button>
                 </div>
+                
+                <!-- User/Cart Actions (Optional - Placeholder to match Wisata layout) -->
+                <div class="hidden md:flex items-center gap-3">
+                    <!-- Placeholder -->
+                </div>
             </div>
         </div>
     </div>
@@ -317,26 +322,30 @@ function get_cat_color_prod($cat) {
                             <div class="grid grid-cols-2 gap-3">
                                 <label class="cursor-pointer">
                                     <input type="radio" name="sort" value="terbaru" <?php checked($urutan, 'terbaru'); ?> class="peer sr-only">
-                                    <div class="px-4 py-3 rounded-xl border border-gray-200 text-center text-sm font-medium text-gray-600 peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:text-orange-700 transition">
-                                        笨ｨ Terbaru
+                                    <div class="px-4 py-3 rounded-xl border border-gray-200 text-center text-sm font-medium text-gray-600 peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:text-orange-700 transition flex flex-col items-center justify-center gap-1 group">
+                                        <i class="fas fa-clock text-lg mb-1 text-gray-400 group-peer-checked:text-orange-500"></i>
+                                        <span>Terbaru</span>
                                     </div>
                                 </label>
                                 <label class="cursor-pointer">
                                     <input type="radio" name="sort" value="terlaris" <?php checked($urutan, 'terlaris'); ?> class="peer sr-only">
-                                    <div class="px-4 py-3 rounded-xl border border-gray-200 text-center text-sm font-medium text-gray-600 peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:text-orange-700 transition">
-                                        敗 Terlaris
+                                    <div class="px-4 py-3 rounded-xl border border-gray-200 text-center text-sm font-medium text-gray-600 peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:text-orange-700 transition flex flex-col items-center justify-center gap-1 group">
+                                        <i class="fas fa-fire text-lg mb-1 text-gray-400 group-peer-checked:text-orange-500"></i>
+                                        <span>Terlaris</span>
                                     </div>
                                 </label>
                                 <label class="cursor-pointer">
                                     <input type="radio" name="sort" value="termurah" <?php checked($urutan, 'termurah'); ?> class="peer sr-only">
-                                    <div class="px-4 py-3 rounded-xl border border-gray-200 text-center text-sm font-medium text-gray-600 peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:text-orange-700 transition">
-                                        腸 Termurah
+                                    <div class="px-4 py-3 rounded-xl border border-gray-200 text-center text-sm font-medium text-gray-600 peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:text-orange-700 transition flex flex-col items-center justify-center gap-1 group">
+                                        <i class="fas fa-tag text-lg mb-1 text-gray-400 group-peer-checked:text-orange-500"></i>
+                                        <span>Termurah</span>
                                     </div>
                                 </label>
                                 <label class="cursor-pointer">
                                     <input type="radio" name="sort" value="termahal" <?php checked($urutan, 'termahal'); ?> class="peer sr-only">
-                                    <div class="px-4 py-3 rounded-xl border border-gray-200 text-center text-sm font-medium text-gray-600 peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:text-orange-700 transition">
-                                        虫 Termahal
+                                    <div class="px-4 py-3 rounded-xl border border-gray-200 text-center text-sm font-medium text-gray-600 peer-checked:border-orange-500 peer-checked:bg-orange-50 peer-checked:text-orange-700 transition flex flex-col items-center justify-center gap-1 group">
+                                        <i class="fas fa-crown text-lg mb-1 text-gray-400 group-peer-checked:text-orange-500"></i>
+                                        <span>Termahal</span>
                                     </div>
                                 </label>
                             </div>
