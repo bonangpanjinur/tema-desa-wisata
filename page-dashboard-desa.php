@@ -1,7 +1,7 @@
 <?php
 /**
  * Template Name: Dashboard Desa (Admin Desa)
- * Description: Pusat kontrol untuk admin desa mengelola wisata, pedagang, dan profil desa.
+ * Description: Pusat kontrol untuk admin desa mengelola wisata, pedagang, dan profil desa secara lengkap.
  */
 
 // 1. CEK AKSES & LOGIN
@@ -20,7 +20,7 @@ $table_pedagang = $wpdb->prefix . 'dw_pedagang';
 // Ambil Data Desa
 $desa = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_desa WHERE id_user_desa = %d", $current_user->ID));
 
-// Jika bukan admin desa, redirect atau tampilkan pesan
+// Jika bukan admin desa
 if (!$desa) {
     get_header();
     echo '<div class="container mx-auto py-20 text-center"><h2 class="text-2xl font-bold text-red-600">Akses Ditolak</h2><p>Anda belum terdaftar sebagai admin desa.</p><a href="'.home_url('/daftar-desa').'" class="btn-primary mt-4 inline-block">Daftar Sekarang</a></div>';
@@ -46,8 +46,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $jam_buka  = sanitize_text_field($_POST['jam_buka']);
         $kontak    = sanitize_text_field($_POST['kontak_pengelola']);
         $lokasi    = sanitize_textarea_field($_POST['lokasi_maps']);
+        $fasilitas = sanitize_textarea_field($_POST['fasilitas']); // Field baru
         
-        // Handle Upload Foto
+        // 1. Handle Foto Utama
         $attachment_id = '';
         if (!empty($_FILES['foto_utama']['name'])) {
             require_once(ABSPATH . 'wp-admin/includes/image.php');
@@ -62,6 +63,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $attachment_id = isset($_POST['existing_foto']) ? sanitize_text_field($_POST['existing_foto']) : '';
         }
 
+        // 2. Handle Galeri (Multi Upload)
+        $galeri_ids = [];
+        // Ambil galeri lama jika ada
+        if (isset($_POST['existing_galeri']) && !empty($_POST['existing_galeri'])) {
+            $galeri_ids = json_decode(stripslashes($_POST['existing_galeri']), true);
+            if (!is_array($galeri_ids)) $galeri_ids = [];
+        }
+
+        // Proses upload file baru untuk galeri
+        if (!empty($_FILES['galeri']['name'][0])) {
+            require_once(ABSPATH . 'wp-admin/includes/image.php');
+            require_once(ABSPATH . 'wp-admin/includes/file.php');
+            require_once(ABSPATH . 'wp-admin/includes/media.php');
+
+            $files = $_FILES['galeri'];
+            foreach ($files['name'] as $key => $value) {
+                if ($files['name'][$key]) {
+                    $file = array(
+                        'name'     => $files['name'][$key],
+                        'type'     => $files['type'][$key],
+                        'tmp_name' => $files['tmp_name'][$key],
+                        'error'    => $files['error'][$key],
+                        'size'     => $files['size'][$key]
+                    );
+                    $_FILES = array("upload_file" => $file);
+                    $attach_id = media_handle_upload("upload_file", 0);
+                    if (!is_wp_error($attach_id)) {
+                        $galeri_ids[] = $attach_id;
+                    }
+                }
+            }
+        }
+
         $data = [
             'id_desa'      => $desa->id,
             'nama_wisata'  => $nama,
@@ -70,10 +104,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'deskripsi'    => $desc,
             'harga_tiket'  => $harga,
             'jam_buka'     => $jam_buka,
-            'fasilitas'    => '', // Bisa ditambah field input fasilitas
+            'fasilitas'    => $fasilitas,
             'kontak_pengelola' => $kontak,
             'lokasi_maps'  => $lokasi,
             'foto_utama'   => $attachment_id,
+            'galeri'       => json_encode($galeri_ids),
             'status'       => 'aktif',
             'updated_at'   => current_time('mysql')
         ];
@@ -99,30 +134,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $message_type = 'success';
     }
 
-    // C. UPDATE PROFIL DESA
+    // C. UPDATE PROFIL DESA (LENGKAP)
     if (isset($_POST['action']) && $_POST['action'] === 'update_desa') {
         $nama_desa = sanitize_text_field($_POST['nama_desa']);
         $desc_desa = wp_kses_post($_POST['deskripsi']);
         $alamat    = sanitize_textarea_field($_POST['alamat_lengkap']);
         
-        // Upload Foto Profil Desa (Optional)
+        // Info Bank
+        $nama_bank      = sanitize_text_field($_POST['nama_bank_desa']);
+        $no_rekening    = sanitize_text_field($_POST['no_rekening_desa']);
+        $atas_nama_rek  = sanitize_text_field($_POST['atas_nama_rekening_desa']);
+
+        require_once(ABSPATH . 'wp-admin/includes/image.php');
+        require_once(ABSPATH . 'wp-admin/includes/file.php');
+        require_once(ABSPATH . 'wp-admin/includes/media.php');
+
+        // 1. Upload Foto Profil Desa
         $foto_desa_id = $desa->foto;
         if (!empty($_FILES['foto_desa']['name'])) {
-            require_once(ABSPATH . 'wp-admin/includes/image.php');
-            require_once(ABSPATH . 'wp-admin/includes/file.php');
-            require_once(ABSPATH . 'wp-admin/includes/media.php');
             $attach_id = media_handle_upload('foto_desa', 0);
             if (!is_wp_error($attach_id)) $foto_desa_id = $attach_id;
+        }
+
+        // 2. Upload QRIS Desa
+        $qris_desa_url = $desa->qris_image_url_desa;
+        if (!empty($_FILES['qris_desa']['name'])) {
+            $attach_id = media_handle_upload('qris_desa', 0);
+            if (!is_wp_error($attach_id)) {
+                $qris_desa_url = wp_get_attachment_url($attach_id);
+            }
         }
 
         $wpdb->update($table_desa, [
             'nama_desa'      => $nama_desa,
             'deskripsi'      => $desc_desa,
             'alamat_lengkap' => $alamat,
-            'foto'           => $foto_desa_id
+            'foto'           => $foto_desa_id,
+            'nama_bank_desa' => $nama_bank,
+            'no_rekening_desa' => $no_rekening,
+            'atas_nama_rekening_desa' => $atas_nama_rek,
+            'qris_image_url_desa' => $qris_desa_url
         ], ['id' => $desa->id]);
         
-        $message = 'Profil desa berhasil diperbarui.';
+        $message = 'Profil desa & informasi pembayaran berhasil diperbarui.';
         $message_type = 'success';
         // Refresh data
         $desa = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_desa WHERE id = %d", $desa->id));
@@ -133,7 +187,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pedagang_id = intval($_POST['pedagang_id']);
         $status_baru = sanitize_text_field($_POST['status_verifikasi']); // 'disetujui' atau 'ditolak'
         
-        // Update status pendaftaran pedagang
         $wpdb->update($table_pedagang, [
             'status_pendaftaran' => $status_baru,
             'status_akun'        => ($status_baru == 'disetujui' ? 'aktif' : 'nonaktif')
@@ -157,7 +210,7 @@ get_header();
         <div class="container mx-auto px-4">
             <div class="flex flex-col md:flex-row md:items-center justify-between py-6 gap-4">
                 <div class="flex items-center gap-4">
-                    <div class="w-16 h-16 bg-gradient-to-br from-green-500 to-teal-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg shadow-green-100 overflow-hidden">
+                    <div class="w-16 h-16 bg-gradient-to-br from-green-500 to-teal-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg shadow-green-100 overflow-hidden relative">
                         <?php if($desa->foto): 
                             $img_src = is_numeric($desa->foto) ? wp_get_attachment_url($desa->foto) : $desa->foto;
                         ?>
@@ -246,7 +299,7 @@ get_header();
                 break;
 
             // ------------------------------------------------------------------
-            // TAB 2: MANAJEMEN WISATA (CRUD)
+            // TAB 2: MANAJEMEN WISATA (CRUD LENGKAP)
             // ------------------------------------------------------------------
             case 'wisata':
                 $action = isset($_GET['act']) ? $_GET['act'] : 'list';
@@ -259,66 +312,61 @@ get_header();
                         $w_data = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_wisata WHERE id = %d AND id_desa = %d", $edit_id, $desa->id));
                     }
                     ?>
-                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 max-w-3xl mx-auto">
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 max-w-4xl mx-auto">
                         <div class="flex justify-between items-center mb-6">
                             <h2 class="text-xl font-bold text-gray-800"><?php echo $action === 'add' ? 'Tambah Wisata Baru' : 'Edit Wisata'; ?></h2>
                             <a href="?tab=wisata" class="text-gray-500 hover:text-gray-700"><i class="fas fa-times"></i> Batal</a>
                         </div>
                         
-                        <form method="POST" enctype="multipart/form-data" class="space-y-5">
+                        <form method="POST" enctype="multipart/form-data" class="space-y-6">
                             <?php wp_nonce_field('save_wisata_nonce'); ?>
                             <input type="hidden" name="action" value="save_wisata">
                             <?php if($w_data): ?><input type="hidden" name="wisata_id" value="<?php echo $w_data->id; ?>"><?php endif; ?>
 
-                            <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-2">Nama Wisata</label>
-                                <input type="text" name="nama_wisata" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500" required value="<?php echo $w_data ? esc_attr($w_data->nama_wisata) : ''; ?>">
-                            </div>
+                            <!-- Info Dasar -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="md:col-span-2">
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">Nama Wisata</label>
+                                    <input type="text" name="nama_wisata" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500" required value="<?php echo $w_data ? esc_attr($w_data->nama_wisata) : ''; ?>">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">Kategori</label>
+                                    <select name="kategori" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500">
+                                        <?php 
+                                        $cats = ['Alam', 'Budaya', 'Edukasi', 'Religi', 'Kuliner', 'Buatan', 'Sejarah'];
+                                        foreach($cats as $c) {
+                                            $sel = ($w_data && $w_data->kategori == $c) ? 'selected' : '';
+                                            echo "<option value='$c' $sel>$c</option>";
+                                        }
+                                        ?>
+                                    </select>
+                                </div>
 
-                            <div class="grid grid-cols-2 gap-4">
                                 <div>
                                     <label class="block text-sm font-bold text-gray-700 mb-2">Harga Tiket (Rp)</label>
                                     <input type="number" name="harga_tiket" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500" value="<?php echo $w_data ? esc_attr($w_data->harga_tiket) : '0'; ?>">
                                     <p class="text-xs text-gray-400 mt-1">Isi 0 jika gratis.</p>
                                 </div>
-                                <div>
-                                    <label class="block text-sm font-bold text-gray-700 mb-2">Jam Buka</label>
-                                    <input type="text" name="jam_buka" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Contoh: 08:00 - 17:00" value="<?php echo $w_data ? esc_attr($w_data->jam_buka) : ''; ?>">
-                                </div>
                             </div>
 
+                            <!-- Detail Info -->
                             <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-2">Kategori</label>
-                                <select name="kategori" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500">
-                                    <?php 
-                                    $cats = ['Alam', 'Budaya', 'Edukasi', 'Religi', 'Kuliner', 'Buatan'];
-                                    foreach($cats as $c) {
-                                        $sel = ($w_data && $w_data->kategori == $c) ? 'selected' : '';
-                                        echo "<option value='$c' $sel>$c</option>";
-                                    }
-                                    ?>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-2">Foto Utama</label>
-                                <?php if($w_data && $w_data->foto_utama): 
-                                    $img_src = is_numeric($w_data->foto_utama) ? wp_get_attachment_url($w_data->foto_utama) : $w_data->foto_utama;
-                                ?>
-                                    <div class="mb-2">
-                                        <img src="<?php echo esc_url($img_src); ?>" class="h-20 w-20 object-cover rounded border border-gray-200">
-                                        <input type="hidden" name="existing_foto" value="<?php echo esc_attr($w_data->foto_utama); ?>">
-                                    </div>
-                                <?php endif; ?>
-                                <input type="file" name="foto_utama" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100" accept="image/*">
-                            </div>
-
-                            <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-2">Deskripsi</label>
+                                <label class="block text-sm font-bold text-gray-700 mb-2">Deskripsi Lengkap</label>
                                 <textarea name="deskripsi" rows="5" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"><?php echo $w_data ? esc_textarea($w_data->deskripsi) : ''; ?></textarea>
                             </div>
 
-                            <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-2">Fasilitas (Pisahkan dengan koma)</label>
+                                <input type="text" name="fasilitas" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Toilet, Parkir, Musholla, Spot Foto" value="<?php echo $w_data ? esc_attr($w_data->fasilitas) : ''; ?>">
+                            </div>
+
+                            <!-- Operasional & Kontak -->
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">Jam Buka</label>
+                                    <input type="text" name="jam_buka" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="08:00 - 17:00" value="<?php echo $w_data ? esc_attr($w_data->jam_buka) : ''; ?>">
+                                </div>
                                 <div>
                                     <label class="block text-sm font-bold text-gray-700 mb-2">Kontak Pengelola</label>
                                     <input type="text" name="kontak_pengelola" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500" placeholder="Nomor WA/Telp" value="<?php echo $w_data ? esc_attr($w_data->kontak_pengelola) : ''; ?>">
@@ -329,8 +377,49 @@ get_header();
                                 </div>
                             </div>
 
-                            <div class="pt-4 border-t border-gray-100">
-                                <button type="submit" class="w-full bg-green-600 text-white font-bold py-3 rounded-xl hover:bg-green-700 transition shadow-lg">Simpan Data Wisata</button>
+                            <!-- Media -->
+                            <div class="border-t border-gray-100 pt-6">
+                                <h3 class="font-bold text-gray-800 mb-4">Media & Foto</h3>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label class="block text-sm font-bold text-gray-700 mb-2">Foto Utama (Sampul)</label>
+                                        <?php if($w_data && $w_data->foto_utama): 
+                                            $img_src = is_numeric($w_data->foto_utama) ? wp_get_attachment_url($w_data->foto_utama) : $w_data->foto_utama;
+                                        ?>
+                                            <div class="mb-2">
+                                                <img src="<?php echo esc_url($img_src); ?>" class="h-32 w-full object-cover rounded border border-gray-200">
+                                                <input type="hidden" name="existing_foto" value="<?php echo esc_attr($w_data->foto_utama); ?>">
+                                            </div>
+                                        <?php endif; ?>
+                                        <input type="file" name="foto_utama" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100" accept="image/*">
+                                    </div>
+                                    
+                                    <div>
+                                        <label class="block text-sm font-bold text-gray-700 mb-2">Galeri Foto (Upload Banyak)</label>
+                                        <?php if($w_data && $w_data->galeri): 
+                                            $gallery = json_decode($w_data->galeri, true);
+                                            if($gallery && is_array($gallery)):
+                                        ?>
+                                            <div class="flex gap-2 mb-2 overflow-x-auto pb-2">
+                                                <?php foreach($gallery as $img_id): 
+                                                    $g_src = is_numeric($img_id) ? wp_get_attachment_url($img_id) : $img_id;
+                                                ?>
+                                                <img src="<?php echo esc_url($g_src); ?>" class="h-16 w-16 object-cover rounded border border-gray-200 flex-shrink-0">
+                                                <?php endforeach; ?>
+                                            </div>
+                                            <input type="hidden" name="existing_galeri" value="<?php echo esc_attr($w_data->galeri); ?>">
+                                        <?php endif; endif; ?>
+                                        <input type="file" name="galeri[]" multiple class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" accept="image/*">
+                                        <p class="text-xs text-gray-400 mt-1">Tekan Ctrl/Cmd untuk memilih banyak foto sekaligus.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="pt-6 border-t border-gray-100 flex justify-end">
+                                <button type="submit" class="bg-green-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-green-700 transition shadow-lg flex items-center gap-2">
+                                    <i class="fas fa-save"></i> Simpan Data Wisata
+                                </button>
                             </div>
                         </form>
                     </div>
@@ -421,14 +510,14 @@ get_header();
                                     <td class="p-4 text-gray-500"><?php echo esc_html($p->nomor_wa); ?></td>
                                     <td class="p-4">
                                         <?php 
-                                            $status_label = str_replace('_', ' ', $p->status_pendaftaran);
+                                            // FIX: PHP 7.4 Compatible (no match)
                                             $status_class = 'bg-gray-100 text-gray-600';
-                                            if ($p->status_pendaftaran === 'disetujui') $status_class = 'bg-green-100 text-green-700';
-                                            elseif ($p->status_pendaftaran === 'menunggu_desa') $status_class = 'bg-orange-100 text-orange-700';
-                                            elseif ($p->status_pendaftaran === 'ditolak') $status_class = 'bg-red-100 text-red-700';
+                                            if ($p->status_pendaftaran == 'disetujui') $status_class = 'bg-green-100 text-green-700';
+                                            elseif ($p->status_pendaftaran == 'menunggu_desa') $status_class = 'bg-orange-100 text-orange-700';
+                                            elseif ($p->status_pendaftaran == 'ditolak') $status_class = 'bg-red-100 text-red-700';
                                         ?>
                                         <span class="px-2 py-1 rounded text-xs font-bold capitalize <?php echo $status_class; ?>">
-                                            <?php echo $status_label; ?>
+                                            <?php echo str_replace('_', ' ', $p->status_pendaftaran); ?>
                                         </span>
                                     </td>
                                     <td class="p-4 text-right">
@@ -455,46 +544,84 @@ get_header();
                 break;
 
             // ------------------------------------------------------------------
-            // TAB 4: PROFIL DESA (EDIT)
+            // TAB 4: PROFIL DESA & BANK (LENGKAP)
             // ------------------------------------------------------------------
             case 'pengaturan':
                 ?>
-                <div class="max-w-2xl mx-auto bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
-                    <h2 class="text-xl font-bold text-gray-800 mb-6 border-b pb-4">Edit Profil Desa</h2>
-                    <form method="POST" enctype="multipart/form-data">
-                        <input type="hidden" name="action" value="update_desa">
-                        
-                        <div class="space-y-5">
-                            <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-2">Nama Desa</label>
-                                <input type="text" name="nama_desa" value="<?php echo esc_attr($desa->nama_desa); ?>" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500">
-                            </div>
+                <div class="max-w-4xl mx-auto">
+                    <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+                        <h2 class="text-xl font-bold text-gray-800 mb-6 border-b pb-4">Pengaturan Profil Desa</h2>
+                        <form method="POST" enctype="multipart/form-data">
+                            <input type="hidden" name="action" value="update_desa">
                             
-                            <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-2">Foto Profil Desa</label>
-                                <?php if($desa->foto): 
-                                    $img_src = is_numeric($desa->foto) ? wp_get_attachment_url($desa->foto) : $desa->foto;
-                                ?>
-                                    <img src="<?php echo esc_url($img_src); ?>" class="h-20 w-20 object-cover rounded border border-gray-200 mb-2">
-                                <?php endif; ?>
-                                <input type="file" name="foto_desa" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100" accept="image/*">
+                            <!-- Bagian 1: Profil Umum -->
+                            <div class="mb-8">
+                                <h3 class="text-lg font-bold text-gray-700 mb-4">Informasi Umum</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div class="md:col-span-2">
+                                        <label class="block text-sm font-bold text-gray-700 mb-2">Nama Desa</label>
+                                        <input type="text" name="nama_desa" value="<?php echo esc_attr($desa->nama_desa); ?>" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500">
+                                    </div>
+                                    
+                                    <div>
+                                        <label class="block text-sm font-bold text-gray-700 mb-2">Foto Profil Desa</label>
+                                        <?php if($desa->foto): 
+                                            $img_src = is_numeric($desa->foto) ? wp_get_attachment_url($desa->foto) : $desa->foto;
+                                        ?>
+                                            <img src="<?php echo esc_url($img_src); ?>" class="h-24 w-24 object-cover rounded border border-gray-200 mb-2">
+                                        <?php endif; ?>
+                                        <input type="file" name="foto_desa" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100" accept="image/*">
+                                    </div>
+
+                                    <div>
+                                        <label class="block text-sm font-bold text-gray-700 mb-2">Alamat Kantor Desa</label>
+                                        <textarea name="alamat_lengkap" rows="3" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"><?php echo esc_textarea($desa->alamat_lengkap); ?></textarea>
+                                    </div>
+                                    
+                                    <div class="md:col-span-2">
+                                        <label class="block text-sm font-bold text-gray-700 mb-2">Deskripsi Singkat</label>
+                                        <textarea name="deskripsi" rows="4" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"><?php echo esc_textarea($desa->deskripsi); ?></textarea>
+                                    </div>
+                                </div>
                             </div>
 
-                            <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-2">Deskripsi Singkat</label>
-                                <textarea name="deskripsi" rows="4" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"><?php echo esc_textarea($desa->deskripsi); ?></textarea>
+                            <!-- Bagian 2: Info Bank & Pembayaran -->
+                            <div class="border-t border-gray-100 pt-8">
+                                <h3 class="text-lg font-bold text-gray-700 mb-4">Informasi Pembayaran (Bank & QRIS)</h3>
+                                <p class="text-sm text-gray-500 mb-6">Data ini akan digunakan oleh pedagang untuk membayar komisi/iuran ke desa.</p>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label class="block text-sm font-bold text-gray-700 mb-2">Nama Bank</label>
+                                        <input type="text" name="nama_bank_desa" value="<?php echo esc_attr($desa->nama_bank_desa); ?>" placeholder="Contoh: Bank BJB / BRI" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-bold text-gray-700 mb-2">Nomor Rekening</label>
+                                        <input type="text" name="no_rekening_desa" value="<?php echo esc_attr($desa->no_rekening_desa); ?>" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500">
+                                    </div>
+                                    <div class="md:col-span-2">
+                                        <label class="block text-sm font-bold text-gray-700 mb-2">Atas Nama Rekening</label>
+                                        <input type="text" name="atas_nama_rekening_desa" value="<?php echo esc_attr($desa->atas_nama_rekening_desa); ?>" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500">
+                                    </div>
+
+                                    <div class="md:col-span-2">
+                                        <label class="block text-sm font-bold text-gray-700 mb-2">Upload QRIS Desa</label>
+                                        <?php if($desa->qris_image_url_desa): ?>
+                                            <div class="mb-2">
+                                                <img src="<?php echo esc_url($desa->qris_image_url_desa); ?>" class="h-32 object-contain border border-gray-200 rounded">
+                                            </div>
+                                        <?php endif; ?>
+                                        <input type="file" name="qris_desa" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" accept="image/*">
+                                        <p class="text-xs text-gray-400 mt-1">Upload gambar QRIS agar pedagang bisa scan bayar.</p>
+                                    </div>
+                                </div>
                             </div>
 
-                            <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-2">Alamat Kantor Desa</label>
-                                <textarea name="alamat_lengkap" rows="2" class="w-full border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"><?php echo esc_textarea($desa->alamat_lengkap); ?></textarea>
+                            <div class="mt-8 pt-6 border-t border-gray-100 flex justify-end">
+                                <button type="submit" class="bg-green-600 text-white font-bold py-3 px-8 rounded-xl hover:bg-green-700 transition shadow-lg">Simpan Perubahan</button>
                             </div>
-                        </div>
-
-                        <div class="mt-8 pt-6 border-t border-gray-100">
-                            <button type="submit" class="w-full bg-green-600 text-white font-bold py-3 rounded-xl hover:bg-green-700 transition">Simpan Perubahan</button>
-                        </div>
-                    </form>
+                        </form>
+                    </div>
                 </div>
                 <?php
                 break;
