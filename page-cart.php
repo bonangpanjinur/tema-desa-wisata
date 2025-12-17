@@ -4,12 +4,13 @@
  * Description: Menampilkan item di keranjang session/db dan total harga.
  */
 
+// Pastikan session dimulai sebelum get_header()
+if (!session_id()) session_start();
+
 get_header(); 
 
 $user_id = get_current_user_id();
 $cart_items = [];
-
-if (!session_id()) session_start();
 
 // LOGIKA PENGAMBILAN DATA KERANJANG
 if (isset($_SESSION['dw_cart']) && !empty($_SESSION['dw_cart'])) {
@@ -18,30 +19,38 @@ if (isset($_SESSION['dw_cart']) && !empty($_SESSION['dw_cart'])) {
     $table_pedagang = $wpdb->prefix . 'dw_pedagang';
     
     $product_ids = array_keys($_SESSION['dw_cart']);
+    
     if (!empty($product_ids)) {
-        $ids_placeholder = implode(',', array_fill(0, count($product_ids), '%d'));
-        // FIX: Select kolom yang sesuai skema (foto_utama, slug)
+        // --- FIX: Query IN Clause yang Aman ---
+        // Sanitasi semua ID menjadi integer
+        $ids_safe = array_map('intval', $product_ids);
+        $ids_str = implode(',', $ids_safe);
+        
+        // Query langsung tanpa prepare untuk array IN (karena sudah di-intval)
         $sql = "SELECT p.*, pd.nama_toko 
                 FROM $table_produk p 
                 LEFT JOIN $table_pedagang pd ON p.id_pedagang = pd.id
-                WHERE p.id IN ($ids_placeholder)";
-        $raw_products = $wpdb->get_results($wpdb->prepare($sql, $product_ids));
+                WHERE p.id IN ($ids_str)";
+                
+        $raw_products = $wpdb->get_results($sql);
         
-        foreach ($raw_products as $prod) {
-            $qty = intval($_SESSION['dw_cart'][$prod->id]);
-            if ($qty > 0) {
-                $cart_items[] = [
-                    'id' => $prod->id,
-                    'product_id' => $prod->id,
-                    'quantity' => $qty,
-                    'price' => $prod->harga,
-                    'name' => $prod->nama_produk,
-                    'image' => $prod->foto_utama, // FIX: Gunakan foto_utama
-                    'slug' => $prod->slug, // FIX: Gunakan slug
-                    'toko' => [
-                        'nama_toko' => $prod->nama_toko
-                    ]
-                ];
+        if ($raw_products) {
+            foreach ($raw_products as $prod) {
+                $qty = intval($_SESSION['dw_cart'][$prod->id]);
+                if ($qty > 0) {
+                    $cart_items[] = [
+                        'id' => $prod->id,
+                        'product_id' => $prod->id,
+                        'quantity' => $qty,
+                        'price' => $prod->harga,
+                        'name' => $prod->nama_produk,
+                        'image' => $prod->foto_utama,
+                        'slug' => $prod->slug,
+                        'toko' => [
+                            'nama_toko' => $prod->nama_toko
+                        ]
+                    ];
+                }
             }
         }
     }
@@ -99,13 +108,19 @@ $total_belanja = 0;
                         $price = $item['price'];
                         $name = $item['name'];
                         $raw_foto = $item['image'];
+                        $slug = !empty($item['slug']) ? $item['slug'] : sanitize_title($name);
                         
-                        // FIX: URL Slug
-                        $slug = $item['slug'];
                         $link = home_url('/produk/detail/' . $slug);
 
-                        // FIX: Logic Gambar sesuai archive
+                        // Logic Gambar
                         $img_src = 'https://via.placeholder.com/150?text=No+Image';
+                        
+                        // Cek apakah raw_foto berupa JSON array
+                        $decoded_foto = json_decode($raw_foto, true);
+                        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded_foto) && !empty($decoded_foto)) {
+                            $raw_foto = $decoded_foto[0];
+                        }
+
                         if (!empty($raw_foto)) {
                             if (is_numeric($raw_foto)) {
                                 $att = wp_get_attachment_image_src($raw_foto, 'thumbnail');

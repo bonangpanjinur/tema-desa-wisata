@@ -35,98 +35,106 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dw_place_order'])) {
         // 1. Ambil Data Produk + Info Pedagang
         $cart_items = $_SESSION['dw_cart'];
         $product_ids = array_keys($cart_items);
-        $ids_str = implode(',', array_map('intval', $product_ids));
+        
+        // FIX: Sanitasi ID dan buat string query
+        $ids_safe = array_map('intval', $product_ids);
+        $ids_str = implode(',', $ids_safe);
         
         $sql = "SELECT p.id, p.nama_produk, p.harga, p.id_pedagang, pd.nama_toko 
                 FROM $table_produk p 
                 LEFT JOIN $table_pedagang pd ON p.id_pedagang = pd.id 
                 WHERE p.id IN ($ids_str)";
+                
         $db_products = $wpdb->get_results($sql);
         
-        // 2. Grouping per Pedagang untuk Transaksi Sub
-        $grouped_items = [];
-        $total_transaksi_all = 0;
-        
-        foreach ($db_products as $prod) {
-            $qty = intval($cart_items[$prod->id]);
-            if ($qty > 0) {
-                $subtotal_item = $prod->harga * $qty;
-                
-                if (!isset($grouped_items[$prod->id_pedagang])) {
-                    $grouped_items[$prod->id_pedagang] = [
-                        'nama_toko' => $prod->nama_toko,
-                        'sub_total' => 0,
-                        'items'     => []
+        if ($db_products) {
+            // 2. Grouping per Pedagang untuk Transaksi Sub
+            $grouped_items = [];
+            $total_transaksi_all = 0;
+            
+            foreach ($db_products as $prod) {
+                $qty = intval($cart_items[$prod->id]);
+                if ($qty > 0) {
+                    $subtotal_item = $prod->harga * $qty;
+                    
+                    if (!isset($grouped_items[$prod->id_pedagang])) {
+                        $grouped_items[$prod->id_pedagang] = [
+                            'nama_toko' => $prod->nama_toko,
+                            'sub_total' => 0,
+                            'items'     => []
+                        ];
+                    }
+                    
+                    $grouped_items[$prod->id_pedagang]['items'][] = [
+                        'id_produk'    => $prod->id,
+                        'nama_produk'  => $prod->nama_produk,
+                        'harga_satuan' => $prod->harga,
+                        'jumlah'       => $qty,
+                        'total_harga'  => $subtotal_item
                     ];
+                    
+                    $grouped_items[$prod->id_pedagang]['sub_total'] += $subtotal_item;
+                    $total_transaksi_all += $subtotal_item;
                 }
-                
-                $grouped_items[$prod->id_pedagang]['items'][] = [
-                    'id_produk'    => $prod->id,
-                    'nama_produk'  => $prod->nama_produk,
-                    'harga_satuan' => $prod->harga,
-                    'jumlah'       => $qty,
-                    'total_harga'  => $subtotal_item
-                ];
-                
-                $grouped_items[$prod->id_pedagang]['sub_total'] += $subtotal_item;
-                $total_transaksi_all += $subtotal_item;
             }
-        }
-        
-        // 3. Insert Transaksi Utama
-        $invoice_code = 'INV-' . date('ymd') . '-' . strtoupper(substr(uniqid(), -5));
-        
-        $data_trx = [
-            'kode_unik'         => $invoice_code,
-            'id_pembeli'        => $user_id,
-            'total_produk'      => $total_transaksi_all,
-            'total_ongkir'      => 0, // Logic ongkir belum ada
-            'total_transaksi'   => $total_transaksi_all, // + ongkir
-            'nama_penerima'     => $nama,
-            'no_hp'             => $no_hp,
-            'alamat_lengkap'    => $alamat,
-            'catatan_pembeli'   => $catatan,
-            'metode_pembayaran' => $metode,
-            'status_transaksi'  => 'menunggu_pembayaran',
-            'created_at'        => current_time('mysql')
-        ];
-        
-        if ($wpdb->insert($table_transaksi, $data_trx)) {
-            $transaksi_id = $wpdb->insert_id;
-            $new_invoice = $invoice_code;
             
-            // 4. Insert Sub Transaksi & Items
-            foreach ($grouped_items as $id_pedagang => $data_sub) {
-                // Insert Sub Transaksi
-                $wpdb->insert($table_sub, [
-                    'id_transaksi'        => $transaksi_id,
-                    'id_pedagang'         => $id_pedagang,
-                    'nama_toko'           => $data_sub['nama_toko'],
-                    'sub_total'           => $data_sub['sub_total'],
-                    'ongkir'              => 0,
-                    'total_pesanan_toko'  => $data_sub['sub_total'], // + ongkir per toko
-                    'status_pesanan'      => 'menunggu_konfirmasi',
-                    'created_at'          => current_time('mysql')
-                ]);
-                $sub_id = $wpdb->insert_id;
+            // 3. Insert Transaksi Utama
+            $invoice_code = 'INV-' . date('ymd') . '-' . strtoupper(substr(uniqid(), -5));
+            
+            $data_trx = [
+                'kode_unik'         => $invoice_code,
+                'id_pembeli'        => $user_id,
+                'total_produk'      => $total_transaksi_all,
+                'total_ongkir'      => 0, // Logic ongkir belum ada
+                'total_transaksi'   => $total_transaksi_all, // + ongkir
+                'nama_penerima'     => $nama,
+                'no_hp'             => $no_hp,
+                'alamat_lengkap'    => $alamat,
+                'catatan_pembeli'   => $catatan,
+                'metode_pembayaran' => $metode,
+                'status_transaksi'  => 'menunggu_pembayaran',
+                'created_at'        => current_time('mysql')
+            ];
+            
+            if ($wpdb->insert($table_transaksi, $data_trx)) {
+                $transaksi_id = $wpdb->insert_id;
+                $new_invoice = $invoice_code;
                 
-                // Insert Items
-                foreach ($data_sub['items'] as $item) {
-                    $wpdb->insert($table_items, [
-                        'id_sub_transaksi' => $sub_id,
-                        'id_produk'        => $item['id_produk'],
-                        'nama_produk'      => $item['nama_produk'],
-                        'harga_satuan'     => $item['harga_satuan'],
-                        'jumlah'           => $item['jumlah'],
-                        'total_harga'      => $item['total_harga']
+                // 4. Insert Sub Transaksi & Items
+                foreach ($grouped_items as $id_pedagang => $data_sub) {
+                    // Insert Sub Transaksi
+                    $wpdb->insert($table_sub, [
+                        'id_transaksi'        => $transaksi_id,
+                        'id_pedagang'         => $id_pedagang,
+                        'nama_toko'           => $data_sub['nama_toko'],
+                        'sub_total'           => $data_sub['sub_total'],
+                        'ongkir'              => 0,
+                        'total_pesanan_toko'  => $data_sub['sub_total'], // + ongkir per toko
+                        'status_pesanan'      => 'menunggu_konfirmasi',
+                        'created_at'          => current_time('mysql')
                     ]);
+                    $sub_id = $wpdb->insert_id;
+                    
+                    // Insert Items
+                    foreach ($data_sub['items'] as $item) {
+                        $wpdb->insert($table_items, [
+                            'id_sub_transaksi' => $sub_id,
+                            'id_produk'        => $item['id_produk'],
+                            'nama_produk'      => $item['nama_produk'],
+                            'harga_satuan'     => $item['harga_satuan'],
+                            'jumlah'           => $item['jumlah'],
+                            'total_harga'      => $item['total_harga']
+                        ]);
+                    }
                 }
+                
+                unset($_SESSION['dw_cart']);
+                $order_success = true;
+            } else {
+                $error_message = 'Gagal menyimpan transaksi utama.';
             }
-            
-            unset($_SESSION['dw_cart']);
-            $order_success = true;
         } else {
-            $error_message = 'Gagal menyimpan transaksi utama.';
+            $error_message = 'Produk tidak ditemukan di database.';
         }
     }
 }
@@ -140,17 +148,22 @@ $total_belanja = 0;
 
 if (!empty($cart_items) && !$order_success) {
     $product_ids = array_keys($cart_items);
-    $ids_placeholder = implode(',', array_fill(0, count($product_ids), '%d'));
-    // Hanya perlu nama dan harga untuk ringkasan
-    $sql = "SELECT id, nama_produk, harga FROM $table_produk WHERE id IN ($ids_placeholder)";
-    $raw_products = $wpdb->get_results($wpdb->prepare($sql, $product_ids));
     
-    foreach ($raw_products as $prod) {
-        $qty = intval($cart_items[$prod->id]);
-        $prod->qty = $qty;
-        $prod->subtotal = $prod->harga * $qty;
-        $list_produk[] = $prod;
-        $total_belanja += $prod->subtotal;
+    // FIX: Query
+    $ids_safe = array_map('intval', $product_ids);
+    $ids_str = implode(',', $ids_safe);
+    
+    $sql = "SELECT id, nama_produk, harga FROM $table_produk WHERE id IN ($ids_str)";
+    $raw_products = $wpdb->get_results($sql);
+    
+    if ($raw_products) {
+        foreach ($raw_products as $prod) {
+            $qty = intval($cart_items[$prod->id]);
+            $prod->qty = $qty;
+            $prod->subtotal = $prod->harga * $qty;
+            $list_produk[] = $prod;
+            $total_belanja += $prod->subtotal;
+        }
     }
 }
 
