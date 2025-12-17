@@ -1,7 +1,7 @@
 <?php
 /**
  * Template Name: Dashboard Toko (Pedagang)
- * Description: Pusat kontrol untuk pedagang mengelola produk, pesanan, dan paket.
+ * Description: Pusat kontrol untuk pedagang mengelola produk, pesanan, dan paket secara lengkap.
  */
 
 // 1. CEK AKSES & LOGIN
@@ -47,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $desc    = wp_kses_post($_POST['deskripsi']);
         $kategori= sanitize_text_field($_POST['kategori']);
         
-        // Handle Upload Foto
+        // 1. Handle Foto Utama
         $attachment_id = '';
         if (!empty($_FILES['foto_utama']['name'])) {
             require_once(ABSPATH . 'wp-admin/includes/image.php');
@@ -56,11 +56,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             $attach_id = media_handle_upload('foto_utama', 0);
             if (!is_wp_error($attach_id)) {
-                $attachment_id = $attach_id; // Simpan ID
+                $attachment_id = $attach_id;
             }
         } else {
-            // Jika edit dan tidak upload baru, pakai yang lama
             $attachment_id = isset($_POST['existing_foto']) ? sanitize_text_field($_POST['existing_foto']) : '';
+        }
+
+        // 2. Handle Galeri (Multi Upload)
+        $galeri_ids = [];
+        if (isset($_POST['existing_galeri']) && !empty($_POST['existing_galeri'])) {
+            $galeri_ids = json_decode(stripslashes($_POST['existing_galeri']), true);
+            if (!is_array($galeri_ids)) $galeri_ids = [];
+        }
+
+        if (!empty($_FILES['galeri']['name'][0])) {
+            require_once(ABSPATH . 'wp-admin/includes/image.php');
+            require_once(ABSPATH . 'wp-admin/includes/file.php');
+            require_once(ABSPATH . 'wp-admin/includes/media.php');
+
+            $files = $_FILES['galeri'];
+            foreach ($files['name'] as $key => $value) {
+                if ($files['name'][$key]) {
+                    $file = array(
+                        'name'     => $files['name'][$key],
+                        'type'     => $files['type'][$key],
+                        'tmp_name' => $files['tmp_name'][$key],
+                        'error'    => $files['error'][$key],
+                        'size'     => $files['size'][$key]
+                    );
+                    $_FILES = array("upload_file" => $file);
+                    $attach_id = media_handle_upload("upload_file", 0);
+                    if (!is_wp_error($attach_id)) {
+                        $galeri_ids[] = $attach_id;
+                    }
+                }
+            }
         }
 
         $data = [
@@ -71,7 +101,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'harga'       => $harga,
             'stok'        => $stok,
             'kategori'    => $kategori,
-            'foto_utama'  => $attachment_id, // Simpan ID attachment
+            'foto_utama'  => $attachment_id,
+            'galeri'      => json_encode($galeri_ids),
             'status'      => 'aktif',
             'updated_at'  => current_time('mysql')
         ];
@@ -109,7 +140,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'nama_paket_snapshot' => $paket->nama_paket,
                 'harga_paket' => $paket->harga,
                 'jumlah_transaksi' => $paket->jumlah_transaksi,
-                'status'      => 'pending', // Menunggu konfirmasi admin/upload bukti
+                'status'      => 'pending', 
                 'created_at'  => current_time('mysql')
             ]);
             $message = 'Permintaan pembelian paket berhasil. Silakan lakukan pembayaran dan upload bukti bayar di tabel riwayat di bawah.';
@@ -117,13 +148,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // D. UPLOAD BUKTI BAYAR PAKET (NEW FEATURE)
+    // D. UPLOAD BUKTI BAYAR PAKET
     if (isset($_POST['action']) && $_POST['action'] === 'upload_bukti_paket') {
         if (!wp_verify_nonce($_POST['_wpnonce'], 'upload_bukti_paket_nonce')) die('Security check failed');
         
         $pembelian_id = intval($_POST['pembelian_id']);
-        
-        // Verifikasi kepemilikan transaksi
         $check_trx = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_pembelian_paket WHERE id = %d AND id_pedagang = %d", $pembelian_id, $pedagang->id));
         
         if ($check_trx && $check_trx->status === 'pending') {
@@ -153,16 +182,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // E. UPDATE TOKO
+    // E. UPDATE TOKO (LENGKAP)
     if (isset($_POST['action']) && $_POST['action'] === 'update_shop') {
         $nama_toko = sanitize_text_field($_POST['nama_toko']);
         $no_wa     = sanitize_text_field($_POST['nomor_wa']);
         $alamat    = sanitize_textarea_field($_POST['alamat_lengkap']);
         
+        // Info Bank
+        $nama_bank      = sanitize_text_field($_POST['nama_bank']);
+        $no_rekening    = sanitize_text_field($_POST['no_rekening']);
+        $atas_nama_rek  = sanitize_text_field($_POST['atas_nama_rekening']);
+
+        require_once(ABSPATH . 'wp-admin/includes/image.php');
+        require_once(ABSPATH . 'wp-admin/includes/file.php');
+        require_once(ABSPATH . 'wp-admin/includes/media.php');
+
+        // 1. Upload Foto Profil Toko
+        $foto_profil_url = $pedagang->foto_profil;
+        if (!empty($_FILES['foto_profil']['name'])) {
+            $attach_id = media_handle_upload('foto_profil', 0);
+            if (!is_wp_error($attach_id)) $foto_profil_url = wp_get_attachment_url($attach_id);
+        }
+
+        // 2. Upload QRIS Toko
+        $qris_url = $pedagang->qris_image_url;
+        if (!empty($_FILES['qris_toko']['name'])) {
+            $attach_id = media_handle_upload('qris_toko', 0);
+            if (!is_wp_error($attach_id)) {
+                $qris_url = wp_get_attachment_url($attach_id);
+            }
+        }
+
         $wpdb->update($table_pedagang, [
-            'nama_toko' => $nama_toko,
-            'nomor_wa'  => $no_wa,
-            'alamat_lengkap' => $alamat
+            'nama_toko'      => $nama_toko,
+            'nomor_wa'       => $no_wa,
+            'alamat_lengkap' => $alamat,
+            'foto_profil'    => $foto_profil_url,
+            'nama_bank'      => $nama_bank,
+            'no_rekening'    => $no_rekening,
+            'atas_nama_rekening' => $atas_nama_rek,
+            'qris_image_url' => $qris_url
         ], ['id' => $pedagang->id]);
         
         $message = 'Pengaturan toko berhasil disimpan.';
@@ -185,8 +244,12 @@ get_header();
         <div class="container mx-auto px-4">
             <div class="flex flex-col md:flex-row md:items-center justify-between py-6 gap-4">
                 <div class="flex items-center gap-4">
-                    <div class="w-16 h-16 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg shadow-orange-100">
-                        <?php echo strtoupper(substr($pedagang->nama_toko, 0, 1)); ?>
+                    <div class="w-16 h-16 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold shadow-lg shadow-orange-100 overflow-hidden relative">
+                        <?php if($pedagang->foto_profil): ?>
+                            <img src="<?php echo esc_url($pedagang->foto_profil); ?>" class="w-full h-full object-cover">
+                        <?php else: ?>
+                            <?php echo strtoupper(substr($pedagang->nama_toko, 0, 1)); ?>
+                        <?php endif; ?>
                     </div>
                     <div>
                         <h1 class="text-2xl font-bold text-gray-900"><?php echo esc_html($pedagang->nama_toko); ?></h1>
@@ -306,67 +369,97 @@ get_header();
                         $p_data = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_produk WHERE id = %d AND id_pedagang = %d", $edit_id, $pedagang->id));
                     }
                     ?>
-                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 max-w-3xl mx-auto">
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 max-w-4xl mx-auto">
                         <div class="flex justify-between items-center mb-6">
                             <h2 class="text-xl font-bold text-gray-800"><?php echo $action === 'add' ? 'Tambah Produk Baru' : 'Edit Produk'; ?></h2>
                             <a href="?tab=produk" class="text-gray-500 hover:text-gray-700"><i class="fas fa-times"></i> Batal</a>
                         </div>
                         
-                        <form method="POST" enctype="multipart/form-data" class="space-y-5">
+                        <form method="POST" enctype="multipart/form-data" class="space-y-6">
                             <?php wp_nonce_field('save_product_nonce'); ?>
                             <input type="hidden" name="action" value="save_product">
                             <?php if($p_data): ?><input type="hidden" name="product_id" value="<?php echo $p_data->id; ?>"><?php endif; ?>
 
-                            <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-2">Nama Produk</label>
-                                <input type="text" name="nama_produk" class="w-full border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500" required value="<?php echo $p_data ? esc_attr($p_data->nama_produk) : ''; ?>">
-                            </div>
+                            <!-- Info Dasar -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="md:col-span-2">
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">Nama Produk</label>
+                                    <input type="text" name="nama_produk" class="w-full border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500" required value="<?php echo $p_data ? esc_attr($p_data->nama_produk) : ''; ?>">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">Kategori</label>
+                                    <select name="kategori" class="w-full border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500">
+                                        <?php 
+                                        $cats = ['Makanan', 'Minuman', 'Kerajinan', 'Fashion', 'Pertanian', 'Jasa'];
+                                        foreach($cats as $c) {
+                                            $sel = ($p_data && $p_data->kategori == $c) ? 'selected' : '';
+                                            echo "<option value='$c' $sel>$c</option>";
+                                        }
+                                        ?>
+                                    </select>
+                                </div>
 
-                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">Stok Awal</label>
+                                    <input type="number" name="stok" class="w-full border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500" required value="<?php echo $p_data ? esc_attr($p_data->stok) : '1'; ?>">
+                                </div>
+
                                 <div>
                                     <label class="block text-sm font-bold text-gray-700 mb-2">Harga (Rp)</label>
                                     <input type="number" name="harga" class="w-full border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500" required value="<?php echo $p_data ? esc_attr($p_data->harga) : ''; ?>">
                                 </div>
-                                <div>
-                                    <label class="block text-sm font-bold text-gray-700 mb-2">Stok</label>
-                                    <input type="number" name="stok" class="w-full border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500" required value="<?php echo $p_data ? esc_attr($p_data->stok) : '1'; ?>">
-                                </div>
                             </div>
 
-                            <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-2">Kategori</label>
-                                <select name="kategori" class="w-full border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500">
-                                    <?php 
-                                    $cats = ['Makanan', 'Minuman', 'Kerajinan', 'Fashion', 'Pertanian', 'Jasa'];
-                                    foreach($cats as $c) {
-                                        $sel = ($p_data && $p_data->kategori == $c) ? 'selected' : '';
-                                        echo "<option value='$c' $sel>$c</option>";
-                                    }
-                                    ?>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-2">Foto Utama</label>
-                                <?php if($p_data && $p_data->foto_utama): 
-                                    $img_src = is_numeric($p_data->foto_utama) ? wp_get_attachment_url($p_data->foto_utama) : $p_data->foto_utama;
-                                ?>
-                                    <div class="mb-2">
-                                        <img src="<?php echo esc_url($img_src); ?>" class="h-20 w-20 object-cover rounded border border-gray-200">
-                                        <input type="hidden" name="existing_foto" value="<?php echo esc_attr($p_data->foto_utama); ?>">
-                                    </div>
-                                <?php endif; ?>
-                                <input type="file" name="foto_utama" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100" accept="image/*">
-                                <p class="text-xs text-gray-400 mt-1">Format: JPG, PNG. Maks 2MB.</p>
-                            </div>
-
+                            <!-- Detail Info -->
                             <div>
                                 <label class="block text-sm font-bold text-gray-700 mb-2">Deskripsi Produk</label>
                                 <textarea name="deskripsi" rows="5" class="w-full border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"><?php echo $p_data ? esc_textarea($p_data->deskripsi) : ''; ?></textarea>
                             </div>
 
-                            <div class="pt-4 border-t border-gray-100">
-                                <button type="submit" class="w-full bg-gray-900 text-white font-bold py-3 rounded-xl hover:bg-orange-600 transition shadow-lg">Simpan Produk</button>
+                            <!-- Media -->
+                            <div class="border-t border-gray-100 pt-6">
+                                <h3 class="font-bold text-gray-800 mb-4">Media & Foto</h3>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label class="block text-sm font-bold text-gray-700 mb-2">Foto Utama (Sampul)</label>
+                                        <?php if($p_data && $p_data->foto_utama): 
+                                            $img_src = is_numeric($p_data->foto_utama) ? wp_get_attachment_url($p_data->foto_utama) : $p_data->foto_utama;
+                                        ?>
+                                            <div class="mb-2">
+                                                <img src="<?php echo esc_url($img_src); ?>" class="h-32 w-full object-cover rounded border border-gray-200">
+                                                <input type="hidden" name="existing_foto" value="<?php echo esc_attr($p_data->foto_utama); ?>">
+                                            </div>
+                                        <?php endif; ?>
+                                        <input type="file" name="foto_utama" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100" accept="image/*">
+                                    </div>
+                                    
+                                    <div>
+                                        <label class="block text-sm font-bold text-gray-700 mb-2">Galeri Foto (Upload Banyak)</label>
+                                        <?php if($p_data && $p_data->galeri): 
+                                            $gallery = json_decode($p_data->galeri, true);
+                                            if($gallery && is_array($gallery)):
+                                        ?>
+                                            <div class="flex gap-2 mb-2 overflow-x-auto pb-2">
+                                                <?php foreach($gallery as $img_id): 
+                                                    $g_src = is_numeric($img_id) ? wp_get_attachment_url($img_id) : $img_id;
+                                                ?>
+                                                <img src="<?php echo esc_url($g_src); ?>" class="h-16 w-16 object-cover rounded border border-gray-200 flex-shrink-0">
+                                                <?php endforeach; ?>
+                                            </div>
+                                            <input type="hidden" name="existing_galeri" value="<?php echo esc_attr($p_data->galeri); ?>">
+                                        <?php endif; endif; ?>
+                                        <input type="file" name="galeri[]" multiple class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" accept="image/*">
+                                        <p class="text-xs text-gray-400 mt-1">Tekan Ctrl/Cmd untuk memilih banyak foto sekaligus.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="pt-6 border-t border-gray-100 flex justify-end">
+                                <button type="submit" class="bg-gray-900 text-white px-8 py-3 rounded-xl font-bold hover:bg-orange-600 transition shadow-lg flex items-center gap-2">
+                                    <i class="fas fa-save"></i> Simpan Produk
+                                </button>
                             </div>
                         </form>
                     </div>
@@ -436,7 +529,7 @@ get_header();
                 break;
 
             // ------------------------------------------------------------------
-            // TAB 3: MANAJEMEN PESANAN (FIXED: Compatible with PHP < 8.0)
+            // TAB 3: MANAJEMEN PESANAN
             // ------------------------------------------------------------------
             case 'pesanan':
                 $orders = $wpdb->get_results($wpdb->prepare("
@@ -592,34 +685,82 @@ get_header();
                 break;
 
             // ------------------------------------------------------------------
-            // TAB 5: PENGATURAN TOKO
+            // TAB 5: PENGATURAN TOKO (LENGKAP)
             // ------------------------------------------------------------------
             case 'pengaturan':
                 ?>
-                <div class="max-w-2xl mx-auto bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+                <div class="max-w-4xl mx-auto bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
                     <h2 class="text-xl font-bold text-gray-800 mb-6 border-b pb-4">Pengaturan Toko</h2>
-                    <form method="POST">
+                    <form method="POST" enctype="multipart/form-data">
                         <input type="hidden" name="action" value="update_shop">
                         
-                        <div class="space-y-4">
-                            <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-2">Nama Toko</label>
-                                <input type="text" name="nama_toko" value="<?php echo esc_attr($pedagang->nama_toko); ?>" class="w-full border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500">
-                            </div>
-                            
-                            <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-2">Nomor WhatsApp (Aktif)</label>
-                                <input type="text" name="nomor_wa" value="<?php echo esc_attr($pedagang->nomor_wa); ?>" class="w-full border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500">
-                            </div>
+                        <!-- Bagian 1: Profil Toko -->
+                        <div class="mb-8">
+                            <h3 class="text-lg font-bold text-gray-700 mb-4">Profil Toko</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="md:col-span-2">
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">Nama Toko</label>
+                                    <input type="text" name="nama_toko" value="<?php echo esc_attr($pedagang->nama_toko); ?>" class="w-full border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">Nomor WhatsApp (Aktif)</label>
+                                    <input type="text" name="nomor_wa" value="<?php echo esc_attr($pedagang->nomor_wa); ?>" class="w-full border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500">
+                                </div>
 
-                            <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-2">Alamat Lengkap Toko</label>
-                                <textarea name="alamat_lengkap" rows="3" class="w-full border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"><?php echo esc_textarea($pedagang->alamat_lengkap); ?></textarea>
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">Foto Profil Toko</label>
+                                    <?php if($pedagang->foto_profil): ?>
+                                        <div class="mb-2">
+                                            <img src="<?php echo esc_url($pedagang->foto_profil); ?>" class="h-20 w-20 object-cover rounded-full border border-gray-200">
+                                        </div>
+                                    <?php endif; ?>
+                                    <input type="file" name="foto_profil" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100" accept="image/*">
+                                </div>
+
+                                <div class="md:col-span-2">
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">Alamat Lengkap Toko</label>
+                                    <textarea name="alamat_lengkap" rows="3" class="w-full border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"><?php echo esc_textarea($pedagang->alamat_lengkap); ?></textarea>
+                                </div>
                             </div>
                         </div>
 
-                        <div class="mt-8 pt-6 border-t border-gray-100">
-                            <button type="submit" class="bg-gray-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-orange-600 transition">Simpan Perubahan</button>
+                        <!-- Bagian 2: Info Bank & Pembayaran -->
+                        <div class="border-t border-gray-100 pt-8">
+                            <h3 class="text-lg font-bold text-gray-700 mb-4">Informasi Pembayaran (Bank & QRIS)</h3>
+                            <p class="text-sm text-gray-500 mb-6">Data ini akan digunakan untuk menerima pembayaran dari pelanggan jika memilih metode transfer langsung ke toko.</p>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">Nama Bank</label>
+                                    <input type="text" name="nama_bank" value="<?php echo esc_attr($pedagang->nama_bank); ?>" placeholder="Contoh: BCA / Mandiri" class="w-full border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">Nomor Rekening</label>
+                                    <input type="text" name="no_rekening" value="<?php echo esc_attr($pedagang->no_rekening); ?>" class="w-full border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500">
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">Atas Nama Rekening</label>
+                                    <input type="text" name="atas_nama_rekening" value="<?php echo esc_attr($pedagang->atas_nama_rekening); ?>" class="w-full border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500">
+                                </div>
+
+                                <div class="md:col-span-2">
+                                    <label class="block text-sm font-bold text-gray-700 mb-2">Upload QRIS Toko</label>
+                                    <?php if($pedagang->qris_image_url): ?>
+                                        <div class="mb-2">
+                                            <img src="<?php echo esc_url($pedagang->qris_image_url); ?>" class="h-32 object-contain border border-gray-200 rounded">
+                                        </div>
+                                    <?php endif; ?>
+                                    <input type="file" name="qris_toko" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" accept="image/*">
+                                    <p class="text-xs text-gray-400 mt-1">Upload gambar QRIS agar pelanggan bisa scan bayar.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-8 pt-6 border-t border-gray-100 flex justify-end">
+                            <button type="submit" class="bg-gray-900 text-white px-8 py-3 rounded-xl font-bold hover:bg-orange-600 transition shadow-lg flex items-center gap-2">
+                                <i class="fas fa-save"></i> Simpan Perubahan
+                            </button>
                         </div>
                     </form>
                 </div>
