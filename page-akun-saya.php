@@ -1,178 +1,198 @@
 <?php
 /**
- * Template Name: Halaman Akun Saya Custom
- * Description: Dashboard pusat untuk semua role (Pembeli, Pedagang, Admin Desa).
+ * Template Name: Halaman Akun Saya
+ * Description: Halaman profil yang mendeteksi peran berdasarkan Nama Role (Slug) agar lebih akurat sesuai definisi plugin.
  */
 
-// 1. Cek Login
-if ( !is_user_logged_in() ) {
-    wp_redirect( home_url('/login') );
+if (!is_user_logged_in()) {
+    wp_redirect(home_url('/login'));
     exit;
 }
 
 get_header();
 
 $current_user = wp_get_current_user();
-$roles = (array) $current_user->roles;
+$roles = ( array ) $current_user->roles; // Ambil array role user
 
-// Tentukan Role Utama untuk Tampilan Badge
-$role_label = 'Pembeli';
-$role_class = 'bg-gray-100 text-gray-600';
+$role_label = 'Pengguna';
+$dashboard_url = home_url('/transaksi');
+$dashboard_label = 'Riwayat Belanja';
 
-if ( in_array( 'administrator', $roles ) ) {
+// --- LOGIKA DETEKSI PERAN (BERDASARKAN ROLE SLUG) ---
+// Kita cek langsung nama role-nya agar pasti sesuai dengan yang ada di database.
+
+$is_admin_kabupaten = in_array( 'administrator', $roles ) || in_array( 'admin_kabupaten', $roles );
+$is_admin_desa      = in_array( 'admin_desa', $roles ); // Sesuai dengan $correct_slug = 'admin_desa'
+$is_pedagang        = in_array( 'pedagang', $roles );
+
+// Tentukan Label & Link Utama (Prioritas: Admin > Admin Desa > Pedagang > Pembeli)
+if ($is_admin_kabupaten) {
     $role_label = 'Administrator';
-    $role_class = 'bg-red-100 text-red-600';
-} elseif ( in_array( 'admin_desa', $roles ) ) {
+    $dashboard_url = admin_url();
+    $dashboard_label = 'WP Admin';
+} elseif ($is_admin_desa) {
     $role_label = 'Admin Desa';
-    $role_class = 'bg-blue-100 text-blue-600';
-} elseif ( in_array( 'pedagang', $roles ) ) {
+    $dashboard_url = home_url('/dashboard-desa');
+    $dashboard_label = 'Dashboard Desa';
+} elseif ($is_pedagang) {
     $role_label = 'Pedagang';
-    $role_class = 'bg-orange-100 text-orange-600';
+    $dashboard_url = home_url('/dashboard-toko');
+    $dashboard_label = 'Dashboard Toko';
+} else {
+    $role_label = 'Pembeli';
 }
 
-// Avatar
-$avatar_url = get_avatar_url( $current_user->ID, ['size' => 200] );
+// Handle Logout
+if (isset($_GET['action']) && $_GET['action'] == 'logout') {
+    wp_logout();
+    wp_redirect(home_url('/login'));
+    exit;
+}
 ?>
 
-<div class="min-h-screen bg-gray-50 font-sans pb-20 relative overflow-hidden">
+<div class="bg-gray-50 min-h-screen font-sans text-gray-800 pb-20">
     
-    <!-- Background Header -->
-    <div class="bg-white pb-24 pt-12 border-b border-gray-100 relative">
-        <div class="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-orange-50/50 to-transparent pointer-events-none"></div>
-        <div class="container mx-auto px-4 relative z-10">
-            <h1 class="text-3xl font-bold text-gray-900 mb-2">Akun Saya</h1>
-            <p class="text-gray-500">Kelola aktivitas dan profil Anda di satu tempat.</p>
-        </div>
+    <!-- Header Profile (Background) -->
+    <div class="bg-gradient-to-r from-orange-600 to-orange-500 h-48 relative">
+        <div class="absolute bottom-0 left-0 w-full h-16 bg-gradient-to-t from-gray-50 to-transparent"></div>
     </div>
 
-    <!-- Main Content (Negative Margin for Overlap Effect) -->
-    <div class="container mx-auto px-4 -mt-16 relative z-20">
+    <div class="container mx-auto px-4 -mt-20 relative z-10">
         
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Profile Card -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 md:p-8 flex flex-col md:flex-row items-center md:items-start gap-6 mb-8">
+            <!-- Avatar -->
+            <div class="w-24 h-24 md:w-32 md:h-32 bg-white rounded-full p-1 shadow-md">
+                <div class="w-full h-full rounded-full overflow-hidden bg-gray-200">
+                    <?php echo get_avatar($current_user->ID, 128, '', '', ['class' => 'w-full h-full object-cover']); ?>
+                </div>
+            </div>
             
-            <!-- KOLOM KIRI: Profil Ringkas -->
-            <div class="lg:col-span-1">
-                <div class="bg-white rounded-2xl shadow-xl shadow-gray-100 p-6 border border-gray-100 text-center sticky top-24">
-                    <div class="relative inline-block mb-4">
-                        <img src="<?php echo esc_url($avatar_url); ?>" alt="<?php echo esc_attr($current_user->display_name); ?>" class="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md">
-                        <div class="absolute bottom-0 right-0 w-6 h-6 bg-green-500 border-2 border-white rounded-full" title="Online"></div>
-                    </div>
-                    
-                    <h2 class="text-xl font-bold text-gray-900"><?php echo esc_html($current_user->display_name); ?></h2>
-                    <p class="text-sm text-gray-500 mb-3"><?php echo esc_html($current_user->user_email); ?></p>
-                    
-                    <span class="inline-block px-3 py-1 rounded-full text-xs font-bold <?php echo $role_class; ?>">
-                        <?php echo $role_label; ?>
-                    </span>
-
-                    <div class="mt-6 pt-6 border-t border-gray-100 space-y-3">
-                        <a href="<?php echo home_url('/edit-profil'); ?>" class="block w-full py-2 px-4 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-xl text-sm font-bold transition">
-                            <i class="fas fa-user-edit mr-2"></i> Edit Profil
-                        </a>
-                        <a href="<?php echo wp_logout_url(home_url()); ?>" class="block w-full py-2 px-4 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-sm font-bold transition">
-                            <i class="fas fa-sign-out-alt mr-2"></i> Keluar
-                        </a>
-                    </div>
+            <!-- User Info -->
+            <div class="text-center md:text-left flex-1">
+                <span class="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-2 
+                    <?php 
+                    if ($is_admin_desa) echo 'bg-green-100 text-green-700'; 
+                    elseif ($is_pedagang) echo 'bg-blue-100 text-blue-700'; 
+                    else echo 'bg-gray-100 text-gray-600'; 
+                    ?>">
+                    <?php echo esc_html($role_label); ?>
+                </span>
+                <h1 class="text-2xl md:text-3xl font-bold text-gray-900 mb-1"><?php echo esc_html($current_user->display_name); ?></h1>
+                <p class="text-gray-500 text-sm mb-4"><?php echo esc_html($current_user->user_email); ?></p>
+                
+                <div class="flex flex-wrap justify-center md:justify-start gap-3">
+                    <a href="<?php echo home_url('/edit-profil'); ?>" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-bold text-gray-600 hover:bg-gray-50 transition">
+                        <i class="fas fa-edit mr-1"></i> Edit Profil
+                    </a>
+                    <a href="?action=logout" class="px-4 py-2 border border-red-200 bg-red-50 rounded-lg text-sm font-bold text-red-600 hover:bg-red-100 transition" onclick="return confirm('Yakin ingin keluar?');">
+                        <i class="fas fa-sign-out-alt mr-1"></i> Keluar
+                    </a>
                 </div>
             </div>
 
-            <!-- KOLOM KANAN: Menu Dashboard -->
-            <div class="lg:col-span-2">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Stats -->
+            <div class="hidden md:block text-right">
+                <p class="text-xs text-gray-400">Bergabung sejak</p>
+                <p class="font-bold text-gray-800"><?php echo date('d M Y', strtotime($current_user->user_registered)); ?></p>
+            </div>
+        </div>
 
-                    <!-- 1. MENU UTAMA (BERDASARKAN ROLE) -->
-                    
-                    <?php if ( in_array( 'admin_desa', $roles ) || in_array( 'administrator', $roles ) ) : ?>
-                        <!-- KHUSUS ADMIN DESA -->
-                        <a href="<?php echo home_url('/dashboard-desa'); ?>" class="group bg-white p-6 rounded-2xl shadow-sm border border-blue-100 hover:shadow-lg hover:border-blue-300 transition-all duration-300 flex items-center gap-4 relative overflow-hidden">
-                            <!-- ... ikon & teks ... -->
-                        </a>
-                    <?php endif; ?>
-
-                    <?php if ( in_array( 'admin_desa', $roles ) || in_array( 'pedagang', $roles ) || in_array( 'administrator', $roles ) ) : ?>
-                        <!-- KHUSUS PEDAGANG (Admin Desa juga bisa akses jika punya toko) -->
-                        <a href="<?php echo home_url('/dashboard-toko'); ?>" class="group bg-white p-6 rounded-2xl shadow-sm border border-orange-100 hover:shadow-lg hover:border-orange-300 transition-all duration-300 flex items-center gap-4 relative overflow-hidden">
-                            <!-- ... ikon & teks ... -->
-                        </a>
-                    <?php endif; ?>
-
-                    <?php if ( in_array( 'admin_desa', $roles ) || in_array( 'pedagang', $roles ) || in_array( 'administrator', $roles ) ) : ?>
-                        <!-- KHUSUS PEDAGANG (Admin Desa juga bisa akses jika punya toko) -->
-                        <a href="<?php echo home_url('/dashboard-toko'); ?>" class="group bg-white p-6 rounded-2xl shadow-sm border border-orange-100 hover:shadow-lg hover:border-orange-300 transition-all duration-300 flex items-center gap-4 relative overflow-hidden">
-                            <div class="absolute top-0 right-0 w-24 h-24 bg-orange-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
-                            <div class="w-12 h-12 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center text-xl relative z-10">
-                                <i class="fas fa-store"></i>
-                            </div>
-                            <div class="relative z-10">
-                                <h3 class="font-bold text-gray-900 group-hover:text-orange-600 transition">Kelola Toko</h3>
-                                <p class="text-xs text-gray-500 mt-1">Atur produk, pesanan masuk, dan laporan.</p>
-                            </div>
-                        </a>
-                    <?php endif; ?>
-
-                    <!-- 2. MENU UMUM (SEMUA USER) -->
-
-                    <!-- Riwayat Transaksi -->
-                    <a href="<?php echo home_url('/transaksi'); ?>" class="group bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 flex items-center gap-4">
-                        <div class="w-12 h-12 bg-gray-50 text-gray-600 rounded-xl flex items-center justify-center text-xl group-hover:bg-gray-100 transition">
-                            <i class="fas fa-receipt"></i>
-                        </div>
-                        <div>
-                            <h3 class="font-bold text-gray-900">Pesanan Saya</h3>
-                            <p class="text-xs text-gray-500 mt-1">Riwayat belanja dan status pengiriman.</p>
-                        </div>
-                    </a>
-
-                    <!-- Favorit -->
-                    <a href="<?php echo home_url('/favorit'); ?>" class="group bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 flex items-center gap-4">
-                        <div class="w-12 h-12 bg-pink-50 text-pink-500 rounded-xl flex items-center justify-center text-xl group-hover:bg-pink-100 transition">
-                            <i class="fas fa-heart"></i>
-                        </div>
-                        <div>
-                            <h3 class="font-bold text-gray-900">Favorit</h3>
-                            <p class="text-xs text-gray-500 mt-1">Produk dan wisata yang Anda simpan.</p>
-                        </div>
-                    </a>
-
-                    <!-- Keranjang -->
-                    <a href="<?php echo home_url('/cart'); ?>" class="group bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 flex items-center gap-4">
-                        <div class="w-12 h-12 bg-green-50 text-green-600 rounded-xl flex items-center justify-center text-xl group-hover:bg-green-100 transition">
-                            <i class="fas fa-shopping-cart"></i>
-                        </div>
-                        <div>
-                            <h3 class="font-bold text-gray-900">Keranjang</h3>
-                            <p class="text-xs text-gray-500 mt-1">Lihat item yang akan dibeli.</p>
-                        </div>
-                    </a>
-
-                    <!-- Bantuan -->
-                    <a href="https://wa.me/6281234567890" target="_blank" class="group bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 flex items-center gap-4">
-                        <div class="w-12 h-12 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center text-xl group-hover:bg-purple-100 transition">
-                            <i class="fas fa-headset"></i>
-                        </div>
-                        <div>
-                            <h3 class="font-bold text-gray-900">Bantuan</h3>
-                            <p class="text-xs text-gray-500 mt-1">Hubungi admin jika ada kendala.</p>
-                        </div>
-                    </a>
-
-                </div>
-
-                <!-- Banner Promosi Kecil (Opsional) -->
-                <div class="mt-8 bg-gradient-to-r from-gray-900 to-gray-800 rounded-2xl p-6 text-white relative overflow-hidden shadow-lg">
-                    <div class="absolute top-0 right-0 w-32 h-32 bg-white opacity-5 rounded-full -mr-10 -mt-10 blur-2xl"></div>
-                    <div class="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                        <div>
-                            <h3 class="text-lg font-bold">Dukung UMKM Desa!</h3>
-                            <p class="text-sm text-gray-300 mt-1">Setiap pembelian Anda membantu ekonomi warga desa tumbuh.</p>
-                        </div>
-                        <a href="<?php echo home_url('/produk'); ?>" class="px-5 py-2 bg-white text-gray-900 rounded-lg text-sm font-bold hover:bg-orange-50 transition">
-                            Belanja Sekarang
-                        </a>
+        <!-- MENU GRID -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            
+            <!-- 1. TOMBOL DASHBOARD UTAMA (Sesuai Role) -->
+            <a href="<?php echo esc_url($dashboard_url); ?>" class="group bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1 relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-24 h-24 bg-orange-50 rounded-bl-full -mr-4 -mt-4 transition group-hover:scale-110"></div>
+                <div class="relative z-10 flex items-center gap-4">
+                    <div class="w-12 h-12 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center text-xl shadow-sm">
+                        <i class="fas fa-tachometer-alt"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-lg text-gray-800 group-hover:text-orange-600 transition"><?php echo esc_html($dashboard_label); ?></h3>
+                        <p class="text-xs text-gray-500">Masuk ke halaman pengelolaan utama.</p>
                     </div>
                 </div>
+            </a>
 
-            </div>
+            <!-- 2. MENU KHUSUS ADMIN DESA -->
+            <?php if ($is_admin_desa) : ?>
+            <a href="<?php echo home_url('/dashboard-desa?tab=wisata'); ?>" class="group bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 bg-green-100 text-green-600 rounded-xl flex items-center justify-center text-xl shadow-sm">
+                        <i class="fas fa-map-marked-alt"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-lg text-gray-800 group-hover:text-green-600 transition">Kelola Wisata</h3>
+                        <p class="text-xs text-gray-500">Tambah & edit destinasi wisata desa.</p>
+                    </div>
+                </div>
+            </a>
+
+            <a href="<?php echo home_url('/dashboard-desa?tab=pedagang'); ?>" class="group bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center text-xl shadow-sm">
+                        <i class="fas fa-store-alt"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-lg text-gray-800 group-hover:text-blue-600 transition">Verifikasi UMKM</h3>
+                        <p class="text-xs text-gray-500">Setujui pendaftaran pedagang baru.</p>
+                    </div>
+                </div>
+            </a>
+            <?php endif; ?>
+
+            <!-- 3. MENU KHUSUS PEDAGANG -->
+            <?php if ($is_pedagang && !$is_admin_desa) : ?>
+            <a href="<?php echo home_url('/dashboard-toko?tab=produk'); ?>" class="group bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center text-xl shadow-sm">
+                        <i class="fas fa-box"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-lg text-gray-800 group-hover:text-purple-600 transition">Produk Saya</h3>
+                        <p class="text-xs text-gray-500">Kelola stok dan harga produk.</p>
+                    </div>
+                </div>
+            </a>
+            <a href="<?php echo home_url('/dashboard-toko?tab=pesanan'); ?>" class="group bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 bg-yellow-100 text-yellow-600 rounded-xl flex items-center justify-center text-xl shadow-sm">
+                        <i class="fas fa-receipt"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-lg text-gray-800 group-hover:text-yellow-600 transition">Pesanan Masuk</h3>
+                        <p class="text-xs text-gray-500">Cek orderan baru dari pelanggan.</p>
+                    </div>
+                </div>
+            </a>
+            <?php endif; ?>
+
+            <!-- 4. MENU UMUM (SEMUA USER) -->
+            <a href="<?php echo home_url('/transaksi'); ?>" class="group bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 bg-red-100 text-red-600 rounded-xl flex items-center justify-center text-xl shadow-sm">
+                        <i class="fas fa-shopping-bag"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-lg text-gray-800 group-hover:text-red-600 transition">Riwayat Transaksi</h3>
+                        <p class="text-xs text-gray-500">Lihat status belanjaan Anda.</p>
+                    </div>
+                </div>
+            </a>
+
+            <a href="<?php echo home_url('/edit-profil'); ?>" class="group bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 bg-gray-100 text-gray-600 rounded-xl flex items-center justify-center text-xl shadow-sm">
+                        <i class="fas fa-user-cog"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-lg text-gray-800 group-hover:text-gray-900 transition">Pengaturan Akun</h3>
+                        <p class="text-xs text-gray-500">Ubah password & data diri.</p>
+                    </div>
+                </div>
+            </a>
+
         </div>
     </div>
 </div>
