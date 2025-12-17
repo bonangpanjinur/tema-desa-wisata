@@ -531,4 +531,32 @@ jQuery(document).ready(function($) {
         renderCartPage();
     }
 
+    // Di file JS tema (misal: main.js)
+jQuery('.btn-wishlist').on('click', function(e) {
+    e.preventDefault();
+    var btn = jQuery(this);
+    var item_id = btn.data('id');
+    
+    jQuery.post(dw_ajax.ajax_url, {
+        action: 'dw_toggle_wishlist',
+        item_id: item_id,
+        item_type: 'wisata'
+    }, function(response) {
+        if(response.success) {
+            // Ubah icon hati (Solid/Outline)
+            var icon = btn.find('i');
+            if(response.data.status === 'added') {
+                icon.removeClass('far').addClass('fas text-red-500');
+            } else {
+                icon.removeClass('fas text-red-500').addClass('far');
+            }
+        } else {
+            if(response.data.code === 'not_logged_in') {
+                alert('Silakan login untuk menyimpan favorit.');
+                window.location.href = '/login'; // Sesuaikan URL login
+            }
+        }
+    });
+});
+
 });
