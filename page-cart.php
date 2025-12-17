@@ -1,6 +1,7 @@
 <?php
 /**
  * Template Name: Halaman Keranjang (Cart) Integrated
+ * Description: Menampilkan item di keranjang session/db dan total harga.
  */
 
 get_header(); 
@@ -11,15 +12,51 @@ get_header();
 $user_id = get_current_user_id();
 $cart_items = [];
 
-if (function_exists('dw_get_user_cart') && $user_id) {
-    $cart_items = dw_get_user_cart($user_id);
-} else {
-    // Fallback jika user belum login atau fungsi tidak ditemukan
-    // Anda bisa menambahkan logika pengambilan dari cookie di sini jika plugin mendukungnya
-    // Untuk saat ini kita asumsikan user harus login
-    if (!$user_id) {
-        // Opsi: Redirect ke login atau tampilkan pesan
+// Cek apakah session sudah dimulai, jika belum start session
+if (!session_id()) session_start();
+
+// LOGIKA PENGAMBILAN DATA KERANJANG
+// Prioritas 1: Ambil dari Session (untuk guest/user login yang baru nambah item)
+if (isset($_SESSION['dw_cart']) && !empty($_SESSION['dw_cart'])) {
+    // Format session kita: [product_id => qty]
+    // Kita perlu konversi ke format array lengkap untuk view
+    global $wpdb;
+    $table_produk = $wpdb->prefix . 'dw_produk';
+    $table_pedagang = $wpdb->prefix . 'dw_pedagang';
+    
+    $product_ids = array_keys($_SESSION['dw_cart']);
+    if (!empty($product_ids)) {
+        $ids_placeholder = implode(',', array_fill(0, count($product_ids), '%d'));
+        $sql = "SELECT p.*, pd.nama_toko 
+                FROM $table_produk p 
+                LEFT JOIN $table_pedagang pd ON p.id_pedagang = pd.id
+                WHERE p.id IN ($ids_placeholder)";
+        $raw_products = $wpdb->get_results($wpdb->prepare($sql, $product_ids));
+        
+        foreach ($raw_products as $prod) {
+            $qty = intval($_SESSION['dw_cart'][$prod->id]);
+            if ($qty > 0) {
+                // Standarisasi struktur item cart
+                $cart_items[] = [
+                    'id' => $prod->id, // Cart ID (bisa sama dengan Product ID untuk session)
+                    'product_id' => $prod->id,
+                    'productId' => $prod->id, // Alias
+                    'quantity' => $qty,
+                    'qty' => $qty, // Alias
+                    'price' => $prod->harga,
+                    'name' => $prod->nama_produk,
+                    'image' => $prod->foto_produk,
+                    'toko' => [
+                        'nama_toko' => $prod->nama_toko
+                    ]
+                ];
+            }
+        }
     }
+} 
+// Prioritas 2: Ambil dari Fungsi Helper (jika ada sistem cart di DB)
+elseif (function_exists('dw_get_user_cart') && $user_id) {
+    $cart_items = dw_get_user_cart($user_id);
 }
 
 $total_belanja = 0;
@@ -49,7 +86,7 @@ $total_belanja = 0;
                 </div>
                 <h3 class="text-xl font-bold text-gray-800 mb-2">Keranjang Belanja Kosong</h3>
                 <p class="text-gray-500 mb-8 max-w-md mx-auto">
-                    <?php echo is_user_logged_in() ? 'Tampaknya Anda belum menambahkan produk apapun.' : 'Silakan login untuk melihat keranjang belanja Anda.'; ?>
+                    Tampaknya Anda belum menambahkan produk apapun. Yuk, dukung UMKM desa dengan berbelanja!
                 </p>
                 <a href="<?php echo home_url('/produk'); ?>" class="group px-8 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-orange-600 transition-all duration-300 shadow-lg hover:shadow-orange-200 flex items-center gap-2">
                     <i class="fas fa-store"></i> Mulai Belanja
@@ -70,7 +107,6 @@ $total_belanja = 0;
 
                     <?php foreach ($cart_items as $item) : 
                         // FIX: Mapping Key yang sangat aman
-                        // Mencoba berbagai kemungkinan key karena struktur array bisa berbeda dari penyimpanan
                         $product_id = $item['productId'] ?? $item['product_id'] ?? 0;
                         $qty = $item['quantity'] ?? $item['qty'] ?? 1;
                         $price = $item['price'] ?? 0;
@@ -80,11 +116,17 @@ $total_belanja = 0;
                         // FIX: Fallback Image Logic
                         $img_src = 'https://via.placeholder.com/150?text=No+Image';
                         if (!empty($image_url)) {
-                            // Cek apakah ID attachment (numeric) atau URL string
+                            // Cek apakah JSON string (multiple images)
+                            $json_decoded = json_decode($image_url, true);
+                            if (json_last_error() === JSON_ERROR_NONE && is_array($json_decoded) && !empty($json_decoded)) {
+                                $image_url = $json_decoded[0]; // Ambil gambar pertama
+                            }
+                            
+                            // Resolusi ID ke URL
                             if (is_numeric($image_url)) {
                                 $att = wp_get_attachment_image_src($image_url, 'thumbnail');
                                 if ($att) $img_src = $att[0];
-                            } else {
+                            } elseif(filter_var($image_url, FILTER_VALIDATE_URL)) {
                                 $img_src = $image_url;
                             }
                         }
@@ -98,7 +140,7 @@ $total_belanja = 0;
                     
                     <!-- ITEM CARD -->
                     <div class="cart-item-row group bg-white p-4 rounded-2xl shadow-sm border border-gray-100 transition-all hover:shadow-md relative overflow-hidden" 
-                         data-cart-id="<?php echo esc_attr($item['id'] ?? ''); ?>" 
+                         data-cart-id="<?php echo esc_attr($item['id'] ?? $product_id); ?>" 
                          data-product-id="<?php echo esc_attr($product_id); ?>">
                         
                         <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
@@ -107,7 +149,7 @@ $total_belanja = 0;
                             <div class="col-span-1 md:col-span-6 flex gap-4">
                                 <!-- Gambar -->
                                 <div class="w-20 h-20 md:w-24 md:h-24 bg-gray-50 rounded-xl overflow-hidden flex-shrink-0 border border-gray-100 relative">
-                                    <a href="<?php echo get_permalink($product_id); ?>">
+                                    <a href="<?php echo get_permalink($product_id); ?>"> // Asumsi link produk standar WP atau custom link logic
                                         <img src="<?php echo esc_url($img_src); ?>" 
                                              alt="<?php echo esc_attr($name); ?>" 
                                              class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
@@ -140,11 +182,11 @@ $total_belanja = 0;
                             <div class="col-span-1 md:col-span-3 flex justify-between md:justify-center items-center mt-2 md:mt-0 border-t md:border-t-0 border-gray-50 pt-3 md:pt-0">
                                 <span class="md:hidden text-xs font-bold text-gray-500">Jumlah:</span>
                                 <div class="flex items-center bg-gray-50 rounded-lg border border-gray-200">
-                                    <button class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-orange-600 hover:bg-white rounded-l-lg transition-all qty-btn minus">
+                                    <button class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-orange-600 hover:bg-white rounded-l-lg transition-all btn-update-qty" data-action="decrease" data-id="<?php echo esc_attr($product_id); ?>">
                                         <i class="fas fa-minus text-xs"></i>
                                     </button>
-                                    <input type="number" value="<?php echo esc_attr($qty); ?>" class="w-10 text-center bg-transparent border-none text-sm font-bold text-gray-700 p-0 focus:ring-0 qty-input" readonly>
-                                    <button class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-orange-600 hover:bg-white rounded-r-lg transition-all qty-btn plus">
+                                    <input type="number" value="<?php echo esc_attr($qty); ?>" class="w-10 text-center bg-transparent border-none text-sm font-bold text-gray-700 p-0 focus:ring-0 input-qty" readonly data-max="99">
+                                    <button class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-orange-600 hover:bg-white rounded-r-lg transition-all btn-update-qty" data-action="increase" data-id="<?php echo esc_attr($product_id); ?>">
                                         <i class="fas fa-plus text-xs"></i>
                                     </button>
                                 </div>
@@ -154,12 +196,12 @@ $total_belanja = 0;
                             <div class="col-span-1 md:col-span-3 flex justify-between md:justify-end items-center mt-2 md:mt-0">
                                 <span class="md:hidden text-xs font-bold text-gray-500">Total:</span>
                                 <div class="text-right">
-                                    <div class="font-bold text-orange-600 text-base md:text-lg item-subtotal">
+                                    <div class="font-bold text-orange-600 text-base md:text-lg subtotal-display">
                                         Rp <?php echo number_format($subtotal, 0, ',', '.'); ?>
                                     </div>
                                 </div>
                                 
-                                <button class="delete-cart-item ml-4 text-gray-300 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition-all duration-200" title="Hapus">
+                                <button class="btn-remove-item ml-4 text-gray-300 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition-all duration-200" data-id="<?php echo esc_attr($product_id); ?>" title="Hapus">
                                     <i class="fas fa-trash-alt"></i>
                                 </button>
                             </div>
@@ -187,7 +229,7 @@ $total_belanja = 0;
                             </div>
                             <div class="flex justify-between text-gray-600 text-sm">
                                 <span>Subtotal Produk</span>
-                                <span class="font-medium text-gray-900 cart-grand-total">
+                                <span class="font-medium text-gray-900" id="cart-total">
                                     Rp <?php echo number_format($total_belanja, 0, ',', '.'); ?>
                                 </span>
                             </div>
@@ -196,7 +238,7 @@ $total_belanja = 0;
                         <div class="border-t border-dashed border-gray-200 my-4 pt-4">
                             <div class="flex justify-between items-end mb-1">
                                 <span class="font-bold text-gray-800">Total Sementara</span>
-                                <span class="font-bold text-2xl text-orange-600 cart-grand-total">
+                                <span class="font-bold text-2xl text-orange-600" id="cart-grand-total">
                                     Rp <?php echo number_format($total_belanja, 0, ',', '.'); ?>
                                 </span>
                             </div>

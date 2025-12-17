@@ -186,38 +186,23 @@ function get_cat_color_prod($cat) {
             <?php foreach ($produk_list as $p) : 
                 $link_p = !empty($p->slug_produk) ? home_url('/produk/detail/' . $p->slug_produk) : home_url('/detail-produk/?id=' . $p->id);
                 
-                // --- FIX LOGIKA GAMBAR PRODUK ---
-                // Inisialisasi default
+                // --- LOGIKA GAMBAR PRODUK (Disesuaikan dengan Front Page) ---
                 $img_p = 'https://via.placeholder.com/400x400?text=Produk'; 
-                $foto_raw = $p->foto_produk;
-                $foto_id = null;
+                $fotos = !empty($p->foto_produk) ? json_decode($p->foto_produk) : [];
+                
+                // Ambil foto pertama dari array, atau jika bukan array gunakan langsung
+                $foto_utama = (is_array($fotos) && !empty($fotos)) ? $fotos[0] : $p->foto_produk;
 
-                if (!empty($foto_raw)) {
-                    // Cek 1: Apakah JSON string? (biasanya dari multiple upload)
-                    $json_decoded = json_decode($foto_raw, true);
-                    if (json_last_error() === JSON_ERROR_NONE && is_array($json_decoded) && !empty($json_decoded)) {
-                        $foto_id = $json_decoded[0]; // Ambil foto pertama
-                    }
-                    // Cek 2: Apakah Serialized Array?
-                    elseif (is_serialized($foto_raw)) {
-                        $unserialized = unserialize($foto_raw);
-                        if (is_array($unserialized) && !empty($unserialized)) {
-                            $foto_id = $unserialized[0];
-                        }
-                    }
-                    // Cek 3: Anggap single value
-                    else {
-                        $foto_id = $foto_raw;
-                    }
-
-                    // Resolusi ke URL
-                    if (is_numeric($foto_id)) {
-                        $img_src = wp_get_attachment_image_src($foto_id, 'medium_large'); 
+                if (!empty($foto_utama)) {
+                    if (is_numeric($foto_utama)) {
+                        // Jika berupa ID Attachment
+                        $img_src = wp_get_attachment_image_src($foto_utama, 'medium_large');
                         if ($img_src) {
                             $img_p = $img_src[0];
                         }
-                    } elseif (filter_var($foto_id, FILTER_VALIDATE_URL)) {
-                        $img_p = $foto_id;
+                    } else {
+                        // Jika berupa URL string
+                        $img_p = $foto_utama;
                     }
                 }
                 
