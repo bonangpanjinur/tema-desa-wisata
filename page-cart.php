@@ -5,10 +5,23 @@
 
 get_header(); 
 
-// 1. Ambil data keranjang (Pastikan user login/guest handled by plugin logic)
+// 1. Ambil data keranjang
+// Pastikan user login untuk mengambil dari user_meta. 
+// Jika plugin mendukung guest cart via cookie, logika itu harus ada di dw_get_user_cart atau wrapper function.
 $user_id = get_current_user_id();
-// Menggunakan fungsi dw_get_user_cart dari includes/cart.php
-$cart_items = function_exists('dw_get_user_cart') ? dw_get_user_cart($user_id) : []; 
+$cart_items = [];
+
+if (function_exists('dw_get_user_cart') && $user_id) {
+    $cart_items = dw_get_user_cart($user_id);
+} else {
+    // Fallback jika user belum login atau fungsi tidak ditemukan
+    // Anda bisa menambahkan logika pengambilan dari cookie di sini jika plugin mendukungnya
+    // Untuk saat ini kita asumsikan user harus login
+    if (!$user_id) {
+        // Opsi: Redirect ke login atau tampilkan pesan
+    }
+}
+
 $total_belanja = 0;
 ?>
 
@@ -35,7 +48,9 @@ $total_belanja = 0;
                     </div>
                 </div>
                 <h3 class="text-xl font-bold text-gray-800 mb-2">Keranjang Belanja Kosong</h3>
-                <p class="text-gray-500 mb-8 max-w-md mx-auto">Tampaknya Anda belum menambahkan produk apapun.</p>
+                <p class="text-gray-500 mb-8 max-w-md mx-auto">
+                    <?php echo is_user_logged_in() ? 'Tampaknya Anda belum menambahkan produk apapun.' : 'Silakan login untuk melihat keranjang belanja Anda.'; ?>
+                </p>
                 <a href="<?php echo home_url('/produk'); ?>" class="group px-8 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-orange-600 transition-all duration-300 shadow-lg hover:shadow-orange-200 flex items-center gap-2">
                     <i class="fas fa-store"></i> Mulai Belanja
                 </a>
@@ -54,17 +69,28 @@ $total_belanja = 0;
                     </div>
 
                     <?php foreach ($cart_items as $item) : 
-                        // FIX: Mapping Key Sesuai includes/cart.php
-                        $product_id = isset($item['productId']) ? $item['productId'] : (isset($item['product_id']) ? $item['product_id'] : 0);
-                        $qty = isset($item['quantity']) ? $item['quantity'] : (isset($item['qty']) ? $item['qty'] : 1);
-                        $price = isset($item['price']) ? $item['price'] : 0;
-                        $name = isset($item['name']) ? $item['name'] : 'Produk Tanpa Nama';
+                        // FIX: Mapping Key yang sangat aman
+                        // Mencoba berbagai kemungkinan key karena struktur array bisa berbeda dari penyimpanan
+                        $product_id = $item['productId'] ?? $item['product_id'] ?? 0;
+                        $qty = $item['quantity'] ?? $item['qty'] ?? 1;
+                        $price = $item['price'] ?? 0;
+                        $name = $item['name'] ?? 'Produk Tanpa Nama';
+                        $image_url = $item['image'] ?? '';
                         
-                        // FIX: Ambil URL Gambar Langsung
-                        $img_src = !empty($item['image']) ? $item['image'] : 'https://via.placeholder.com/150?text=No+Image';
-                        
-                        // FIX: Ambil Nama Toko dari array nested
-                        $shop_name = isset($item['toko']['nama_toko']) ? $item['toko']['nama_toko'] : 'Toko Desa';
+                        // FIX: Fallback Image Logic
+                        $img_src = 'https://via.placeholder.com/150?text=No+Image';
+                        if (!empty($image_url)) {
+                            // Cek apakah ID attachment (numeric) atau URL string
+                            if (is_numeric($image_url)) {
+                                $att = wp_get_attachment_image_src($image_url, 'thumbnail');
+                                if ($att) $img_src = $att[0];
+                            } else {
+                                $img_src = $image_url;
+                            }
+                        }
+
+                        // FIX: Ambil Nama Toko
+                        $shop_name = $item['toko']['nama_toko'] ?? 'Toko Desa';
 
                         $subtotal = $price * $qty;
                         $total_belanja += $subtotal;
