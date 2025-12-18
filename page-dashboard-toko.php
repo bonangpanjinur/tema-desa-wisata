@@ -4,6 +4,9 @@
  * Description: Pusat kontrol untuk pedagang mengelola produk, pesanan, dan paket secara lengkap.
  */
 
+// Buffering output untuk mencegah error redirect
+ob_start();
+
 // 1. CEK AKSES & LOGIN
 if (!is_user_logged_in()) {
     auth_redirect();
@@ -207,6 +210,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $no_wa     = sanitize_text_field($_POST['nomor_wa']);
         $alamat    = sanitize_textarea_field($_POST['alamat_lengkap']);
         
+        // Data Wilayah
+        $prov_id   = sanitize_text_field($_POST['provinsi']);
+        $kab_id    = sanitize_text_field($_POST['kabupaten']);
+        $kec_id    = sanitize_text_field($_POST['kecamatan']);
+        $kel_id    = sanitize_text_field($_POST['kelurahan']);
+        
+        // Simpan nama wilayah juga (biasanya dikirim via hidden input, tapi jika tidak, kita simpan ID saja dulu atau ambil dari API backend)
+        // Di sini kita asumsikan ID yang dikirim.
+        
         $nama_bank      = sanitize_text_field($_POST['nama_bank']);
         $no_rekening    = sanitize_text_field($_POST['no_rekening']);
         $atas_nama_rek  = sanitize_text_field($_POST['atas_nama_rekening']);
@@ -231,6 +243,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'nama_toko'      => $nama_toko,
             'nomor_wa'       => $no_wa,
             'alamat_lengkap' => $alamat,
+            'api_provinsi_id'=> $prov_id,
+            'api_kabupaten_id'=> $kab_id,
+            'api_kecamatan_id'=> $kec_id,
+            'api_kelurahan_id'=> $kel_id,
             'foto_profil'    => $foto_profil_url,
             'nama_bank'      => $nama_bank,
             'no_rekening'    => $no_rekening,
@@ -763,6 +779,37 @@ get_header();
                                     <label class="block text-sm font-bold text-gray-700 mb-2">Alamat Lengkap Toko</label>
                                     <textarea name="alamat_lengkap" rows="3" class="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-900 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors"><?php echo esc_textarea($pedagang->alamat_lengkap); ?></textarea>
                                 </div>
+
+                                <!-- DATA WILAYAH (AJAX) -->
+                                <div class="md:col-span-2 border-t border-gray-100 pt-6 mt-2">
+                                    <h4 class="text-sm font-bold text-gray-700 mb-3">Lokasi Wilayah (Untuk Ongkir)</h4>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-xs font-semibold text-gray-600 mb-1">Provinsi</label>
+                                            <select name="provinsi" id="dw-provinsi" class="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white" data-selected="<?php echo esc_attr($pedagang->api_provinsi_id); ?>">
+                                                <option value="">Pilih Provinsi...</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-semibold text-gray-600 mb-1">Kabupaten/Kota</label>
+                                            <select name="kabupaten" id="dw-kabupaten" class="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white disabled:bg-gray-100" disabled data-selected="<?php echo esc_attr($pedagang->api_kabupaten_id); ?>">
+                                                <option value="">Pilih Kabupaten...</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-semibold text-gray-600 mb-1">Kecamatan</label>
+                                            <select name="kecamatan" id="dw-kecamatan" class="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white disabled:bg-gray-100" disabled data-selected="<?php echo esc_attr($pedagang->api_kecamatan_id); ?>">
+                                                <option value="">Pilih Kecamatan...</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-semibold text-gray-600 mb-1">Kelurahan</label>
+                                            <select name="kelurahan" id="dw-kelurahan" class="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white disabled:bg-gray-100" disabled data-selected="<?php echo esc_attr($pedagang->api_kelurahan_id); ?>">
+                                                <option value="">Pilih Kelurahan...</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -805,6 +852,71 @@ get_header();
                         </div>
                     </form>
                 </div>
+
+                <!-- Script AJAX Wilayah -->
+                <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    const selectProv = document.getElementById('dw-provinsi');
+                    const selectKab  = document.getElementById('dw-kabupaten');
+                    const selectKec  = document.getElementById('dw-kecamatan');
+                    const selectKel  = document.getElementById('dw-kelurahan');
+                    const ajaxUrl    = '<?php echo admin_url('admin-ajax.php'); ?>';
+
+                    // Load Data Awal
+                    if(selectProv) loadWilayah('dw_get_provinsi', selectProv, selectProv.getAttribute('data-selected'));
+
+                    // Event Listeners
+                    if(selectProv) {
+                        selectProv.addEventListener('change', function() {
+                            resetSelect(selectKab); resetSelect(selectKec); resetSelect(selectKel);
+                            if(this.value) loadWilayah('dw_get_kabupaten', selectKab, null, {prov_id: this.value});
+                        });
+                    }
+                    if(selectKab) {
+                        selectKab.addEventListener('change', function() {
+                            resetSelect(selectKec); resetSelect(selectKel);
+                            if(this.value) loadWilayah('dw_get_kecamatan', selectKec, null, {kab_id: this.value});
+                        });
+                    }
+                    if(selectKec) {
+                        selectKec.addEventListener('change', function() {
+                            resetSelect(selectKel);
+                            if(this.value) loadWilayah('dw_get_kelurahan', selectKel, null, {kec_id: this.value});
+                        });
+                    }
+
+                    function resetSelect(el) {
+                        el.innerHTML = '<option value="">Pilih...</option>';
+                        el.disabled = true;
+                    }
+
+                    function loadWilayah(action, targetEl, selectedId = null, extraParams = {}) {
+                        let formData = new FormData();
+                        formData.append('action', action);
+                        for (let key in extraParams) formData.append(key, extraParams[key]);
+
+                        fetch(ajaxUrl, {
+                            method: 'POST',
+                            body: formData
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if(data.success && data.data) {
+                                targetEl.disabled = false;
+                                let html = '<option value="">Pilih...</option>';
+                                data.data.forEach(item => {
+                                    let isSel = (selectedId && (item.id == selectedId || item.kode == selectedId)) ? 'selected' : '';
+                                    html += `<option value="${item.id || item.kode}" ${isSel}>${item.nama}</option>`;
+                                });
+                                targetEl.innerHTML = html;
+                                // Trigger change otomatis jika ada selectedId untuk load chain berikutnya
+                                if(selectedId) targetEl.dispatchEvent(new Event('change'));
+                            }
+                        })
+                        .catch(err => console.error('Error loading wilayah:', err));
+                    }
+                });
+                </script>
                 <?php
                 break;
         } 
