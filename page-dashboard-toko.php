@@ -688,6 +688,7 @@ get_header();
                                     <th class="p-4">Harga</th>
                                     <th class="p-4">Status</th>
                                     <th class="p-4">Bukti Bayar</th>
+                                    <th class="p-4">Keterangan</th>
                                     <th class="p-4 text-right">Tanggal</th>
                                 </tr>
                             </thead>
@@ -702,12 +703,6 @@ get_header();
                                         <span class="px-2 py-1 rounded text-xs font-bold capitalize <?php echo $h->status == 'disetujui' ? 'bg-green-100 text-green-700' : ($h->status == 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'); ?>">
                                             <?php echo $h->status; ?>
                                         </span>
-                                        <?php if($h->status == 'ditolak' && !empty($h->catatan_admin)): ?>
-                                            <div class="mt-1 text-xs text-red-600 bg-red-50 p-2 rounded border border-red-100 max-w-xs">
-                                                <strong>Alasan:</strong><br>
-                                                <?php echo esc_html($h->catatan_admin); ?>
-                                            </div>
-                                        <?php endif; ?>
                                     </td>
                                     <td class="p-4">
                                         <?php if($h->status == 'pending' || $h->status == 'ditolak'): ?>
@@ -729,10 +724,20 @@ get_header();
                                             <span class="text-green-600 text-xs"><i class="fas fa-check-circle"></i> Selesai</span>
                                         <?php endif; ?>
                                     </td>
+                                    <td class="p-4">
+                                        <?php if($h->status == 'ditolak' && !empty($h->catatan_admin)): ?>
+                                            <div class="text-xs text-red-600 bg-red-50 p-2 rounded border border-red-100 max-w-xs">
+                                                <strong>Alasan:</strong><br>
+                                                <?php echo esc_html($h->catatan_admin); ?>
+                                            </div>
+                                        <?php else: ?>
+                                            <span class="text-gray-400 text-xs">-</span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td class="p-4 text-right text-gray-500"><?php echo date('d/m/Y', strtotime($h->created_at)); ?></td>
                                 </tr>
                                 <?php endforeach; else: ?>
-                                <tr><td colspan="5" class="p-4 text-center text-gray-400">Belum ada riwayat pembelian.</td></tr>
+                                <tr><td colspan="6" class="p-4 text-center text-gray-400">Belum ada riwayat pembelian.</td></tr>
                                 <?php endif; ?>
                             </tbody>
                         </table>
