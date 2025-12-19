@@ -396,5 +396,52 @@ function dw_template_include( $template ) {
     
     return $template;
 }
+/**
+ * 1. Mengubah URL di Email Reset Password agar mengarah ke Halaman Custom
+ */
+add_filter( 'lostpassword_url', 'dw_custom_lost_password_url', 10, 0 );
+function dw_custom_lost_password_url() {
+    return home_url( '/lupa-password/' );
+}
+
+/**
+ * 2. Redirect jika user mengakses wp-login.php?action=lostpassword
+ */
+add_action( 'login_form_lostpassword', 'dw_redirect_to_custom_lostpassword' );
+function dw_redirect_to_custom_lostpassword() {
+    if ( 'GET' == $_SERVER['REQUEST_METHOD'] ) {
+        if ( is_user_logged_in() ) {
+            wp_redirect( home_url( '/akun-saya/' ) );
+            exit;
+        }
+        wp_redirect( home_url( '/lupa-password/' ) );
+        exit;
+    }
+}
+
+/**
+ * 3. Redirect halaman 'Reset Password' (input password baru) ke halaman custom
+ * Ini menangani saat user klik link di email.
+ */
+add_action( 'login_form_rp', 'dw_redirect_to_custom_resetpass' );
+add_action( 'login_form_resetpass', 'dw_redirect_to_custom_resetpass' );
+
+function dw_redirect_to_custom_resetpass() {
+    if ( 'GET' == $_SERVER['REQUEST_METHOD'] ) {
+        // Ambil key dan login dari URL asli
+        $key = isset( $_GET['key'] ) ? trim( $_GET['key'] ) : '';
+        $login = isset( $_GET['login'] ) ? trim( $_GET['login'] ) : '';
+        
+        // Arahkan ke halaman custom kita (pastikan slug halamannya 'reset-password')
+        $redirect_url = home_url( '/reset-password/' );
+        
+        if ( $key && $login ) {
+            $redirect_url = add_query_arg( array( 'key' => $key, 'login' => $login ), $redirect_url );
+        }
+        
+        wp_redirect( $redirect_url );
+        exit;
+    }
+}
 add_filter( 'template_include', 'dw_template_include' );
 ?>
