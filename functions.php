@@ -396,6 +396,14 @@ function dw_template_include( $template ) {
     
     return $template;
 }
+add_filter( 'template_include', 'dw_template_include' );
+
+/**
+ * ============================================================================
+ * 8. CUSTOM LOST PASSWORD & RESET URL HANDLER
+ * ============================================================================
+ */
+
 /**
  * 1. Mengubah URL di Email Reset Password agar mengarah ke Halaman Custom
  */
@@ -443,5 +451,4 @@ function dw_redirect_to_custom_resetpass() {
         exit;
     }
 }
-add_filter( 'template_include', 'dw_template_include' );
 ?>
