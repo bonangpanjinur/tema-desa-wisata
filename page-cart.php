@@ -2,6 +2,7 @@
 /**
  * Template Name: Halaman Keranjang (Cart) Integrated
  * Description: Menampilkan item di keranjang dengan desain modern & grouped by Merchant.
+ * Update: Kompatibilitas Database activation.php (Auto-detect column names).
  */
 
 // 1. Pastikan Session Dimulai (Wajib Paling Atas)
@@ -70,12 +71,23 @@ if ( ! empty( $cart_items ) ) {
 
             if ( $prod_db ) {
                 $nama_penjual = !empty($prod_db->nama_toko) ? $prod_db->nama_toko : 'Produk Desa';
-                // Update data terbaru agar sinkron dengan DB (opsional)
-                $nama_produk = $prod_db->nama_produk;
-                $harga       = $prod_db->harga;
-                $foto        = $prod_db->foto_utama;
+                
+                // Update data terbaru agar sinkron dengan DB
+                if ( isset($prod_db->nama_produk) ) $nama_produk = $prod_db->nama_produk;
+                if ( isset($prod_db->harga) ) $harga = $prod_db->harga;
+                
+                // Cek variasi nama kolom foto (Kompatibilitas activation.php)
+                if ( isset( $prod_db->foto_utama ) && !empty( $prod_db->foto_utama ) ) {
+                    $foto = $prod_db->foto_utama;
+                } elseif ( isset( $prod_db->foto ) && !empty( $prod_db->foto ) ) {
+                    $foto = $prod_db->foto;
+                } elseif ( isset( $prod_db->gambar ) && !empty( $prod_db->gambar ) ) {
+                    $foto = $prod_db->gambar;
+                }
+
             } else {
                 // 2. Cek di tabel Wisata (Tiket)
+                // Gunakan LEFT JOIN ke tabel Desa untuk ambil nama desa
                 $wisata_db = $wpdb->get_row( $wpdb->prepare("
                     SELECT w.*, d.nama_desa 
                     FROM $tbl_wisata w 
@@ -84,10 +96,23 @@ if ( ! empty( $cart_items ) ) {
                 ", $pid) );
                 
                 if ( $wisata_db ) {
-                    $nama_penjual = 'Wisata: ' . ($wisata_db->nama_desa ? $wisata_db->nama_desa : 'Desa');
-                    $nama_produk  = $wisata_db->nama_wisata;
-                    $harga        = $wisata_db->harga_tiket;
-                    $foto         = $wisata_db->foto_utama;
+                    $nama_penjual = 'Wisata: ' . (isset($wisata_db->nama_desa) ? $wisata_db->nama_desa : 'Desa');
+                    
+                    if ( isset($wisata_db->nama_wisata) ) $nama_produk = $wisata_db->nama_wisata;
+                    
+                    // Cek variasi nama kolom Harga (harga_tiket vs harga)
+                    if ( isset( $wisata_db->harga_tiket ) ) {
+                        $harga = $wisata_db->harga_tiket;
+                    } elseif ( isset( $wisata_db->harga ) ) {
+                        $harga = $wisata_db->harga;
+                    }
+
+                    // Cek variasi nama kolom Foto
+                    if ( isset( $wisata_db->foto_utama ) && !empty( $wisata_db->foto_utama ) ) {
+                        $foto = $wisata_db->foto_utama;
+                    } elseif ( isset( $wisata_db->foto ) && !empty( $wisata_db->foto ) ) {
+                        $foto = $wisata_db->foto;
+                    }
                 }
             }
         }
