@@ -1,7 +1,7 @@
 <?php
 /**
  * Template Name: Halaman Register Custom
- * Description: Registration for Buyer, Merchant, and Ojek.
+ * Description: Registration for Buyer, Merchant, and Ojek with Premium UI.
  */
 
 if ( is_user_logged_in() ) {
@@ -54,24 +54,20 @@ if ( $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['dw_register_nonce']) 
                 
                 update_user_meta( $user_id, 'nama_toko', $nama_toko );
                 update_user_meta( $user_id, 'no_wa', $no_wa );
-                update_user_meta( $user_id, 'status_verifikasi', 'pending' ); // Butuh verifikasi admin desa
+                update_user_meta( $user_id, 'status_verifikasi', 'pending' );
             } 
-            // 2. Logika Ojek (BARU)
+            // 2. Logika Ojek
             elseif ( $role === 'ojek' ) {
                 $plat_nomor = sanitize_text_field($_POST['plat_nomor']);
-                $no_wa      = sanitize_text_field($_POST['no_wa']); // Ojek juga butuh WA untuk koordinasi
+                $no_wa      = sanitize_text_field($_POST['no_wa']); 
 
                 update_user_meta( $user_id, 'plat_nomor', $plat_nomor );
                 update_user_meta( $user_id, 'no_wa', $no_wa );
-                update_user_meta( $user_id, 'status_ojek', 'pending' ); // Ojek mungkin butuh verifikasi juga
-                update_user_meta( $user_id, 'status_ketersediaan', 'offline' ); // Default offline
+                update_user_meta( $user_id, 'status_ojek', 'pending' ); 
+                update_user_meta( $user_id, 'status_ketersediaan', 'offline' );
             }
-            // 3. Logika Pembeli
-            else {
-                // Pembeli otomatis aktif
-            }
-
-            // Auto Login setelah register (Opsional, bisa dimatikan jika butuh verifikasi email)
+            
+            // Auto Login
             $creds = array(
                 'user_login'    => $username,
                 'user_password' => $password,
@@ -83,7 +79,7 @@ if ( $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['dw_register_nonce']) 
             if ( $role === 'pedagang' ) {
                 wp_redirect( home_url('/dashboard-toko') );
             } elseif ( $role === 'ojek' ) {
-                wp_redirect( home_url('/dashboard-ojek') ); // Redirect ke dashboard ojek
+                wp_redirect( home_url('/dashboard-ojek') );
             } else {
                 wp_redirect( home_url('/akun-saya') );
             }
@@ -94,157 +90,218 @@ if ( $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['dw_register_nonce']) 
         }
     }
 }
+
+get_header(); 
 ?>
 
-<?php get_header(); ?>
+<!-- Alpine.js -->
+<script src="https://cdn.jsdelivr.net/gh/alpinejs/alpine@v2.x.x/dist/alpine.min.js" defer></script>
 
-<div class="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-    <div class="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Bergabung dengan Desa Wisata
-        </h2>
-        <p class="mt-2 text-center text-sm text-gray-600">
-            Satu akun untuk jelajahi, belanja, berjualan, atau mengantar.
-        </p>
+<div class="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans relative overflow-hidden">
+    
+    <!-- Background Decoration (Sama dengan Login) -->
+    <div class="absolute top-0 left-0 w-full h-[600px] bg-gradient-to-b from-orange-50 to-transparent -z-10"></div>
+    <div class="absolute -top-24 -right-24 w-96 h-96 bg-yellow-100 rounded-full blur-3xl opacity-40 -z-10"></div>
+    <div class="absolute top-1/2 -left-24 w-72 h-72 bg-orange-100 rounded-full blur-3xl opacity-40 -z-10"></div>
+
+    <div class="sm:mx-auto sm:w-full sm:max-w-xl">
+        <div class="text-center mb-8">
+            <a href="<?php echo home_url(); ?>" class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-orange-500 to-red-500 text-white shadow-lg shadow-orange-200 mb-6 transform hover:scale-105 transition-transform duration-300">
+                <i class="fas fa-user-plus text-3xl"></i>
+            </a>
+            <h2 class="text-3xl font-extrabold text-gray-900 tracking-tight">
+                Bergabung Sekarang
+            </h2>
+            <p class="mt-2 text-sm text-gray-600">
+                Buat akun baru untuk mulai menjelajah atau berbisnis
+            </p>
+        </div>
     </div>
 
-    <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div class="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+    <div class="mt-2 sm:mx-auto sm:w-full sm:max-w-xl relative z-10">
+        <div class="bg-white py-8 px-4 shadow-2xl shadow-gray-100 sm:rounded-2xl sm:px-10 border border-gray-100">
             
             <?php if($error_message): ?>
-                <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-4" role="alert">
-                    <p class="text-sm text-red-700"><?php echo $error_message; ?></p>
+                <div class="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg animate-pulse flex items-start gap-3">
+                    <i class="fas fa-exclamation-circle text-red-500 mt-0.5"></i>
+                    <div>
+                        <h3 class="text-sm font-bold text-red-800">Registrasi Gagal</h3>
+                        <p class="text-sm text-red-700 mt-1"><?php echo $error_message; ?></p>
+                    </div>
                 </div>
             <?php endif; ?>
 
             <form class="space-y-6" action="" method="POST" x-data="{ role: 'buyer' }">
                 <?php wp_nonce_field('dw_register_action', 'dw_register_nonce'); ?>
                 
-                <!-- Pilihan Role dengan UI Grid 3 Kolom -->
+                <!-- Pilihan Role: Card Style -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Saya ingin mendaftar sebagai:</label>
-                    <div class="grid grid-cols-3 gap-3">
-                        <!-- Pilihan Pembeli -->
+                    <label class="block text-sm font-bold text-gray-700 mb-3 text-center uppercase tracking-wider text-xs text-gray-400">Pilih Tipe Akun</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <!-- Wisatawan -->
                         <div @click="role = 'buyer'" 
-                             :class="{ 'border-blue-500 bg-blue-50 text-blue-700': role === 'buyer', 'border-gray-200 hover:border-gray-300': role !== 'buyer' }"
-                             class="cursor-pointer border rounded-lg p-3 text-center transition-all">
-                            <i class="fas fa-user text-xl mb-1 block"></i>
-                            <span class="text-xs font-bold block">Wisatawan</span>
+                             :class="{ 'ring-2 ring-blue-500 bg-blue-50': role === 'buyer', 'border-gray-200 hover:border-blue-300 hover:bg-gray-50': role !== 'buyer' }"
+                             class="cursor-pointer border rounded-xl p-4 text-center transition-all duration-200 relative group overflow-hidden">
+                            <div class="mb-2">
+                                <div class="w-10 h-10 mx-auto rounded-full flex items-center justify-center" :class="role === 'buyer' ? 'bg-blue-200 text-blue-700' : 'bg-gray-100 text-gray-500 group-hover:bg-blue-100 group-hover:text-blue-600'">
+                                    <i class="fas fa-user text-lg"></i>
+                                </div>
+                            </div>
+                            <span class="text-xs font-bold block" :class="role === 'buyer' ? 'text-blue-800' : 'text-gray-600'">Wisatawan</span>
+                            <div x-show="role === 'buyer'" class="absolute top-2 right-2 text-blue-500"><i class="fas fa-check-circle"></i></div>
                         </div>
                         
-                        <!-- Pilihan Pedagang -->
+                        <!-- Pedagang -->
                         <div @click="role = 'pedagang'" 
-                             :class="{ 'border-orange-500 bg-orange-50 text-orange-700': role === 'pedagang', 'border-gray-200 hover:border-gray-300': role !== 'pedagang' }"
-                             class="cursor-pointer border rounded-lg p-3 text-center transition-all">
-                            <i class="fas fa-store text-xl mb-1 block"></i>
-                            <span class="text-xs font-bold block">Pedagang</span>
+                             :class="{ 'ring-2 ring-orange-500 bg-orange-50': role === 'pedagang', 'border-gray-200 hover:border-orange-300 hover:bg-gray-50': role !== 'pedagang' }"
+                             class="cursor-pointer border rounded-xl p-4 text-center transition-all duration-200 relative group overflow-hidden">
+                            <div class="mb-2">
+                                <div class="w-10 h-10 mx-auto rounded-full flex items-center justify-center" :class="role === 'pedagang' ? 'bg-orange-200 text-orange-700' : 'bg-gray-100 text-gray-500 group-hover:bg-orange-100 group-hover:text-orange-600'">
+                                    <i class="fas fa-store text-lg"></i>
+                                </div>
+                            </div>
+                            <span class="text-xs font-bold block" :class="role === 'pedagang' ? 'text-orange-800' : 'text-gray-600'">Pedagang</span>
+                            <div x-show="role === 'pedagang'" class="absolute top-2 right-2 text-orange-500"><i class="fas fa-check-circle"></i></div>
                         </div>
 
-                        <!-- Pilihan Ojek (BARU) -->
+                        <!-- Ojek -->
                         <div @click="role = 'ojek'" 
-                             :class="{ 'border-green-500 bg-green-50 text-green-700': role === 'ojek', 'border-gray-200 hover:border-gray-300': role !== 'ojek' }"
-                             class="cursor-pointer border rounded-lg p-3 text-center transition-all">
-                            <i class="fas fa-motorcycle text-xl mb-1 block"></i>
-                            <span class="text-xs font-bold block">Ojek</span>
+                             :class="{ 'ring-2 ring-green-500 bg-green-50': role === 'ojek', 'border-gray-200 hover:border-green-300 hover:bg-gray-50': role !== 'ojek' }"
+                             class="cursor-pointer border rounded-xl p-4 text-center transition-all duration-200 relative group overflow-hidden">
+                            <div class="mb-2">
+                                <div class="w-10 h-10 mx-auto rounded-full flex items-center justify-center" :class="role === 'ojek' ? 'bg-green-200 text-green-700' : 'bg-gray-100 text-gray-500 group-hover:bg-green-100 group-hover:text-green-600'">
+                                    <i class="fas fa-motorcycle text-lg"></i>
+                                </div>
+                            </div>
+                            <span class="text-xs font-bold block" :class="role === 'ojek' ? 'text-green-800' : 'text-gray-600'">Ojek</span>
+                            <div x-show="role === 'ojek'" class="absolute top-2 right-2 text-green-500"><i class="fas fa-check-circle"></i></div>
                         </div>
                     </div>
                     <input type="hidden" name="role_type" :value="role" id="role_input">
                 </div>
 
+                <div class="border-t border-gray-100 pt-4"></div>
+
                 <!-- Field Umum (Semua Role) -->
-                <div>
-                    <label for="username" class="block text-sm font-medium text-gray-700">Username</label>
-                    <input type="text" name="username" id="username" required 
-                           class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                </div>
+                <div class="grid grid-cols-1 gap-5">
+                    <div>
+                        <label for="nama_lengkap" class="block text-sm font-medium text-gray-700 mb-1">Nama Lengkap</label>
+                        <input type="text" name="nama_lengkap" id="nama_lengkap" required 
+                               class="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-xl placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 sm:text-sm transition-all bg-gray-50 focus:bg-white"
+                               placeholder="Nama sesuai KTP">
+                    </div>
 
-                <div>
-                    <label for="email" class="block text-sm font-medium text-gray-700">Alamat Email</label>
-                    <input type="email" name="email" id="email" required 
-                           class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                        <div>
+                            <label for="username" class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                            <input type="text" name="username" id="username" required 
+                                   class="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-xl placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 sm:text-sm transition-all bg-gray-50 focus:bg-white"
+                                   placeholder="Tanpa spasi">
+                        </div>
+                        <div>
+                            <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Alamat Email</label>
+                            <input type="email" name="email" id="email" required 
+                                   class="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-xl placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 sm:text-sm transition-all bg-gray-50 focus:bg-white"
+                                   placeholder="email@contoh.com">
+                        </div>
+                    </div>
 
-                <div>
-                    <label for="nama_lengkap" class="block text-sm font-medium text-gray-700">Nama Lengkap</label>
-                    <input type="text" name="nama_lengkap" id="nama_lengkap" required 
-                           class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                </div>
-
-                <div>
-                    <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
-                    <input type="password" name="password" id="password" required 
-                           class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                    <div>
+                        <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                        <input type="password" name="password" id="password" required 
+                               class="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-xl placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 sm:text-sm transition-all bg-gray-50 focus:bg-white"
+                               placeholder="Minimal 8 karakter">
+                    </div>
                 </div>
 
                 <!-- Field Khusus Pedagang -->
-                <div x-show="role === 'pedagang'" x-transition class="bg-orange-50 p-4 rounded-md border border-orange-200 space-y-4">
-                    <h4 class="text-sm font-bold text-orange-800 border-b border-orange-200 pb-2">Informasi Toko</h4>
+                <div x-show="role === 'pedagang'" 
+                     x-transition:enter="transition ease-out duration-200"
+                     x-transition:enter-start="opacity-0 transform -translate-y-2"
+                     x-transition:enter-end="opacity-100 transform translate-y-0"
+                     class="bg-orange-50 p-5 rounded-2xl border border-orange-100 space-y-4 shadow-sm">
+                    <div class="flex items-center gap-2 mb-2">
+                        <i class="fas fa-store text-orange-500"></i>
+                        <h4 class="text-sm font-bold text-orange-800">Detail Usaha</h4>
+                    </div>
                     <div>
-                        <label for="nama_toko" class="block text-sm font-medium text-gray-700">Nama Toko / Usaha</label>
+                        <label for="nama_toko" class="block text-sm font-medium text-gray-700 mb-1">Nama Toko / Usaha</label>
                         <input type="text" name="nama_toko" id="input_nama_toko" 
                                :required="role === 'pedagang'"
-                               class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm">
+                               class="block w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-orange-500 focus:border-orange-500 sm:text-sm bg-white"
+                               placeholder="Contoh: Keripik Pisang Bu Ani">
                     </div>
                 </div>
 
-                <!-- Field Khusus Ojek (BARU) -->
-                <div x-show="role === 'ojek'" x-transition class="bg-green-50 p-4 rounded-md border border-green-200 space-y-4" style="display: none;">
-                    <h4 class="text-sm font-bold text-green-800 border-b border-green-200 pb-2">Informasi Kendaraan</h4>
+                <!-- Field Khusus Ojek -->
+                <div x-show="role === 'ojek'" 
+                     x-transition:enter="transition ease-out duration-200"
+                     x-transition:enter-start="opacity-0 transform -translate-y-2"
+                     x-transition:enter-end="opacity-100 transform translate-y-0"
+                     class="bg-green-50 p-5 rounded-2xl border border-green-100 space-y-4 shadow-sm" style="display: none;">
+                    <div class="flex items-center gap-2 mb-2">
+                        <i class="fas fa-motorcycle text-green-600"></i>
+                        <h4 class="text-sm font-bold text-green-800">Detail Kendaraan</h4>
+                    </div>
                     <div>
-                        <label for="plat_nomor" class="block text-sm font-medium text-gray-700">Plat Nomor Kendaraan</label>
-                        <input type="text" name="plat_nomor" id="input_plat_nomor" placeholder="Contoh: AB 1234 XY"
+                        <label for="plat_nomor" class="block text-sm font-medium text-gray-700 mb-1">Plat Nomor</label>
+                        <input type="text" name="plat_nomor" id="input_plat_nomor" 
                                :required="role === 'ojek'"
-                               class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm">
-                        <p class="text-xs text-gray-500 mt-1">Pastikan plat nomor sesuai dengan kendaraan yang digunakan.</p>
+                               class="block w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-green-500 focus:border-green-500 sm:text-sm bg-white"
+                               placeholder="Contoh: AB 1234 XY">
+                        <p class="text-xs text-gray-500 mt-1">Nomor polisi kendaraan yang akan digunakan.</p>
                     </div>
                 </div>
 
-                <!-- Field Kontak (Dibagikan Pedagang & Ojek) -->
-                <div x-show="role === 'pedagang' || role === 'ojek'" x-transition class="bg-gray-50 p-4 rounded-md border border-gray-200 space-y-4" style="display: none;">
+                <!-- Field Kontak (Pedagang & Ojek) -->
+                <div x-show="role === 'pedagang' || role === 'ojek'" 
+                     x-transition:enter="transition ease-out duration-200"
+                     class="bg-gray-50 p-5 rounded-2xl border border-gray-200 space-y-4" style="display: none;">
                      <div>
-                        <label for="no_wa" class="block text-sm font-medium text-gray-700">Nomor WhatsApp</label>
-                        <div class="mt-1 flex rounded-md shadow-sm">
-                            <span class="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 sm:text-sm">
+                        <label for="no_wa" class="block text-sm font-medium text-gray-700 mb-1">Nomor WhatsApp</label>
+                        <div class="mt-1 flex rounded-xl shadow-sm">
+                            <span class="inline-flex items-center px-4 rounded-l-xl border border-r-0 border-gray-300 bg-gray-100 text-gray-500 font-bold text-sm">
                                 +62
                             </span>
-                            <input type="text" name="no_wa" id="input_no_wa" placeholder="81234567890"
+                            <input type="text" name="no_wa" id="input_no_wa" 
                                    :required="role === 'pedagang' || role === 'ojek'"
-                                   class="flex-1 min-w-0 block w-full px-3 py-2 rounded-none rounded-r-md focus:ring-blue-500 focus:border-blue-500 sm:text-sm border-gray-300">
+                                   class="flex-1 min-w-0 block w-full px-4 py-3 rounded-none rounded-r-xl border border-gray-300 focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                                   placeholder="81234567890">
                         </div>
-                        <p class="text-xs text-gray-500 mt-1">Nomor ini akan digunakan untuk notifikasi pesanan.</p>
+                        <p class="text-xs text-gray-500 mt-1">Nomor aktif untuk notifikasi pesanan.</p>
                     </div>
                 </div>
 
                 <div>
-                    <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
-                        Daftar Sekarang
+                    <button type="submit" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-lg text-sm font-bold text-white bg-gray-900 hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-all duration-300 transform hover:-translate-y-0.5">
+                        <i class="fas fa-paper-plane mr-2 mt-0.5"></i> Daftar Sekarang
                     </button>
                 </div>
             </form>
 
-            <div class="mt-6">
+            <div class="mt-8">
                 <div class="relative">
                     <div class="absolute inset-0 flex items-center">
-                        <div class="w-full border-t border-gray-300"></div>
+                        <div class="w-full border-t border-gray-200"></div>
                     </div>
                     <div class="relative flex justify-center text-sm">
-                        <span class="px-2 bg-white text-gray-500">
-                            Sudah punya akun?
-                        </span>
+                        <span class="px-2 bg-white text-gray-500 font-medium">Sudah punya akun?</span>
                     </div>
                 </div>
 
                 <div class="mt-6 text-center">
-                    <a href="<?php echo home_url('/login'); ?>" class="font-medium text-blue-600 hover:text-blue-500">
-                        Masuk disini
+                    <a href="<?php echo home_url('/login'); ?>" class="text-base font-bold text-orange-600 hover:text-orange-500 transition-colors">
+                        Masuk disini <i class="fas fa-arrow-right ml-1 text-sm"></i>
                     </a>
                 </div>
             </div>
         </div>
+        
+        <!-- Footer Kecil -->
+        <p class="mt-8 text-center text-xs text-gray-400">
+            &copy; <?php echo date('Y'); ?> <?php bloginfo('name'); ?>. Hak Cipta Dilindungi.
+        </p>
     </div>
 </div>
-
-<!-- Alpine.js untuk Interaktivitas (Pastikan diload) -->
-<script src="https://cdn.jsdelivr.net/gh/alpinejs/alpine@v2.x.x/dist/alpine.min.js" defer></script>
 
 <?php get_footer(); ?>
