@@ -1,7 +1,7 @@
 <?php
 /**
  * Template Name: Halaman Login Custom
- * Description: Login page with enhanced UI/UX for Merchants, Villages, and Buyers.
+ * Description: Login page with enhanced UI/UX for Merchants, Villages, Buyers, and Ojek.
  */
 
 // Redirect jika sudah login
@@ -11,6 +11,9 @@ if ( is_user_logged_in() ) {
         wp_redirect( home_url('/dashboard-desa') );
     } elseif ( in_array( 'pedagang', (array) $current_user->roles ) ) {
         wp_redirect( home_url('/dashboard-toko') );
+    } elseif ( in_array( 'ojek', (array) $current_user->roles ) ) {
+        // [BARU] Redirect untuk Ojek
+        wp_redirect( home_url('/dashboard-ojek') );
     } elseif ( in_array( 'administrator', (array) $current_user->roles ) ) {
         wp_redirect( admin_url() );
     } else {
@@ -47,6 +50,9 @@ if ( $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['dw_login_nonce']) && 
             wp_redirect( home_url('/dashboard-desa') );
         } elseif ( in_array( 'pedagang', (array) $current_user->roles ) ) {
             wp_redirect( home_url('/dashboard-toko') );
+        } elseif ( in_array( 'ojek', (array) $current_user->roles ) ) {
+            // [BARU] Redirect untuk Ojek
+            wp_redirect( home_url('/dashboard-ojek') );
         } elseif ( in_array( 'administrator', (array) $current_user->roles ) ) {
             wp_redirect( admin_url() );
         } else {
@@ -84,7 +90,7 @@ get_header();
                 Masuk ke Akun
             </h2>
             <p class="mt-2 text-sm text-gray-600">
-                Akses dashboard untuk Pedagang, Desa, atau Pembeli
+                Akses dashboard untuk Pedagang, Desa, Ojek, atau Pembeli
             </p>
         </div>
     </div>
@@ -164,7 +170,7 @@ get_header();
 
                 <div class="mt-6 grid grid-cols-1 gap-3">
                     <a href="<?php echo home_url('/register'); ?>" class="w-full inline-flex justify-center py-2.5 px-4 border border-gray-300 rounded-xl shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-orange-600 hover:border-orange-200 transition-all">
-                        <span class="sr-only">Daftar sebagai Pembeli/Pedagang</span>
+                        <span class="sr-only">Daftar sebagai Pembeli/Pedagang/Ojek</span>
                         <i class="fas fa-user-plus mr-2 mt-0.5"></i> Daftar Baru
                     </a>
                 </div>

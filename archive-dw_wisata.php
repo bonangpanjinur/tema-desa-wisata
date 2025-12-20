@@ -2,6 +2,7 @@
 /**
  * Template Name: Arsip Wisata Modern Clean
  * Description: Layout full-width dengan filter drawer/modal dan desain kartu estetik yang konsisten.
+ * * Update: Implementasi AJAX pada filter kategori (Pin Badge).
  */
 
 get_header();
@@ -113,14 +114,14 @@ if(empty($list_kategori)) $list_kategori = ['Alam', 'Budaya', 'Religi', 'Kuliner
     <div class="border-b border-gray-100 bg-white/50">
         <div class="container mx-auto px-4">
             <div class="flex items-center gap-2 overflow-x-auto py-3 no-scrollbar mask-gradient">
-                <a href="?kat=" class="shrink-0 px-4 py-1.5 rounded-full text-xs font-bold border transition-all duration-300 <?php echo $kategori == '' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400 hover:text-gray-800'; ?>">
+                <a href="?kat=" class="category-filter-link shrink-0 px-4 py-1.5 rounded-full text-xs font-bold border transition-all duration-300 <?php echo $kategori == '' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400 hover:text-gray-800'; ?>">
                     Semua
                 </a>
                 <?php foreach($list_kategori as $kat): 
                     $is_active = $kategori == $kat;
                 ?>
                 <a href="?kat=<?php echo urlencode($kat); ?>&q=<?php echo urlencode($pencarian); ?>" 
-                   class="shrink-0 px-4 py-1.5 rounded-full text-xs font-bold border transition-all duration-300 <?php echo $is_active ? 'bg-green-500 text-white border-green-500 shadow-md shadow-green-200' : 'bg-white text-gray-500 border-gray-200 hover:border-green-500 hover:text-green-600'; ?>">
+                   class="category-filter-link shrink-0 px-4 py-1.5 rounded-full text-xs font-bold border transition-all duration-300 <?php echo $is_active ? 'bg-green-500 text-white border-green-500 shadow-md shadow-green-200' : 'bg-white text-gray-500 border-gray-200 hover:border-green-500 hover:text-green-600'; ?>">
                     <?php echo esc_html($kat); ?>
                 </a>
                 <?php endforeach; ?>
@@ -129,7 +130,7 @@ if(empty($list_kategori)) $list_kategori = ['Alam', 'Budaya', 'Religi', 'Kuliner
     </div>
 
     <!-- === 3. CONTENT GRID === -->
-    <div class="container mx-auto px-4 py-8">
+    <div id="wisata-grid-container" class="container mx-auto px-4 py-8 transition-opacity duration-300">
         
         <!-- Stats & Active Filters -->
         <div class="flex flex-wrap items-center justify-between gap-4 mb-8">
@@ -159,12 +160,73 @@ if(empty($list_kategori)) $list_kategori = ['Alam', 'Budaya', 'Religi', 'Kuliner
         </div>
 
         <?php if ($wisata_list) : ?>
-        <!-- GRID LAYOUT -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            <?php foreach ($wisata_list as $w) : ?>
+        
+        <!-- GRID LAYOUT UTAMA (Product Style: 2 Kolom Mobile, 4 Kolom Desktop) -->
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-6">
+            <?php foreach ($wisata_list as $w) : 
+                $foto = !empty($w->foto_utama) ? $w->foto_utama : 'https://placehold.co/400x300?text=No+Image';
+                $link = site_url('wisata/' . $w->slug_wisata);
+            ?>
                 
-                <!-- PANGGIL PARENT DESIGN: Card Wisata -->
-                <?php get_template_part('template-parts/card', 'wisata', array('item' => $w)); ?>
+                <!-- CARD WISATA (STYLE PRODUK) -->
+                <a href="<?php echo esc_url($link); ?>" class="group bg-white border border-gray-100 rounded-xl overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300 relative flex flex-col">
+                    
+                    <!-- Image Area (Rasio 4:3) -->
+                    <div class="aspect-[4/3] relative overflow-hidden bg-gray-100">
+                        <img src="<?php echo esc_url($foto); ?>" alt="<?php echo esc_attr($w->nama_wisata); ?>" 
+                             class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
+                        
+                        <!-- Overlay Gradient -->
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60"></div>
+
+                        <!-- Lokasi Badge (Top Left) -->
+                        <div class="absolute top-2 left-2">
+                            <div class="bg-black/30 backdrop-blur-md border border-white/10 text-white text-[10px] px-2 py-1 rounded-md flex items-center gap-1">
+                                <i class="fas fa-map-marker-alt text-green-400"></i>
+                                <span class="truncate max-w-[80px]"><?php echo esc_html($w->nama_desa); ?></span>
+                            </div>
+                        </div>
+
+                        <!-- Rating Badge (Top Right) -->
+                        <?php if(!empty($w->rating_avg)): ?>
+                        <div class="absolute top-2 right-2">
+                            <div class="bg-white/90 backdrop-blur text-gray-800 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm">
+                                <i class="fas fa-star text-yellow-400 text-[9px]"></i> <?php echo number_format($w->rating_avg, 1); ?>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+
+                    <!-- Content Body -->
+                    <div class="p-3 flex flex-col flex-1">
+                        <!-- Kategori -->
+                        <div class="text-[10px] text-gray-400 mb-1 flex items-center gap-1 uppercase tracking-wide font-semibold">
+                            <span><?php echo esc_html($w->kategori); ?></span>
+                            <span>•</span>
+                            <span class="truncate"><?php echo esc_html($w->kecamatan); ?></span>
+                        </div>
+
+                        <!-- Title -->
+                        <h3 class="text-sm font-bold text-gray-800 line-clamp-2 leading-snug mb-2 group-hover:text-green-600 transition-colors min-h-[2.5em]">
+                            <?php echo esc_html($w->nama_wisata); ?>
+                        </h3>
+
+                        <!-- Price & Action -->
+                        <div class="mt-auto flex items-end justify-between pt-2 border-t border-gray-50">
+                            <div class="flex flex-col">
+                                <span class="text-[10px] text-gray-400">Tiket Masuk</span>
+                                <span class="text-sm font-bold text-orange-600">
+                                    <?php echo ($w->harga_tiket > 0) ? 'Rp ' . number_format($w->harga_tiket, 0, ',', '.') : 'Gratis'; ?>
+                                </span>
+                            </div>
+                            
+                            <!-- Action Button (Small Circle) -->
+                            <div class="w-7 h-7 rounded-full bg-green-50 text-green-600 flex items-center justify-center group-hover:bg-green-600 group-hover:text-white transition-all shadow-sm">
+                                <i class="fas fa-arrow-right text-[10px] transform group-hover:-rotate-45 transition-transform"></i>
+                            </div>
+                        </div>
+                    </div>
+                </a>
 
             <?php endforeach; ?>
         </div>
@@ -354,6 +416,48 @@ document.addEventListener('DOMContentLoaded', () => {
     if(openBtn) openBtn.addEventListener('click', openDrawer);
     if(closeBtn) closeBtn.addEventListener('click', closeDrawer);
     if(backdrop) backdrop.addEventListener('click', closeDrawer);
+
+    // --- AJAX CATEGORY FILTER (NEW) ---
+    const gridContainer = document.getElementById('wisata-grid-container');
+    const filterLinks = document.querySelectorAll('.category-filter-link');
+
+    filterLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const url = this.href;
+
+            // 1. Instant UI Update (Switch Active Class)
+            filterLinks.forEach(l => {
+                // Reset styling (inactive state)
+                l.className = 'category-filter-link shrink-0 px-4 py-1.5 rounded-full text-xs font-bold border transition-all duration-300 bg-white text-gray-500 border-gray-200 hover:border-green-500 hover:text-green-600';
+            });
+            // Set active styling for clicked link
+            this.className = 'category-filter-link shrink-0 px-4 py-1.5 rounded-full text-xs font-bold border transition-all duration-300 bg-green-500 text-white border-green-500 shadow-md shadow-green-200';
+
+            // 2. Fetch Content via AJAX
+            gridContainer.style.opacity = '0.4'; // Visual feedback loading
+            
+            fetch(url)
+                .then(response => response.text())
+                .then(html => {
+                    // Parse HTML response
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const newContent = doc.getElementById('wisata-grid-container');
+                    
+                    if (newContent) {
+                        gridContainer.innerHTML = newContent.innerHTML;
+                        // Update URL without reload
+                        window.history.pushState({}, '', url);
+                    }
+                    gridContainer.style.opacity = '1';
+                })
+                .catch(err => {
+                    console.error('Filter Error:', err);
+                    window.location.href = url; // Fallback to normal reload if ajax fails
+                });
+        });
+    });
 });
 </script>
 
