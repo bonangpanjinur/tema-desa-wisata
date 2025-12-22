@@ -94,63 +94,7 @@ function tema_dw_scripts() {
 add_action('wp_enqueue_scripts', 'tema_dw_scripts');
 
 /**
- * 3. Register CPT & Taxonomies
- * PENTING: Kita cek dulu apakah function sudah ada (dari plugin) agar tidak ERROR FATAL.
- */
-
-if (!function_exists('dw_register_cpts')) {
-    function tema_dw_register_cpts() {
-        // CPT Produk
-        register_post_type('dw_produk', array(
-            'labels' => array('name' => 'Produk Desa', 'singular_name' => 'Produk'),
-            'public' => true,
-            'has_archive' => true,
-            'supports' => array('title', 'editor', 'thumbnail', 'excerpt'),
-            'menu_icon' => 'dashicons-cart',
-            'rewrite' => array('slug' => 'produk'),
-        ));
-
-        // CPT Wisata
-        register_post_type('dw_wisata', array(
-            'labels' => array('name' => 'Paket Wisata', 'singular_name' => 'Wisata'),
-            'public' => true,
-            'has_archive' => true,
-            'supports' => array('title', 'editor', 'thumbnail', 'excerpt'),
-            'menu_icon' => 'dashicons-palmtree',
-            'rewrite' => array('slug' => 'wisata'),
-        ));
-
-        // CPT Transaksi
-        register_post_type('dw_transaksi', array(
-            'labels' => array('name' => 'Transaksi', 'singular_name' => 'Transaksi'),
-            'public' => false,
-            'show_ui' => true,
-            'supports' => array('title'),
-            'menu_icon' => 'dashicons-money-alt',
-        ));
-    }
-    add_action('init', 'tema_dw_register_cpts');
-}
-
-if (!function_exists('dw_register_taxonomies')) {
-    function tema_dw_register_taxonomies() {
-        register_taxonomy('kategori_produk', 'dw_produk', array(
-            'labels' => array('name' => 'Kategori Produk'),
-            'hierarchical' => true,
-            'rewrite' => array('slug' => 'kategori-produk'),
-        ));
-
-        register_taxonomy('kategori_wisata', 'dw_wisata', array(
-            'labels' => array('name' => 'Kategori Wisata'),
-            'hierarchical' => true,
-            'rewrite' => array('slug' => 'kategori-wisata'),
-        ));
-    }
-    add_action('init', 'tema_dw_register_taxonomies');
-}
-
-/**
- * 4. Helper Functions
+ * 3. Helper Functions
  */
 
 // Format Rupiah
@@ -198,7 +142,7 @@ function tema_dw_start_session() {
 add_action('init', 'tema_dw_start_session');
 
 /**
- * 5. AJAX Handler untuk Cart (DATABASE VERSION)
+ * 4. AJAX Handler untuk Cart (DATABASE VERSION)
  * Menggunakan tabel 'wp_dw_cart' sesuai skema di activation.php plugin.
  */
 add_action('wp_ajax_dw_add_to_cart', 'tema_dw_cart_handler');
