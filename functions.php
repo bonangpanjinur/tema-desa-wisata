@@ -155,6 +155,10 @@ if (!function_exists('dw_register_taxonomies')) {
 
 // Format Rupiah
 function tema_dw_format_rupiah($angka) {
+    // Cek apakah plugin punya fungsi format rupiah sendiri
+    if (function_exists('dw_format_rupiah')) {
+        return dw_format_rupiah($angka);
+    }
     return 'Rp ' . number_format($angka, 0, ',', '.');
 }
 
@@ -185,7 +189,7 @@ function tema_dw_disable_admin_bar() {
 }
 add_action('after_setup_theme', 'tema_dw_disable_admin_bar');
 
-// Session Start (untuk Simple Cart)
+// Session Start (Diperlukan untuk tracking guest user sebelum login)
 function tema_dw_start_session() {
     if (!session_id()) {
         session_start();
@@ -194,33 +198,103 @@ function tema_dw_start_session() {
 add_action('init', 'tema_dw_start_session');
 
 /**
- * 5. AJAX Handler untuk Cart (Contoh Basic)
+ * 5. AJAX Handler untuk Cart (DATABASE VERSION)
+ * Menggunakan tabel 'wp_dw_cart' sesuai skema di activation.php plugin.
  */
 add_action('wp_ajax_dw_add_to_cart', 'tema_dw_cart_handler');
 add_action('wp_ajax_nopriv_dw_add_to_cart', 'tema_dw_cart_handler');
 
 function tema_dw_cart_handler() {
-    // Validasi nonce di production!
+    global $wpdb; // Akses database WordPress
+
+    // Validasi nonce untuk keamanan (opsional, disarankan diaktifkan di production)
+    // if (!isset($_POST['security']) || !wp_verify_nonce($_POST['security'], 'dw_nonce')) {
+    //     wp_send_json_error(['message' => 'Security check failed']);
+    // }
+
     $product_id = isset($_POST['product_id']) ? intval($_POST['product_id']) : 0;
-    $qty = isset($_POST['qty']) ? intval($_POST['qty']) : 1;
+    $qty        = isset($_POST['qty']) ? intval($_POST['qty']) : 1;
+    $variasi_id = isset($_POST['variasi_id']) ? intval($_POST['variasi_id']) : 0;
 
     if (!$product_id) {
         wp_send_json_error(['message' => 'Produk tidak valid']);
     }
 
-    if (!isset($_SESSION['dw_cart'])) {
-        $_SESSION['dw_cart'] = [];
+    // Tentukan Tabel Cart (Sesuai activation.php plugin)
+    $table_name = $wpdb->prefix . 'dw_cart';
+
+    // Cek apakah tabel ada (untuk memastikan plugin aktif)
+    if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+        // Fallback ke Session jika plugin tidak aktif/tabel hilang
+        if (!isset($_SESSION['dw_cart'])) $_SESSION['dw_cart'] = [];
+        if (isset($_SESSION['dw_cart'][$product_id])) {
+            $_SESSION['dw_cart'][$product_id] += $qty;
+        } else {
+            $_SESSION['dw_cart'][$product_id] = $qty;
+        }
+        wp_send_json_success([
+            'message' => 'Berhasil (Session Mode)', 
+            'cart_count' => array_sum($_SESSION['dw_cart'])
+        ]);
+        return;
     }
 
-    if (isset($_SESSION['dw_cart'][$product_id])) {
-        $_SESSION['dw_cart'][$product_id] += $qty;
+    // Identifikasi User (Logged in vs Guest via Session ID)
+    $user_id = get_current_user_id(); // 0 jika guest
+    $session_id = session_id();
+
+    // Cek apakah produk sudah ada di cart user tersebut
+    // Sesuai skema: user_id (bigint), session_id (varchar), id_produk, qty
+    if ($user_id > 0) {
+        // Logic untuk User Login
+        $existing = $wpdb->get_row($wpdb->prepare(
+            "SELECT id, qty FROM $table_name WHERE user_id = %d AND id_produk = %d AND id_variasi = %d",
+            $user_id, $product_id, $variasi_id
+        ));
     } else {
-        $_SESSION['dw_cart'][$product_id] = $qty;
+        // Logic untuk Guest (pakai Session ID)
+        $existing = $wpdb->get_row($wpdb->prepare(
+            "SELECT id, qty FROM $table_name WHERE session_id = %s AND id_produk = %d AND id_variasi = %d",
+            $session_id, $product_id, $variasi_id
+        ));
+    }
+
+    if ($existing) {
+        // UPDATE: Tambahkan quantity
+        $new_qty = $existing->qty + $qty;
+        $wpdb->update(
+            $table_name,
+            array('qty' => $new_qty, 'updated_at' => current_time('mysql')),
+            array('id' => $existing->id),
+            array('%d', '%s'),
+            array('%d')
+        );
+    } else {
+        // INSERT: Buat baris baru
+        $wpdb->insert(
+            $table_name,
+            array(
+                'user_id' => ($user_id > 0) ? $user_id : null, // Sesuai schema: NULLABLE
+                'session_id' => $session_id,
+                'id_produk' => $product_id,
+                'id_variasi' => $variasi_id,
+                'qty' => $qty,
+                'created_at' => current_time('mysql')
+            ),
+            array('%d', '%s', '%d', '%d', '%d', '%s')
+        );
+    }
+
+    // Hitung Total Item di Cart untuk update UI badge
+    if ($user_id > 0) {
+        $total_items = $wpdb->get_var($wpdb->prepare("SELECT SUM(qty) FROM $table_name WHERE user_id = %d", $user_id));
+    } else {
+        $total_items = $wpdb->get_var($wpdb->prepare("SELECT SUM(qty) FROM $table_name WHERE session_id = %s", $session_id));
     }
 
     wp_send_json_success([
-        'message' => 'Berhasil ditambahkan', 
-        'cart_count' => array_sum($_SESSION['dw_cart'])
+        'message' => 'Berhasil ditambahkan ke Database', 
+        'cart_count' => (int) $total_items
     ]);
 }
 ?>
