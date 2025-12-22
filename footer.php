@@ -68,43 +68,43 @@
     <!-- MOBILE BOTTOM NAVIGATION BAR (App Like Experience) -->
     <!-- Fixed di bawah, hanya muncul di layar < 768px (md) -->
     <nav class="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-50 md:hidden pb-safe">
-        <div class="grid grid-cols-5 h-16 items-center">
+        <div class="grid grid-cols-5 h-[60px] items-end pb-1">
             
             <!-- 1. Beranda -->
-            <a href="<?php echo home_url(); ?>" class="flex flex-col items-center justify-center gap-1 h-full w-full <?php echo is_front_page() ? 'text-primary' : 'text-gray-400 hover:text-gray-600'; ?>">
-                <div class="relative">
-                    <i class="fas fa-home <?php echo is_front_page() ? 'text-xl' : 'text-lg'; ?> transition-all duration-200"></i>
+            <a href="<?php echo home_url(); ?>" class="flex flex-col items-center justify-center h-full w-full group <?php echo is_front_page() ? 'text-primary' : 'text-gray-400 hover:text-gray-600'; ?>">
+                <div class="mb-0.5 relative">
+                    <i class="fas fa-home text-lg transition-transform group-active:scale-90"></i>
                     <?php if(is_front_page()): ?>
-                        <span class="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-primary rounded-full"></span>
+                        <span class="absolute -top-1 -right-1 w-1.5 h-1.5 bg-primary rounded-full border border-white"></span>
                     <?php endif; ?>
                 </div>
-                <span class="text-[10px] font-medium">Beranda</span>
+                <span class="text-[10px] font-medium leading-none">Beranda</span>
             </a>
 
             <!-- 2. Wisata -->
-            <a href="<?php echo home_url('/wisata'); ?>" class="flex flex-col items-center justify-center gap-1 h-full w-full <?php echo is_post_type_archive('dw_wisata') || is_singular('dw_wisata') ? 'text-primary' : 'text-gray-400 hover:text-gray-600'; ?>">
-                <div class="relative">
-                    <i class="fas fa-map-marked-alt <?php echo is_post_type_archive('dw_wisata') ? 'text-xl' : 'text-lg'; ?> transition-all duration-200"></i>
+            <a href="<?php echo home_url('/wisata'); ?>" class="flex flex-col items-center justify-center h-full w-full group <?php echo is_post_type_archive('dw_wisata') || is_singular('dw_wisata') ? 'text-primary' : 'text-gray-400 hover:text-gray-600'; ?>">
+                <div class="mb-0.5">
+                    <i class="fas fa-map-marked-alt text-lg transition-transform group-active:scale-90"></i>
                 </div>
-                <span class="text-[10px] font-medium">Wisata</span>
+                <span class="text-[10px] font-medium leading-none">Wisata</span>
             </a>
 
-            <!-- 3. Produk (Tengah - Menonjol) -->
-            <div class="relative -top-5">
-                <a href="<?php echo home_url('/produk'); ?>" class="flex flex-col items-center justify-center w-14 h-14 bg-primary rounded-full shadow-lg shadow-primary/30 text-white transform hover:scale-105 transition-all duration-200 border-4 border-gray-50">
-                    <i class="fas fa-shopping-basket text-xl"></i>
+            <!-- 3. Produk (Tengah - Menonjol & Rapi) -->
+            <div class="relative h-full flex justify-center items-end">
+                <a href="<?php echo home_url('/produk'); ?>" class="absolute bottom-4 flex flex-col items-center justify-center group">
+                    <div class="w-12 h-12 bg-primary rounded-full shadow-lg shadow-primary/40 text-white flex items-center justify-center transform transition-transform group-active:scale-95 border-4 border-white box-content">
+                        <i class="fas fa-shopping-basket text-lg"></i>
+                    </div>
+                    <span class="text-[10px] font-medium mt-1 leading-none text-gray-500 <?php echo is_post_type_archive('dw_produk') ? 'text-primary font-bold' : ''; ?>">Produk</span>
                 </a>
-                <div class="text-center mt-1">
-                    <span class="text-[10px] font-medium <?php echo is_post_type_archive('dw_produk') ? 'text-primary' : 'text-gray-400'; ?>">Produk</span>
-                </div>
             </div>
 
             <!-- 4. Favorit -->
-            <a href="<?php echo home_url('/favorit'); ?>" class="flex flex-col items-center justify-center gap-1 h-full w-full <?php echo is_page('favorit') ? 'text-primary' : 'text-gray-400 hover:text-gray-600'; ?>">
-                <div class="relative">
-                    <i class="fas fa-heart <?php echo is_page('favorit') ? 'text-xl' : 'text-lg'; ?> transition-all duration-200"></i>
+            <a href="<?php echo home_url('/favorit'); ?>" class="flex flex-col items-center justify-center h-full w-full group <?php echo is_page('favorit') ? 'text-primary' : 'text-gray-400 hover:text-gray-600'; ?>">
+                <div class="mb-0.5">
+                    <i class="fas fa-heart text-lg transition-transform group-active:scale-90"></i>
                 </div>
-                <span class="text-[10px] font-medium">Favorit</span>
+                <span class="text-[10px] font-medium leading-none">Favorit</span>
             </a>
 
             <!-- 5. Akun -->
@@ -112,11 +112,11 @@
             $akun_link = is_user_logged_in() ? home_url('/akun-saya') : home_url('/login');
             $is_akun_active = is_page('akun-saya') || is_page('login') || is_page('dashboard-desa') || is_page('dashboard-toko');
             ?>
-            <a href="<?php echo $akun_link; ?>" class="flex flex-col items-center justify-center gap-1 h-full w-full <?php echo $is_akun_active ? 'text-primary' : 'text-gray-400 hover:text-gray-600'; ?>">
-                <div class="relative">
-                    <i class="fas fa-user <?php echo $is_akun_active ? 'text-xl' : 'text-lg'; ?> transition-all duration-200"></i>
+            <a href="<?php echo $akun_link; ?>" class="flex flex-col items-center justify-center h-full w-full group <?php echo $is_akun_active ? 'text-primary' : 'text-gray-400 hover:text-gray-600'; ?>">
+                <div class="mb-0.5">
+                    <i class="fas fa-user text-lg transition-transform group-active:scale-90"></i>
                 </div>
-                <span class="text-[10px] font-medium">Akun</span>
+                <span class="text-[10px] font-medium leading-none">Akun</span>
             </a>
 
         </div>

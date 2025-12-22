@@ -73,8 +73,8 @@
                 }
                 $cart_count = intval($cart_count);
                 ?>
-                <a href="<?php echo home_url('/cart'); ?>" class="relative group p-2 rounded-full hover:bg-gray-100 transition-colors" aria-label="Keranjang Belanja">
-                    <i class="fas fa-shopping-bag text-xl text-gray-600 group-hover:text-primary transition-colors"></i>
+                <a href="<?php echo home_url('/cart'); ?>" class="relative group p-2 rounded-full hover:bg-green-50 transition-colors" aria-label="Keranjang Belanja">
+                    <i class="fas fa-shopping-bag text-xl text-primary transition-colors"></i>
                     <?php if($cart_count > 0): ?>
                         <span class="dw-cart-count absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center border-2 border-white transform scale-100 transition-transform">
                             <?php echo $cart_count > 9 ? '9+' : $cart_count; ?>

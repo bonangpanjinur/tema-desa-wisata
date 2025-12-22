@@ -140,30 +140,19 @@
     <!-- 2. MOBILE MENU NAVIGATION -->
     <section class="md:hidden py-6 px-4">
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-            <div class="grid grid-cols-4 gap-2">
+            <div class="grid grid-cols-3 gap-2">
                 <a href="<?php echo home_url('/wisata'); ?>" class="flex flex-col items-center gap-2">
                     <div class="w-12 h-12 rounded-full bg-green-50 text-green-600 flex items-center justify-center text-lg"><i class="fas fa-map-marked-alt"></i></div>
                     <span class="text-xs font-medium text-gray-600">Wisata</span>
                 </a>
                 <a href="<?php echo home_url('/produk'); ?>" class="flex flex-col items-center gap-2">
                     <div class="w-12 h-12 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center text-lg"><i class="fas fa-shopping-basket"></i></div>
-                    <span class="text-xs font-medium text-gray-600">Jajan</span>
+                    <span class="text-xs font-medium text-gray-600">Produk</span>
                 </a>
                 <a href="<?php echo home_url('/page-ojek'); ?>" class="flex flex-col items-center gap-2">
                     <div class="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-lg"><i class="fas fa-motorcycle"></i></div>
                     <span class="text-xs font-medium text-gray-600">Ojek</span>
                 </a>
-                <?php if(is_user_logged_in()): ?>
-                <a href="<?php echo home_url('/akun-saya'); ?>" class="flex flex-col items-center gap-2">
-                    <div class="w-12 h-12 rounded-full bg-gray-50 text-gray-600 flex items-center justify-center text-lg"><i class="fas fa-user"></i></div>
-                    <span class="text-xs font-medium text-gray-600">Akun</span>
-                </a>
-                <?php else: ?>
-                <a href="<?php echo home_url('/login'); ?>" class="flex flex-col items-center gap-2">
-                    <div class="w-12 h-12 rounded-full bg-gray-50 text-gray-600 flex items-center justify-center text-lg"><i class="fas fa-sign-in-alt"></i></div>
-                    <span class="text-xs font-medium text-gray-600">Masuk</span>
-                </a>
-                <?php endif; ?>
             </div>
         </div>
     </section>
@@ -294,7 +283,8 @@
     </section>
 
     <!-- 6. FLOATING UP BUTTON -->
-    <button id="scrollToTopBtn" class="fixed bottom-6 right-6 md:bottom-10 md:right-10 w-12 h-12 rounded-full bg-primary hover:bg-primaryDark text-white shadow-lg transition-all duration-300 opacity-0 invisible translate-y-4 z-50 flex items-center justify-center group" aria-label="Kembali ke atas">
+    <!-- Updated: Hidden on Mobile (md:flex) -->
+    <button id="scrollToTopBtn" class="fixed bottom-10 right-10 w-12 h-12 rounded-full bg-primary hover:bg-primaryDark text-white shadow-lg transition-all duration-300 opacity-0 invisible translate-y-4 z-50 hidden md:flex items-center justify-center group" aria-label="Kembali ke atas">
         <i class="fas fa-arrow-up text-lg group-hover:-translate-y-1 transition-transform"></i>
     </button>
 
