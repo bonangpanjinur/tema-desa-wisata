@@ -1,6 +1,7 @@
 <?php
 /**
  * Functions and definitions
+ * Menggunakan prefix 'tema_dw_' untuk menghindari konflik dengan plugin 'desa-wisata-core'
  */
 
 if (!defined('ABSPATH')) {
@@ -8,9 +9,9 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * 1. Theme Support
+ * 1. Theme Support & Setup
  */
-function dw_theme_support() {
+function tema_dw_setup() {
     // Menambahkan dukungan title tag
     add_theme_support('title-tag');
 
@@ -19,253 +20,207 @@ function dw_theme_support() {
 
     // Menambahkan dukungan custom logo
     add_theme_support('custom-logo', array(
-        'height'      => 50,
-        'width'       => 150,
+        'height'      => 60,
+        'width'       => 180,
         'flex-height' => true,
         'flex-width'  => true,
     ));
+
+    // HTML5 support
+    add_theme_support('html5', array(
+        'search-form',
+        'comment-form',
+        'comment-list',
+        'gallery',
+        'caption',
+    ));
 }
-add_action('after_setup_theme', 'dw_theme_support');
+add_action('after_setup_theme', 'tema_dw_setup');
 
 /**
- * 2. Enqueue Scripts & Styles
+ * 2. Enqueue Scripts & Styles (Load Tailwind)
  */
-function dw_enqueue_scripts() {
-    // 1. Load Tailwind CSS via CDN (Development Mode)
-    // Untuk production disarankan menggunakan build process, tapi ini cara tercepat agar langsung jalan.
+function tema_dw_scripts() {
+    // Load Tailwind CSS via CDN (Versi Production harusnya di-build, tapi ini agar langsung jalan)
     wp_enqueue_script('tailwindcss', 'https://cdn.tailwindcss.com', array(), '3.4.0', false);
     
-    // Konfigurasi Tailwind untuk warna custom (opsional, disesuaikan dengan tema desa)
+    // Konfigurasi Tailwind Custom (Warna Desa)
     wp_add_inline_script('tailwindcss', "
         tailwind.config = {
           theme: {
             extend: {
               colors: {
-                primary: '#16a34a', // green-600
-                secondary: '#ca8a04', // yellow-600
-                dark: '#1f2937', // gray-800
+                primary: '#16a34a', // Hijau desa (green-600)
+                primaryDark: '#15803d', // Hijau tua (green-700)
+                secondary: '#ca8a04', // Kuning emas (yellow-600)
+                accent: '#0f172a', // Biru gelap (slate-900)
+                surface: '#f8fafc', // Background terang (slate-50)
+              },
+              fontFamily: {
+                sans: ['Inter', 'sans-serif'],
               }
             }
           }
         }
     ");
 
-    // Load Main CSS Lama (Saya komen agar full Tailwind, aktifkan jika ada style custom spesifik)
-    // wp_enqueue_style('dw-main-style', get_template_directory_uri() . '/assets/css/main.css', array(), '1.0.0');
-    
-    // Style.css bawaan WP (biarkan untuk metadata, tapi isinya mungkin tidak lagi berpengaruh banyak pada visual)
-    wp_enqueue_style('dw-style', get_stylesheet_uri());
+    // Load Google Fonts (Inter)
+    wp_enqueue_style('google-fonts', 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap', array(), null);
 
-    // Font Awesome (Opsional, jika dipakai di desain lama)
-    wp_enqueue_style('font-awesome', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+    // Font Awesome Free
+    wp_enqueue_style('font-awesome', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css', array(), '6.4.0');
 
-    // Load JS
-    // jQuery (WordPress built-in)
-    wp_enqueue_script('jquery');
+    // Style.css bawaan (hanya untuk metadata, visual utama via Tailwind)
+    wp_enqueue_style('tema-dw-style', get_stylesheet_uri());
 
     // Main JS Custom
-    wp_enqueue_script('dw-main-js', get_template_directory_uri() . '/assets/js/main.js', array('jquery'), '1.0.0', true);
+    wp_enqueue_script('tema-dw-main', get_template_directory_uri() . '/assets/js/main.js', array('jquery'), '1.0.1', true);
 
-    // Localize Script untuk AJAX URL
-    wp_localize_script('dw-main-js', 'dw_ajax', array(
+    // Localize Script untuk AJAX (Penting untuk Cart/Filter)
+    wp_localize_script('tema-dw-main', 'dw_ajax', array(
         'ajax_url' => admin_url('admin-ajax.php'),
-        'nonce'    => wp_create_nonce('dw_nonce') // Security
+        'nonce'    => wp_create_nonce('dw_nonce')
     ));
 
     // Script Khusus Halaman
     if (is_post_type_archive('dw_produk') || is_tax('kategori_produk')) {
-         wp_enqueue_script('dw-archive-filter', get_template_directory_uri() . '/assets/js/archive-filter.js', array('jquery'), '1.0.0', true);
+         wp_enqueue_script('tema-dw-filter', get_template_directory_uri() . '/assets/js/archive-filter.js', array('jquery'), '1.0.0', true);
     }
     
-    // Script Cart/Checkout
     if (is_page_template('page-cart.php') || is_page_template('page-checkout.php')) {
-        wp_enqueue_script('dw-checkout', get_template_directory_uri() . '/assets/js/dw-checkout.js', array('jquery'), '1.0.0', true);
+        wp_enqueue_script('tema-dw-checkout', get_template_directory_uri() . '/assets/js/dw-checkout.js', array('jquery'), '1.0.0', true);
     }
 }
-add_action('wp_enqueue_scripts', 'dw_enqueue_scripts');
-
-
-/**
- * 3. Register Custom Post Types (CPT)
- * - Produk Desa (dw_produk)
- * - Paket Wisata (dw_wisata)
- * - Transaksi (dw_transaksi)
- */
-function dw_register_cpts() {
-    
-    // A. Produk Desa
-    register_post_type('dw_produk', array(
-        'labels' => array(
-            'name' => 'Produk Desa',
-            'singular_name' => 'Produk',
-            'add_new' => 'Tambah Produk',
-            'add_new_item' => 'Tambah Produk Baru',
-            'edit_item' => 'Edit Produk',
-        ),
-        'public' => true,
-        'has_archive' => true,
-        'supports' => array('title', 'editor', 'thumbnail', 'excerpt'),
-        'menu_icon' => 'dashicons-cart',
-        'rewrite' => array('slug' => 'produk'),
-    ));
-
-    // B. Paket Wisata
-    register_post_type('dw_wisata', array(
-        'labels' => array(
-            'name' => 'Paket Wisata',
-            'singular_name' => 'Wisata',
-            'add_new' => 'Tambah Wisata',
-            'edit_item' => 'Edit Wisata',
-        ),
-        'public' => true,
-        'has_archive' => true,
-        'supports' => array('title', 'editor', 'thumbnail', 'excerpt'),
-        'menu_icon' => 'dashicons-palmtree',
-        'rewrite' => array('slug' => 'wisata'),
-    ));
-
-    // C. Transaksi
-    register_post_type('dw_transaksi', array(
-        'labels' => array(
-            'name' => 'Transaksi',
-            'singular_name' => 'Transaksi',
-        ),
-        'public' => false, // Tidak bisa diakses publik via URL langsung kecuali admin/code
-        'show_ui' => true,
-        'supports' => array('title'), // Title bisa diisi No Invoice
-        'menu_icon' => 'dashicons-money-alt',
-    ));
-}
-add_action('init', 'dw_register_cpts');
+add_action('wp_enqueue_scripts', 'tema_dw_scripts');
 
 /**
- * 4. Register Taxonomies (Kategori)
+ * 3. Register CPT & Taxonomies
+ * PENTING: Kita cek dulu apakah function sudah ada (dari plugin) agar tidak ERROR FATAL.
  */
-function dw_register_taxonomies() {
-    // Kategori Produk
-    register_taxonomy('kategori_produk', 'dw_produk', array(
-        'labels' => array(
-            'name' => 'Kategori Produk',
-            'singular_name' => 'Kategori',
-        ),
-        'hierarchical' => true,
-        'show_admin_column' => true,
-        'rewrite' => array('slug' => 'kategori-produk'),
-    ));
 
-    // Kategori Wisata
-    register_taxonomy('kategori_wisata', 'dw_wisata', array(
-        'labels' => array(
-            'name' => 'Kategori Wisata',
-            'singular_name' => 'Kategori',
-        ),
-        'hierarchical' => true,
-        'show_admin_column' => true,
-        'rewrite' => array('slug' => 'kategori-wisata'),
-    ));
-}
-add_action('init', 'dw_register_taxonomies');
+if (!function_exists('dw_register_cpts')) {
+    function tema_dw_register_cpts() {
+        // CPT Produk
+        register_post_type('dw_produk', array(
+            'labels' => array('name' => 'Produk Desa', 'singular_name' => 'Produk'),
+            'public' => true,
+            'has_archive' => true,
+            'supports' => array('title', 'editor', 'thumbnail', 'excerpt'),
+            'menu_icon' => 'dashicons-cart',
+            'rewrite' => array('slug' => 'produk'),
+        ));
 
-/**
- * 5. Custom Roles (Untuk Multi-Vendor / Dashboard User)
- */
-function dw_add_roles() {
-    // Role: Pengelola Desa (Bisa posting Wisata & Produk Umum)
-    add_role('pengelola_desa', 'Pengelola Desa', array(
-        'read' => true,
-        'upload_files' => true,
-    ));
+        // CPT Wisata
+        register_post_type('dw_wisata', array(
+            'labels' => array('name' => 'Paket Wisata', 'singular_name' => 'Wisata'),
+            'public' => true,
+            'has_archive' => true,
+            'supports' => array('title', 'editor', 'thumbnail', 'excerpt'),
+            'menu_icon' => 'dashicons-palmtree',
+            'rewrite' => array('slug' => 'wisata'),
+        ));
 
-    // Role: Pedagang (Bisa posting Produk saja)
-    add_role('pedagang', 'Pedagang', array(
-        'read' => true,
-        'upload_files' => true,
-    ));
-
-    // Role: Ojek Wisata (Bisa terima orderan ojek - logic nanti)
-    add_role('ojek_wisata', 'Ojek Wisata', array(
-        'read' => true,
-    ));
-    
-    // Role: Wisatawan (Customer biasa)
-    // Pakai role 'subscriber' bawaan WP saja atau buat baru
-    add_role('wisatawan', 'Wisatawan', array(
-        'read' => true,
-    ));
-}
-add_action('init', 'dw_add_roles');
-
-/**
- * 6. Start Session (Untuk Cart sederhana)
- */
-function dw_start_session() {
-    if (!session_id()) {
-        session_start();
+        // CPT Transaksi
+        register_post_type('dw_transaksi', array(
+            'labels' => array('name' => 'Transaksi', 'singular_name' => 'Transaksi'),
+            'public' => false,
+            'show_ui' => true,
+            'supports' => array('title'),
+            'menu_icon' => 'dashicons-money-alt',
+        ));
     }
+    add_action('init', 'tema_dw_register_cpts');
 }
-add_action('init', 'dw_start_session');
 
-// Helper function: Format Rupiah
-function format_rupiah($angka) {
+if (!function_exists('dw_register_taxonomies')) {
+    function tema_dw_register_taxonomies() {
+        register_taxonomy('kategori_produk', 'dw_produk', array(
+            'labels' => array('name' => 'Kategori Produk'),
+            'hierarchical' => true,
+            'rewrite' => array('slug' => 'kategori-produk'),
+        ));
+
+        register_taxonomy('kategori_wisata', 'dw_wisata', array(
+            'labels' => array('name' => 'Kategori Wisata'),
+            'hierarchical' => true,
+            'rewrite' => array('slug' => 'kategori-wisata'),
+        ));
+    }
+    add_action('init', 'tema_dw_register_taxonomies');
+}
+
+/**
+ * 4. Helper Functions
+ */
+
+// Format Rupiah
+function tema_dw_format_rupiah($angka) {
     return 'Rp ' . number_format($angka, 0, ',', '.');
 }
 
-// Redirect setelah login berdasarkan role
-function dw_login_redirect($url, $request, $user) {
+// Redirect Login
+function tema_dw_login_redirect($url, $request, $user) {
     if ($user && is_object($user) && is_a($user, 'WP_User')) {
         if (in_array('administrator', $user->roles)) {
             return admin_url();
         } elseif (in_array('pengelola_desa', $user->roles)) {
-            return home_url('/dashboard-desa'); // Page Template Dashboard Desa
+            return home_url('/dashboard-desa');
         } elseif (in_array('pedagang', $user->roles)) {
-            return home_url('/dashboard-toko'); // Page Template Dashboard Toko
+            return home_url('/dashboard-toko');
         } elseif (in_array('ojek_wisata', $user->roles)) {
-            return home_url('/dashboard-ojek'); // Page Template Dashboard Ojek
+            return home_url('/dashboard-ojek');
         } else {
-            return home_url('/akun-saya'); // Page Template Akun Saya (Wisatawan)
+            return home_url('/akun-saya');
         }
     }
     return $url;
 }
-add_filter('login_redirect', 'dw_login_redirect', 10, 3);
+add_filter('login_redirect', 'tema_dw_login_redirect', 10, 3);
 
-// Sembunyikan Admin Bar untuk non-admin
-function dw_disable_admin_bar() {
-    if (!current_user_can('administrator')) {
+// Sembunyikan Admin Bar untuk user biasa
+function tema_dw_disable_admin_bar() {
+    if (!current_user_can('edit_posts')) {
         show_admin_bar(false);
     }
 }
-add_action('after_setup_theme', 'dw_disable_admin_bar');
+add_action('after_setup_theme', 'tema_dw_disable_admin_bar');
 
-// AJAX Handlers (Contoh Placeholder untuk Cart)
-add_action('wp_ajax_dw_add_to_cart', 'dw_add_to_cart_handler');
-add_action('wp_ajax_nopriv_dw_add_to_cart', 'dw_add_to_cart_handler');
+// Session Start (untuk Simple Cart)
+function tema_dw_start_session() {
+    if (!session_id()) {
+        session_start();
+    }
+}
+add_action('init', 'tema_dw_start_session');
 
-function dw_add_to_cart_handler() {
-    // Logic cart sederhana masuk session
-    // ... (Implementasi detail ada di file ajax-cart.js & handler ini)
-    
-    $product_id = intval($_POST['product_id']);
-    $qty = intval($_POST['qty']);
+/**
+ * 5. AJAX Handler untuk Cart (Contoh Basic)
+ */
+add_action('wp_ajax_dw_add_to_cart', 'tema_dw_cart_handler');
+add_action('wp_ajax_nopriv_dw_add_to_cart', 'tema_dw_cart_handler');
+
+function tema_dw_cart_handler() {
+    // Validasi nonce di production!
+    $product_id = isset($_POST['product_id']) ? intval($_POST['product_id']) : 0;
+    $qty = isset($_POST['qty']) ? intval($_POST['qty']) : 1;
 
     if (!$product_id) {
-        wp_send_json_error(array('message' => 'Produk tidak valid'));
+        wp_send_json_error(['message' => 'Produk tidak valid']);
     }
 
-    // Cek session cart
     if (!isset($_SESSION['dw_cart'])) {
-        $_SESSION['dw_cart'] = array();
+        $_SESSION['dw_cart'] = [];
     }
 
-    // Add or Update
     if (isset($_SESSION['dw_cart'][$product_id])) {
         $_SESSION['dw_cart'][$product_id] += $qty;
     } else {
         $_SESSION['dw_cart'][$product_id] = $qty;
     }
 
-    wp_send_json_success(array(
-        'message' => 'Produk masuk keranjang', 
-        'count' => count($_SESSION['dw_cart'])
-    ));
+    wp_send_json_success([
+        'message' => 'Berhasil ditambahkan', 
+        'cart_count' => array_sum($_SESSION['dw_cart'])
+    ]);
 }
+?>
