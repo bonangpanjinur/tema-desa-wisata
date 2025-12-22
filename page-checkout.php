@@ -1,306 +1,280 @@
 <?php
 /**
- * Template Name: Halaman Checkout
- * Description: Form checkout dengan logika split-order otomatis ke database (Multi-Vendor support).
+ * Template Name: Halaman Checkout (Promo & Payment Redirect)
+ * Description: Form checkout dengan fitur kode promo dan redirect ke halaman pembayaran.
  */
 
-if ( ! session_id() ) {
-    session_start();
-}
+if (!session_id()) session_start();
 
-// 1. Redirect jika keranjang kosong
-if ( empty( $_SESSION['dw_cart'] ) || ! is_array( $_SESSION['dw_cart'] ) ) {
-    wp_redirect( home_url( '/cart' ) );
+// 1. CEK LOGIN (Wajib)
+if (!is_user_logged_in()) {
+    $redirect = urlencode(get_permalink());
+    wp_redirect(home_url('/login?redirect_to=' . $redirect));
     exit;
 }
 
-// 2. Redirect jika belum login
-if ( ! is_user_logged_in() ) {
-    wp_redirect( home_url( '/login?redirect_to=' . urlencode( home_url( '/checkout' ) ) ) );
+global $wpdb;
+$user_id = get_current_user_id();
+$current_user = wp_get_current_user();
+
+// 2. CEK CART (Harus ada isinya)
+$table_cart = $wpdb->prefix . 'dw_cart';
+$cart_check = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table_cart WHERE user_id = %d", $user_id));
+
+if (!$cart_check || $cart_check == 0) {
+    wp_redirect(home_url('/keranjang'));
     exit;
 }
 
-$user_id       = get_current_user_id();
-$current_user  = wp_get_current_user();
-$error_message = '';
-
-// --- PROSES SUBMIT CHECKOUT ---
-if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset( $_POST['dw_place_order'] ) ) {
+// --- PROSES ORDER (POST REQUEST) ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dw_place_order'])) {
     
-    // Cek Nonce
-    if ( ! isset( $_POST['dw_checkout_nonce'] ) || ! wp_verify_nonce( $_POST['dw_checkout_nonce'], 'dw_checkout_action' ) ) {
-        $error_message = 'Validasi keamanan gagal. Silakan muat ulang halaman.';
-    } else {
-        global $wpdb;
+    // Verifikasi Nonce
+    if (!isset($_POST['dw_checkout_nonce']) || !wp_verify_nonce($_POST['dw_checkout_nonce'], 'dw_checkout_action')) {
+        die('Security check failed');
+    }
 
-        // Definisi Nama Tabel (Sesuai activation.php)
-        $tbl_transaksi = $wpdb->prefix . 'dw_transaksi';
-        $tbl_sub       = $wpdb->prefix . 'dw_transaksi_sub';
+    // A. Ambil Data Cart Lengkap
+    $sql = $wpdb->prepare(
+        "SELECT c.*, 
+                p.nama_produk, p.harga, p.berat_gram, 
+                t.id as toko_id, t.nama_toko
+         FROM $table_cart c
+         JOIN {$wpdb->prefix}dw_produk p ON c.id_produk = p.id
+         JOIN {$wpdb->prefix}dw_pedagang t ON p.id_pedagang = t.id
+         WHERE c.user_id = %d",
+        $user_id
+    );
+    $cart_items = $wpdb->get_results($sql);
+
+    if ($cart_items) {
+        // B. Generate Kode Transaksi Utama (TRX-TIMESTAMP-USERID)
+        $kode_unik = 'TRX-' . date('ymdHis') . '-' . $user_id;
+        $total_transaksi = 0;
         
-        // Deteksi nama tabel items (fallback compatibility)
-        $tbl_detail = $wpdb->prefix . 'dw_transaksi_items'; 
-        if ( $wpdb->get_var( "SHOW TABLES LIKE '{$wpdb->prefix}dw_detail_transaksi'" ) === $wpdb->prefix . 'dw_detail_transaksi' ) {
-            $tbl_detail = $wpdb->prefix . 'dw_detail_transaksi';
+        // Data Input User
+        $nama_penerima = sanitize_text_field($_POST['nama_penerima']);
+        $no_hp         = sanitize_text_field($_POST['no_hp']);
+        $alamat        = sanitize_textarea_field($_POST['alamat_lengkap']);
+        $metode_bayar  = sanitize_text_field($_POST['payment_method']); 
+        $kode_promo    = sanitize_text_field($_POST['kode_promo']);
+
+        // Logika Promo Sederhana (Contoh)
+        $diskon_ongkir = ($kode_promo === 'DISKONONGKIR') ? true : false;
+
+        // C. Insert Master Transaksi (wp_dw_transaksi)
+        $wpdb->insert(
+            $wpdb->prefix . 'dw_transaksi',
+            [
+                'kode_unik' => $kode_unik,
+                'id_pembeli' => $user_id,
+                'total_transaksi' => 0, // Update nanti setelah hitung subtotal
+                'nama_penerima' => $nama_penerima,
+                'no_hp' => $no_hp,
+                'alamat_lengkap' => $alamat,
+                'status_transaksi' => 'menunggu_pembayaran',
+                'metode_pembayaran' => $metode_bayar,
+                'catatan_pembeli' => $kode_promo ? 'Promo: ' . $kode_promo : '',
+                'created_at' => current_time('mysql')
+            ]
+        );
+        $transaksi_id = $wpdb->insert_id;
+
+        // D. Grouping & Split Order (wp_dw_transaksi_sub)
+        $grouped = [];
+        foreach ($cart_items as $item) {
+            $grouped[$item->toko_id]['items'][] = $item;
+            $grouped[$item->toko_id]['nama_toko'] = $item->nama_toko;
         }
 
-        // 1. Grouping Item berdasarkan Seller (Multi-Vendor Logic)
-        $grouped_cart = [];
-        $grand_total  = 0;
-        
-        $tbl_prod = $wpdb->prefix . 'dw_produk';
-        $tbl_wis  = $wpdb->prefix . 'dw_wisata';
-
-        foreach ( $_SESSION['dw_cart'] as $item ) {
-            $pid      = intval( $item['product_id'] );
-            $qty      = intval( $item['quantity'] );
-            $price    = floatval( $item['price'] );
-            $subtotal = $price * $qty;
-            $grand_total += $subtotal;
+        foreach ($grouped as $toko_id => $group) {
+            $sub_total = 0;
+            $ongkir = $diskon_ongkir ? 0 : 15000; // Flat rate sementara
             
-            // Cari ID Pedagang pemilik item ini
-            $id_pedagang_owner = 0; // 0 = Milik Desa/Admin (Default untuk Wisata)
-            
-            // Cek di tabel Produk dulu
-            $cek_prod = $wpdb->get_row( $wpdb->prepare( "SELECT id_pedagang FROM $tbl_prod WHERE id = %d", $pid ) );
-            
-            if ( $cek_prod && isset( $cek_prod->id_pedagang ) ) {
-                $id_pedagang_owner = intval( $cek_prod->id_pedagang );
-            } 
-            // Jika tidak ada di produk, asumsi ini Tiket Wisata (Milik Desa -> ID 0)
-            
-            // Masukkan ke array group
-            $grouped_cart[ $id_pedagang_owner ]['items'][] = $item;
-            
-            if ( ! isset( $grouped_cart[ $id_pedagang_owner ]['total'] ) ) {
-                $grouped_cart[ $id_pedagang_owner ]['total'] = 0;
+            // Hitung Subtotal Toko
+            foreach ($group['items'] as $item) {
+                $sub_total += ($item->harga * $item->qty);
             }
-            $grouped_cart[ $id_pedagang_owner ]['total'] += $subtotal;
-        }
+            $total_toko = $sub_total + $ongkir;
+            $total_transaksi += $total_toko;
 
-        // 2. Insert Parent Transaksi
-        $kode_unik      = 'TRX-' . strtoupper( uniqid() ) . rand( 10, 99 ); // Tambah rand agar lebih unik
-        $alamat_lengkap = sanitize_textarea_field( $_POST['alamat_lengkap'] );
-        $kota           = sanitize_text_field( $_POST['kota'] );
-        $kodepos        = sanitize_text_field( $_POST['kodepos'] );
-        
-        $full_address   = "$alamat_lengkap, $kota, $kodepos";
+            // Insert Sub Transaksi
+            $wpdb->insert(
+                $wpdb->prefix . 'dw_transaksi_sub',
+                [
+                    'id_transaksi' => $transaksi_id,
+                    'id_pedagang' => $toko_id,
+                    'nama_toko' => $group['nama_toko'],
+                    'sub_total' => $sub_total,
+                    'ongkir' => $ongkir,
+                    'total_pesanan_toko' => $total_toko,
+                    'status_pesanan' => 'menunggu_konfirmasi',
+                    'metode_pengiriman' => 'Reguler'
+                ]
+            );
+            $sub_id = $wpdb->insert_id;
 
-        $insert_parent = $wpdb->insert( $tbl_transaksi, [
-            'id_user_pembeli'   => $user_id,
-            'kode_transaksi'    => $kode_unik,
-            'total_belanja'     => $grand_total,
-            'status_pembayaran' => 'menunggu_pembayaran',
-            'detail_pengiriman' => $full_address,
-            'metode_pembayaran' => sanitize_text_field( $_POST['payment_method'] ),
-            'no_telepon'        => sanitize_text_field( $_POST['no_telepon'] ),
-            'catatan'           => sanitize_textarea_field( $_POST['catatan'] ),
-            'created_at'        => current_time( 'mysql' )
-        ] );
-
-        if ( $insert_parent ) {
-            $parent_id = $wpdb->insert_id;
-
-            // 3. Loop Group untuk Insert Sub Transaksi & Detail Items
-            foreach ( $grouped_cart as $id_pedagang => $group_data ) {
+            // Insert Items (wp_dw_transaksi_items)
+            foreach ($group['items'] as $item) {
+                $wpdb->insert(
+                    $wpdb->prefix . 'dw_transaksi_items',
+                    [
+                        'id_sub_transaksi' => $sub_id,
+                        'id_produk' => $item->id_produk,
+                        'nama_produk' => $item->nama_produk,
+                        'harga_satuan' => $item->harga,
+                        'jumlah' => $item->qty,
+                        'total_harga' => ($item->harga * $item->qty)
+                    ]
+                );
                 
-                // Insert Sub Transaksi (Per Toko)
-                $wpdb->insert( $tbl_sub, [
-                    'id_transaksi'       => $parent_id,
-                    'id_pedagang'        => $id_pedagang,
-                    'total_pesanan_toko' => $group_data['total'],
-                    'status_pesanan'     => 'menunggu_pembayaran', // Samakan status awal dengan parent
-                    'created_at'         => current_time( 'mysql' )
-                ] );
-                
-                $sub_id = $wpdb->insert_id;
-
-                // Insert Items ke Sub Transaksi ini
-                foreach ( $group_data['items'] as $item ) {
-                    $wpdb->insert( $tbl_detail, [
-                        'id_transaksi' => $sub_id, // Link ke Sub ID (PENTING untuk dashboard pedagang)
-                        'id_produk'    => $item['product_id'],
-                        'jenis_item'   => 'produk', // Bisa dikembangkan logicnya jika wisata
-                        'nama_item'    => $item['name'],
-                        'harga_satuan' => $item['price'],
-                        'qty'          => $item['quantity'],
-                        'subtotal'     => $item['price'] * $item['quantity']
-                    ] );
-                }
+                // Kurangi Stok Produk
+                $wpdb->query($wpdb->prepare("UPDATE {$wpdb->prefix}dw_produk SET stok = stok - %d, terjual = terjual + %d WHERE id = %d", $item->qty, $item->qty, $item->id_produk));
             }
-
-            // 4. Sukses: Bersihkan Cart & Redirect
-            unset( $_SESSION['dw_cart'] );
-            
-            // Redirect ke halaman detail transaksi atau list transaksi
-            // Kita kirim ID transaksi agar bisa langsung dilihat detailnya (opsional)
-            wp_redirect( home_url( '/transaksi' ) ); 
-            exit;
-
-        } else {
-            $error_message = 'Gagal menyimpan pesanan ke database. Silakan coba lagi.';
         }
+
+        // E. Update Total Transaksi Utama
+        $wpdb->update(
+            $wpdb->prefix . 'dw_transaksi',
+            ['total_transaksi' => $total_transaksi],
+            ['id' => $transaksi_id]
+        );
+
+        // F. Kosongkan Keranjang
+        $wpdb->delete($table_cart, ['user_id' => $user_id]);
+
+        // G. Redirect ke Halaman Pembayaran
+        wp_redirect(home_url('/pembayaran?id=' . $kode_unik));
+        exit;
     }
 }
+
+// --- AMBIL DATA CART UNTUK DISPLAY ---
+$sql_cart = $wpdb->prepare(
+    "SELECT c.*, p.nama_produk, p.harga, t.nama_toko 
+     FROM $table_cart c
+     JOIN {$wpdb->prefix}dw_produk p ON c.id_produk = p.id
+     JOIN {$wpdb->prefix}dw_pedagang t ON p.id_pedagang = t.id
+     WHERE c.user_id = %d",
+    $user_id
+);
+$cart_display = $wpdb->get_results($sql_cart);
+$cart_total = 0;
+foreach($cart_display as $c) $cart_total += ($c->harga * $c->qty);
 
 get_header();
-
-// Hitung total awal untuk tampilan
-$cart_display_total = 0;
-if ( isset( $_SESSION['dw_cart'] ) && is_array( $_SESSION['dw_cart'] ) ) {
-    foreach ( $_SESSION['dw_cart'] as $c ) {
-        $cart_display_total += ( floatval($c['price']) * intval($c['quantity']) );
-    }
-}
 ?>
 
-<div class="min-h-screen bg-gray-50 py-8 lg:py-12 font-sans">
-    <div class="container mx-auto px-4 max-w-6xl">
+<div class="bg-gray-50 min-h-screen py-10 font-sans">
+    <div class="max-w-5xl mx-auto px-4">
         
-        <div class="mb-8 text-center lg:text-left">
-            <h1 class="text-3xl font-extrabold text-gray-900">Checkout</h1>
-            <p class="text-gray-500 mt-2">Lengkapi data pengiriman untuk menyelesaikan pesanan.</p>
-        </div>
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">Checkout Pengiriman</h1>
 
-        <?php if ( $error_message ) : ?>
-            <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-6 flex items-center gap-3">
-                <i class="fas fa-exclamation-circle"></i>
-                <span><?php echo esc_html( $error_message ); ?></span>
-            </div>
-        <?php endif; ?>
+        <form method="POST" action="" class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <?php wp_nonce_field('dw_checkout_action', 'dw_checkout_nonce'); ?>
 
-        <form method="POST" action="" class="flex flex-col lg:flex-row gap-8">
-            <?php wp_nonce_field( 'dw_checkout_action', 'dw_checkout_nonce' ); ?>
-
-            <!-- KOLOM KIRI: Form Data -->
-            <div class="flex-1 space-y-6">
+            <!-- KOLOM KIRI: FORM DATA DIRI -->
+            <div class="lg:col-span-2 space-y-6">
                 
-                <!-- Section Alamat -->
+                <!-- Alamat Pengiriman -->
                 <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                    <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                        <span class="w-8 h-8 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-sm">1</span>
-                        Informasi Pengiriman
-                    </h3>
+                    <h2 class="font-bold text-lg text-gray-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-map-marker-alt text-primary"></i> Alamat Pengiriman
+                    </h2>
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
-                            <label class="block text-sm font-bold text-gray-700 mb-1">Nama Lengkap</label>
-                            <input type="text" name="nama_lengkap" value="<?php echo esc_attr( $current_user->display_name ); ?>" required
-                                   class="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors">
+                            <label class="block text-xs font-bold text-gray-500 mb-1">Nama Penerima</label>
+                            <input type="text" name="nama_penerima" value="<?php echo esc_attr($current_user->display_name); ?>" required class="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 focus:ring-primary focus:border-primary">
                         </div>
                         <div>
-                            <label class="block text-sm font-bold text-gray-700 mb-1">No. WhatsApp / Telepon</label>
-                            <input type="tel" name="no_telepon" placeholder="08..." required
-                                   class="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors">
-                        </div>
-                    </div>
-
-                    <div class="mb-4">
-                        <label class="block text-sm font-bold text-gray-700 mb-1">Alamat Lengkap</label>
-                        <textarea name="alamat_lengkap" rows="3" required placeholder="Nama jalan, RT/RW, No. Rumah"
-                                  class="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors"></textarea>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-bold text-gray-700 mb-1">Kota / Kabupaten</label>
-                            <input type="text" name="kota" required
-                                   class="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-bold text-gray-700 mb-1">Kode Pos</label>
-                            <input type="text" name="kodepos" required
-                                   class="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors">
+                            <label class="block text-xs font-bold text-gray-500 mb-1">Nomor WhatsApp</label>
+                            <input type="tel" name="no_hp" placeholder="0812..." required class="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 focus:ring-primary focus:border-primary">
                         </div>
                     </div>
                     
-                    <div class="mt-4">
-                        <label class="block text-sm font-bold text-gray-700 mb-1">Catatan Tambahan (Opsional)</label>
-                        <input type="text" name="catatan" placeholder="Misal: Titipkan di pos satpam"
-                               class="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 mb-1">Alamat Lengkap</label>
+                        <textarea name="alamat_lengkap" rows="3" placeholder="Nama Jalan, RT/RW, Kecamatan, Kabupaten" required class="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 focus:ring-primary focus:border-primary"></textarea>
                     </div>
                 </div>
 
-                <!-- Section Pembayaran -->
+                <!-- Review Barang -->
                 <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                    <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                        <span class="w-8 h-8 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-sm">2</span>
-                        Metode Pembayaran
-                    </h3>
-                    
-                    <div class="space-y-3">
-                        <label class="flex items-center p-4 border border-gray-200 rounded-xl cursor-pointer hover:bg-orange-50 hover:border-orange-200 transition-all group">
-                            <input type="radio" name="payment_method" value="transfer_bank" checked class="w-5 h-5 text-orange-600 focus:ring-orange-500 border-gray-300">
-                            <div class="ml-4 flex-1">
-                                <span class="block font-bold text-gray-900 group-hover:text-orange-700">Transfer Bank / QRIS</span>
-                                <span class="block text-sm text-gray-500">Bayar via transfer manual atau scan QRIS Desa</span>
+                    <h2 class="font-bold text-lg text-gray-800 mb-4 flex items-center gap-2">
+                        <i class="fas fa-box text-primary"></i> Barang yang dibeli
+                    </h2>
+                    <div class="space-y-4">
+                        <?php foreach ($cart_display as $item): ?>
+                        <div class="flex justify-between items-center text-sm border-b border-gray-50 pb-2">
+                            <div>
+                                <div class="font-bold text-gray-800"><?php echo esc_html($item->nama_produk); ?></div>
+                                <div class="text-xs text-gray-500"><?php echo $item->qty; ?> x <?php echo tema_dw_format_rupiah($item->harga); ?></div>
+                                <div class="text-[10px] text-green-600 bg-green-50 inline-block px-1 rounded">Toko: <?php echo esc_html($item->nama_toko); ?></div>
                             </div>
-                            <i class="fas fa-university text-gray-400 group-hover:text-orange-500"></i>
-                        </label>
-
-                        <label class="flex items-center p-4 border border-gray-200 rounded-xl cursor-pointer hover:bg-orange-50 hover:border-orange-200 transition-all group">
-                            <input type="radio" name="payment_method" value="cod" class="w-5 h-5 text-orange-600 focus:ring-orange-500 border-gray-300">
-                            <div class="ml-4 flex-1">
-                                <span class="block font-bold text-gray-900 group-hover:text-orange-700">Bayar di Tempat (COD)</span>
-                                <span class="block text-sm text-gray-500">Bayar tunai saat barang sampai</span>
+                            <div class="font-bold text-gray-700">
+                                <?php echo tema_dw_format_rupiah($item->harga * $item->qty); ?>
                             </div>
-                            <i class="fas fa-money-bill-wave text-gray-400 group-hover:text-orange-500"></i>
-                        </label>
+                        </div>
+                        <?php endforeach; ?>
                     </div>
                 </div>
 
             </div>
 
-            <!-- KOLOM KANAN: Ringkasan Pesanan -->
-            <div class="w-full lg:w-96 flex-shrink-0">
-                <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100 sticky top-24">
-                    <h3 class="text-lg font-bold text-gray-900 mb-4">Ringkasan Pesanan</h3>
+            <!-- KOLOM KANAN: RINGKASAN & PEMBAYARAN -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 sticky top-24">
                     
-                    <div class="max-h-60 overflow-y-auto pr-2 custom-scrollbar space-y-3 mb-6">
-                        <?php if ( ! empty( $_SESSION['dw_cart'] ) ) : ?>
-                            <?php foreach ( $_SESSION['dw_cart'] as $item ) : ?>
-                                <div class="flex gap-3">
-                                    <div class="w-12 h-12 bg-gray-100 rounded-md overflow-hidden flex-shrink-0 relative">
-                                        <?php if ( ! empty( $item['image'] ) ) : ?>
-                                            <img src="<?php echo esc_url( $item['image'] ); ?>" class="w-full h-full object-cover">
-                                        <?php else : ?>
-                                            <div class="w-full h-full flex items-center justify-center text-gray-400"><i class="fas fa-image"></i></div>
-                                        <?php endif; ?>
-                                    </div>
-                                    <div class="flex-1">
-                                        <p class="text-sm font-bold text-gray-800 line-clamp-1"><?php echo esc_html( $item['name'] ); ?></p>
-                                        <p class="text-xs text-gray-500"><?php echo intval( $item['quantity'] ); ?> x Rp <?php echo number_format( floatval( $item['price'] ), 0, ',', '.' ); ?></p>
-                                    </div>
-                                    <div class="text-sm font-bold text-gray-700">
-                                        Rp <?php echo number_format( floatval( $item['price'] ) * intval( $item['quantity'] ), 0, ',', '.' ); ?>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
+                    <!-- KODE PROMO -->
+                    <div class="mb-6 pb-6 border-b border-dashed border-gray-200">
+                        <label class="block text-xs font-bold text-gray-500 mb-2">Punya Kode Promo?</label>
+                        <div class="flex gap-2">
+                            <input type="text" name="kode_promo" id="promo-input" placeholder="Masukkan kode" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:ring-primary uppercase">
+                            <button type="button" onclick="cekPromo()" class="bg-gray-800 text-white px-3 py-2 rounded-lg text-sm font-bold hover:bg-gray-700">Gunakan</button>
+                        </div>
+                        <p id="promo-msg" class="text-xs mt-1 hidden"></p>
                     </div>
 
-                    <div class="border-t border-dashed border-gray-200 pt-4 space-y-2">
-                        <div class="flex justify-between text-gray-600">
-                            <span>Total Item</span>
-                            <span>Rp <?php echo number_format( $cart_display_total, 0, ',', '.' ); ?></span>
+                    <!-- METODE BAYAR -->
+                    <h3 class="font-bold text-gray-800 mb-4">Metode Pembayaran</h3>
+                    <div class="space-y-3 mb-6">
+                        <label class="flex items-center p-3 border border-gray-200 rounded-xl cursor-pointer hover:border-primary has-[:checked]:border-primary has-[:checked]:bg-green-50 transition">
+                            <input type="radio" name="payment_method" value="transfer" checked class="text-primary focus:ring-primary">
+                            <div class="ml-3">
+                                <span class="block text-sm font-bold text-gray-700">Transfer Bank / QRIS</span>
+                                <span class="block text-xs text-gray-500">Upload bukti bayar manual</span>
+                            </div>
+                        </label>
+                        <label class="flex items-center p-3 border border-gray-200 rounded-xl cursor-pointer hover:border-primary has-[:checked]:border-primary has-[:checked]:bg-green-50 transition">
+                            <input type="radio" name="payment_method" value="cod" class="text-primary focus:ring-primary">
+                            <span class="ml-3 text-sm font-bold text-gray-700">Bayar di Tempat (COD)</span>
+                        </label>
+                    </div>
+
+                    <div class="border-t border-dashed border-gray-200 pt-4 mb-6">
+                        <div class="flex justify-between mb-2 text-sm text-gray-500">
+                            <span>Total Harga</span>
+                            <span><?php echo tema_dw_format_rupiah($cart_total); ?></span>
                         </div>
-                        <div class="flex justify-between text-gray-600">
-                            <span>Ongkos Kirim</span>
-                            <span class="text-green-600 font-bold text-xs bg-green-50 px-2 py-1 rounded">Gratis (Promo)</span>
+                        <div class="flex justify-between mb-2 text-sm text-gray-500">
+                            <span>Ongkos Kirim (Est.)</span>
+                            <span id="ongkir-display">Rp 15.000</span>
                         </div>
-                        <div class="flex justify-between items-center pt-2 mt-2 border-t border-gray-100">
-                            <span class="font-bold text-gray-900 text-lg">Total Bayar</span>
-                            <span class="font-bold text-2xl text-orange-600">Rp <?php echo number_format( $cart_display_total, 0, ',', '.' ); ?></span>
+                        <div class="flex justify-between mb-2 text-sm text-green-600 hidden" id="diskon-row">
+                            <span>Diskon Promo</span>
+                            <span>- Rp 15.000</span>
+                        </div>
+                        <div class="flex justify-between items-end mt-4 pt-4 border-t border-gray-100">
+                            <span class="font-bold text-gray-800">Total Bayar</span>
+                            <span class="text-xl font-bold text-primary" id="total-bayar"><?php echo tema_dw_format_rupiah($cart_total + 15000); ?></span>
                         </div>
                     </div>
 
-                    <button type="submit" name="dw_place_order" class="w-full mt-6 py-4 bg-gray-900 hover:bg-orange-600 text-white font-bold rounded-xl shadow-lg hover:shadow-orange-200 transition-all duration-300 transform hover:-translate-y-1 flex justify-center items-center gap-2">
+                    <button type="submit" name="dw_place_order" class="block w-full bg-primary hover:bg-green-700 text-white text-center font-bold py-3.5 rounded-xl shadow-lg shadow-green-500/30 transition-all transform active:scale-95 flex justify-center items-center gap-2">
                         <span>Buat Pesanan</span>
-                        <i class="fas fa-check-circle"></i>
+                        <i class="fas fa-arrow-right"></i>
                     </button>
-                    
-                    <p class="text-xs text-gray-400 text-center mt-4">
-                        Dengan menekan tombol di atas, Anda menyetujui syarat & ketentuan Desa Wisata.
-                    </p>
                 </div>
             </div>
 
@@ -308,11 +282,37 @@ if ( isset( $_SESSION['dw_cart'] ) && is_array( $_SESSION['dw_cart'] ) ) {
     </div>
 </div>
 
-<style>
-/* Custom Scrollbar */
-.custom-scrollbar::-webkit-scrollbar { width: 4px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 20px; }
-</style>
+<script>
+function cekPromo() {
+    const code = document.getElementById('promo-input').value.toUpperCase();
+    const msg = document.getElementById('promo-msg');
+    const ongkirDisplay = document.getElementById('ongkir-display');
+    const diskonRow = document.getElementById('diskon-row');
+    const totalDisplay = document.getElementById('total-bayar');
+    
+    // Logika JS Sederhana untuk Simulasi UI (Logika asli ada di PHP saat submit)
+    if (code === 'DISKONONGKIR') {
+        msg.innerText = 'Kode promo berhasil digunakan!';
+        msg.className = 'text-xs mt-1 text-green-600 font-bold block';
+        
+        ongkirDisplay.style.textDecoration = 'line-through';
+        ongkirDisplay.className = 'text-gray-400';
+        
+        diskonRow.classList.remove('hidden');
+        
+        // Update Total Visual (Hardcoded simulation)
+        // Total asli = cart + 15000. Diskon = 15000. Jadi balik ke harga cart.
+        totalDisplay.innerText = '<?php echo tema_dw_format_rupiah($cart_total); ?>'; 
+    } else {
+        msg.innerText = 'Kode promo tidak valid.';
+        msg.className = 'text-xs mt-1 text-red-500 block';
+        
+        ongkirDisplay.style.textDecoration = 'none';
+        ongkirDisplay.className = '';
+        diskonRow.classList.add('hidden');
+        totalDisplay.innerText = '<?php echo tema_dw_format_rupiah($cart_total + 15000); ?>';
+    }
+}
+</script>
 
 <?php get_footer(); ?>
