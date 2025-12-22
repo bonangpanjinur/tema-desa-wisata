@@ -1,7 +1,7 @@
 <?php get_header(); ?>
 
 <!-- WRAPPER UTAMA (Background Abu-abu ala Marketplace) -->
-<div class="bg-gray-50 min-h-screen pb-20 font-sans text-gray-700">
+<div class="bg-gray-50 min-h-screen pb-20 font-sans text-gray-700 relative">
 
     <!-- 1. HERO BANNER SECTION (DYNAMIC CAROUSEL) -->
     <section class="pt-4 md:pt-6">
@@ -292,6 +292,36 @@
             </div>
         </div>
     </section>
+
+    <!-- 6. FLOATING UP BUTTON -->
+    <button id="scrollToTopBtn" class="fixed bottom-6 right-6 md:bottom-10 md:right-10 w-12 h-12 rounded-full bg-primary hover:bg-primaryDark text-white shadow-lg transition-all duration-300 opacity-0 invisible translate-y-4 z-50 flex items-center justify-center group" aria-label="Kembali ke atas">
+        <i class="fas fa-arrow-up text-lg group-hover:-translate-y-1 transition-transform"></i>
+    </button>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const scrollBtn = document.getElementById('scrollToTopBtn');
+            
+            // Show/Hide button on scroll
+            window.addEventListener('scroll', function() {
+                if (window.scrollY > 300) {
+                    scrollBtn.classList.remove('opacity-0', 'invisible', 'translate-y-4');
+                    scrollBtn.classList.add('opacity-100', 'visible', 'translate-y-0');
+                } else {
+                    scrollBtn.classList.add('opacity-0', 'invisible', 'translate-y-4');
+                    scrollBtn.classList.remove('opacity-100', 'visible', 'translate-y-0');
+                }
+            });
+
+            // Smooth scroll to top
+            scrollBtn.addEventListener('click', function() {
+                window.scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            });
+        });
+    </script>
 
 </div>
 
