@@ -339,7 +339,3 @@ function tema_dw_filter_products_handler() {
     wp_send_json_error(array('message' => 'Filter belum diimplementasikan sepenuhnya.'));
 }
 
-/**
- * Require File Dependensi Lain
- */
-// Pastikan file ini ada di folder inc/
