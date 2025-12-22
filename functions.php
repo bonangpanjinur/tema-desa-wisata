@@ -84,7 +84,7 @@ function tema_dw_scripts() {
 
     // Script Khusus Halaman
     if (is_post_type_archive('dw_produk') || is_tax('kategori_produk')) {
-         wp_enqueue_script('tema-dw-filter', get_template_directory_uri() . '/assets/js/archive-filter.js', array('jquery'), '1.0.0', true);
+          wp_enqueue_script('tema-dw-filter', get_template_directory_uri() . '/assets/js/archive-filter.js', array('jquery'), '1.0.0', true);
     }
     
     if (is_page_template('page-cart.php') || is_page_template('page-checkout.php')) {

@@ -1,151 +1,98 @@
 jQuery(document).ready(function($) {
     
-    // Helper: Format Rupiah
-    function formatRupiah(number) {
-        return 'Rp ' + new Intl.NumberFormat('id-ID').format(number);
-    }
-
-    // ========================================================================
-    // 1. ADD TO CART (Dari Halaman Produk/Arsip)
-    // ========================================================================
-    $('.btn-add-to-cart').on('click', function(e) {
+    /**
+     * Handler untuk Form Add to Cart
+     * Digunakan di single-dw_produk.php dan single-dw_wisata.php
+     */
+    $('#form-add-to-cart').on('submit', function(e) {
         e.preventDefault();
-        var btn = $(this);
-        var originalHtml = btn.html();
-        var productId = btn.data('product-id');
-        var isCustom = btn.data('is-custom') ? 1 : 0;
+
+        // Ambil elemen form dan tombol
+        var $form = $(this);
+        var $button = $form.find('button[type="submit"]');
+        var $message = $('#cart-message');
         
-        // Loading state
-        btn.addClass('opacity-50 cursor-not-allowed').prop('disabled', true).html('<i class="fas fa-spinner fa-spin text-xs"></i>');
+        // Simpan teks asli tombol
+        var originalText = $button.html();
+
+        // 1. Validasi Input
+        var qty = $form.find('input[name="quantity"]').val();
+        if(qty < 1) {
+            alert("Jumlah minimal 1");
+            return;
+        }
+
+        // 2. Siapkan Data untuk dikirim ke Backend Plugin
+        var formData = {
+            // 'action' harus sesuai dengan add_action('wp_ajax_dw_add_to_cart', ...) di plugin
+            action: 'dw_add_to_cart', 
+            
+            // Ambil nonce dari localize script functions.php untuk keamanan
+            security: dw_global.nonce, 
+            
+            // Data produk
+            product_id: $form.find('input[name="product_id"]').val(),
+            quantity: qty,
+            type: $form.find('input[name="type"]').val() || 'produk'
+        };
+
+        // 3. UI Loading State
+        $button.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Memproses...');
+        $message.hide().removeClass('text-green-600 text-red-600');
+
+        // 4. Kirim Request ke Plugin via wp-admin/admin-ajax.php
+        $.ajax({
+            url: dw_global.ajax_url,
+            type: 'POST',
+            data: formData,
+            success: function(response) {
+                // Respons dari wp_send_json_success() di plugin
+                if (response.success) {
+                    $message.addClass('text-green-600').html('<i class="fas fa-check-circle"></i> ' + response.data.message).fadeIn();
+                    
+                    // Update counter cart di header jika ada elemennya
+                    if($('.dw-cart-count').length) {
+                        $('.dw-cart-count').text(response.data.cart_count);
+                    }
+
+                    // Opsional: Redirect ke halaman cart
+                    // window.location.href = dw_global.cart_url;
+                } else {
+                    // Respons dari wp_send_json_error() di plugin
+                    $message.addClass('text-red-600').html('<i class="fas fa-exclamation-circle"></i> ' + (response.data.message || 'Gagal menambahkan ke keranjang')).fadeIn();
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error("AJAX Error:", error);
+                $message.addClass('text-red-600').html('Terjadi kesalahan server. Silakan coba lagi.').fadeIn();
+            },
+            complete: function() {
+                // Kembalikan tombol ke kondisi semula
+                $button.prop('disabled', false).html(originalText);
+            }
+        });
+    });
+
+    /**
+     * Handler untuk Update Cart (jika ada halaman keranjang di tema)
+     */
+    $('.dw-cart-update-qty').on('change', function() {
+        var cartItemId = $(this).data('cart-item-id');
+        var newQty = $(this).val();
 
         $.ajax({
-            url: dw_ajax.ajax_url,
+            url: dw_global.ajax_url,
             type: 'POST',
             data: {
-                action: 'dw_theme_add_to_cart', // Pastikan nama action sesuai di ajax-handlers.php (dw_theme_add_to_cart atau dw_add_to_cart)
-                nonce: dw_ajax.nonce,
-                product_id: productId,
-                qty: 1,
-                is_custom_db: isCustom
+                action: 'dw_update_cart_qty',
+                security: dw_global.nonce,
+                cart_item_key: cartItemId,
+                quantity: newQty
             },
             success: function(response) {
                 if(response.success) {
-                    // Update Badge Cart di Header (Mobile & Desktop)
-                    $('#header-cart-count, #header-cart-count-mobile, .cart-count-badge').text(response.data.cart_count).removeClass('hidden').addClass('flex');
-                    
-                    // Feedback Sukses Visual
-                    btn.html('<i class="fas fa-check text-xs"></i>').removeClass('bg-gray-50 text-gray-600').addClass('bg-green-600 text-white');
-                    
-                    // Reset tombol setelah 2 detik
-                    setTimeout(function() {
-                        btn.html(originalHtml)
-                           .removeClass('bg-green-600 text-white opacity-50 cursor-not-allowed')
-                           .addClass('bg-gray-50 text-gray-600 hover:bg-orange-500')
-                           .prop('disabled', false);
-                    }, 2000);
-                } else {
-                    alert('Gagal: ' + (response.data.message || 'Error'));
-                    btn.html(originalHtml).removeClass('opacity-50 cursor-not-allowed').prop('disabled', false);
+                    location.reload(); // Reload untuk update total harga
                 }
-            },
-            error: function() {
-                alert('Terjadi kesalahan koneksi.');
-                btn.html(originalHtml).removeClass('opacity-50 cursor-not-allowed').prop('disabled', false);
-            }
-        });
-    });
-
-    // ========================================================================
-    // 2. UPDATE QUANTITY (Di Halaman Cart - Sesuai page-cart.php)
-    // ========================================================================
-    $('.btn-update-qty').on('click', function(e) {
-        e.preventDefault();
-        var btn = $(this);
-        var action = btn.data('action'); // 'increase' or 'decrease'
-        var input = btn.siblings('.input-qty');
-        var currentVal = parseInt(input.val()) || 0;
-        var maxVal = parseInt(input.data('max')) || 999;
-        var productId = btn.data('id');
-        var newVal = currentVal;
-
-        // Logic Limitasi
-        if (action === 'increase') {
-            if (currentVal < maxVal) {
-                newVal = currentVal + 1;
-            } else {
-                alert('Stok maksimal tercapai (' + maxVal + ')');
-                return;
-            }
-        } else {
-            if (currentVal > 1) {
-                newVal = currentVal - 1;
-            } else {
-                return; // Batas minimal 1
-            }
-        }
-
-        // Disable UI sementara
-        btn.parent().find('button').prop('disabled', true);
-        
-        // AJAX Request
-        $.post(dw_ajax.ajax_url, {
-            action: 'dw_update_cart_qty', // Pastikan action ini ada di ajax-handlers.php
-            nonce: dw_ajax.nonce,
-            product_id: productId,
-            quantity: newVal
-        }, function(response) {
-            if (response.success) {
-                input.val(newVal);
-                
-                // Update Subtotal per Item
-                var row = btn.closest('.cart-item-row');
-                row.find('.subtotal-display').text(formatRupiah(response.data.item_subtotal));
-                
-                // Update Total Keranjang
-                $('#cart-total').text(formatRupiah(response.data.cart_total));
-                $('#cart-grand-total').text(formatRupiah(response.data.cart_total));
-                
-                // Update Count di Header
-                $('#header-cart-count, .cart-count-badge').text(response.data.cart_count);
-            } else {
-                alert('Gagal mengupdate: ' + (response.data.message || 'Error'));
-            }
-            // Re-enable buttons
-            btn.parent().find('button').prop('disabled', false);
-        });
-    });
-
-    // ========================================================================
-    // 3. REMOVE ITEM (Di Halaman Cart - Sesuai page-cart.php)
-    // ========================================================================
-    $('.btn-remove-item').on('click', function(e) {
-        e.preventDefault();
-        if (!confirm('Yakin ingin menghapus produk ini dari keranjang?')) return;
-
-        var btn = $(this);
-        var productId = btn.data('id');
-        var row = btn.closest('.cart-item-row');
-
-        $.post(dw_ajax.ajax_url, {
-            action: 'dw_remove_cart_item',
-            nonce: dw_ajax.nonce,
-            product_id: productId
-        }, function(response) {
-            if (response.success) {
-                // Animasi Hapus
-                row.fadeOut(300, function() { $(this).remove(); });
-                
-                // Update Total
-                $('#cart-total').text(formatRupiah(response.data.cart_total));
-                $('#cart-grand-total').text(formatRupiah(response.data.cart_total));
-                $('#header-cart-count, .cart-count-badge').text(response.data.cart_count);
-
-                // Reload jika keranjang jadi kosong
-                if (response.data.cart_count === 0) {
-                    location.reload();
-                }
-            } else {
-                alert('Gagal menghapus item');
             }
         });
     });
