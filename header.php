@@ -1,180 +1,103 @@
-<?php
-/**
- * Header Template
- */
-$brand_name = get_bloginfo( 'name' );
-$current_user = wp_get_current_user();
-// Mengambil jumlah cart dari session jika ada
-$cart_count = (isset($_SESSION['dw_cart'])) ? count($_SESSION['dw_cart']) : 0;
-?>
 <!DOCTYPE html>
 <html <?php language_attributes(); ?>>
 <head>
-    <meta charset="<?php bloginfo('charset'); ?>">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <!-- Font Inter & FontAwesome -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#00BA61', 
-                        'primary-dark': '#00964E',
-                        'primary-light': '#E0F7EB',
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        /* Sembunyikan Scrollbar Horizontal */
-        .hide-scroll::-webkit-scrollbar { display: none; }
-        .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
-        
-        /* Animasi Search Mobile */
-        .search-container {
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            overflow: hidden;
-            width: 0;
-            opacity: 0;
-        }
-        .search-active .search-container {
-            width: 100%;
-            opacity: 1;
-            margin-right: 0.5rem;
-            margin-left: 0.5rem;
-        }
-        /* Sembunyikan logo saat search aktif agar tidak tabrakan */
-        .search-active .logo-area {
-            display: none;
-        }
-        /* Sembunyikan tombol search trigger saat search aktif */
-        .search-active #mobile-search-toggle {
-            display: none;
-        }
-    </style>
+    <meta charset="<?php bloginfo( 'charset' ); ?>">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="profile" href="https://gmpg.org/xfn/11">
     <?php wp_head(); ?>
 </head>
-<body <?php body_class('bg-gray-50 text-gray-800 font-sans pb-16 md:pb-0'); ?>>
 
-    <div id="app-wrapper" class="min-h-screen flex flex-col relative">
-        
-        <!-- HEADER UTAMA (Sticky) -->
-        <header class="bg-primary text-white shadow-sm sticky top-0 z-50 transition-colors duration-200">
-            <div class="container mx-auto px-4 h-16 md:h-20 flex items-center justify-between relative">
-                
-                <!-- === MOBILE LAYOUT (Logo - Search Input - Icons) === -->
-                <div id="mobile-header" class="md:hidden flex items-center justify-between w-full relative z-20 h-full">
-                    
-                    <!-- 1. LOGO (Kiri) -->
-                    <a href="<?php echo home_url(); ?>" class="logo-area flex items-center gap-2 font-bold text-lg tracking-tight transition-opacity duration-200 shrink-0">
-                        <i class="fas fa-leaf text-yellow-300"></i>
-                        <span><?php echo esc_html($brand_name); ?></span>
+<body <?php body_class('bg-gray-50 font-sans text-gray-800'); ?>>
+<?php wp_body_open(); ?>
+
+<header class="bg-white shadow-md sticky top-0 z-50">
+    <div class="container mx-auto px-4">
+        <div class="flex justify-between items-center h-16">
+            
+            <!-- Logo -->
+            <div class="flex-shrink-0 flex items-center">
+                <?php if (has_custom_logo()): ?>
+                    <?php the_custom_logo(); ?>
+                <?php else: ?>
+                    <a href="<?php echo home_url(); ?>" class="text-2xl font-bold text-primary">
+                        <?php bloginfo('name'); ?>
                     </a>
-
-                    <!-- 2. SEARCH INPUT AREA (Tengah - Hidden by default) -->
-                    <div class="search-container flex-1">
-                        <form action="<?php echo home_url('/'); ?>" method="get" class="relative w-full h-10 flex items-center bg-white rounded-lg shadow-inner">
-                            <input type="text" name="s" id="mobile-search-input" placeholder="Cari..." class="w-full h-full pl-3 pr-8 rounded-lg text-gray-700 text-sm focus:outline-none focus:ring-0 border-none bg-transparent">
-                            <!-- Close Icon (X) inside input area -->
-                             <button type="button" id="mobile-search-close" class="absolute right-2 text-gray-400 p-2">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </form>
-                    </div>
-
-                    <!-- 3. RIGHT ICONS (Search Trigger & Cart) -->
-                    <div class="flex items-center gap-1 shrink-0 ml-auto">
-                        <!-- Icon Toggle Search -->
-                        <button id="mobile-search-toggle" class="p-2 text-white focus:outline-none relative z-30 transition-opacity duration-200">
-                            <i class="fas fa-search text-xl"></i>
-                        </button>
-
-                        <!-- Cart Icon -->
-                        <a href="<?php echo home_url('/cart'); ?>" class="relative p-2 transition-opacity duration-200">
-                            <i class="fas fa-shopping-cart text-xl"></i>
-                            <?php if($cart_count > 0): ?>
-                            <span id="header-cart-count-mobile" class="absolute top-0 right-0 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold border border-white"><?php echo $cart_count; ?></span>
-                            <?php endif; ?>
-                        </a>
-                    </div>
-                </div>
-
-                <!-- === DESKTOP LAYOUT === -->
-                <a href="<?php echo home_url(); ?>" class="hidden md:flex items-center gap-2 hover:opacity-90 transition shrink-0">
-                    <i class="fas fa-leaf text-yellow-300 text-2xl"></i>
-                    <span class="font-bold text-2xl tracking-tight"><?php echo esc_html($brand_name); ?></span>
-                </a>
-
-                <div class="hidden md:block flex-1 max-w-2xl mx-auto px-8">
-                    <form action="<?php echo home_url('/'); ?>" method="get" class="relative w-full group">
-                        <input type="text" name="s" placeholder="Cari wisata atau produk..." class="w-full h-11 pl-12 pr-4 rounded-xl text-gray-700 text-sm focus:outline-none focus:ring-4 focus:ring-white/20 shadow-sm bg-white border-none transition-shadow">
-                        <i class="fas fa-search absolute left-4 top-3.5 text-gray-400 text-lg group-focus-within:text-primary transition-colors"></i>
-                    </form>
-                </div>
-
-                <div class="hidden md:flex items-center gap-6">
-                    <nav class="flex items-center gap-6 font-medium text-sm">
-                        <a href="<?php echo home_url(); ?>" class="hover:text-green-100">Beranda</a>
-                        <a href="<?php echo home_url('/wisata'); ?>" class="hover:text-green-100">Wisata</a>
-                        <a href="<?php echo home_url('/produk'); ?>" class="hover:text-green-100">Produk</a>
-                    </nav>
-
-                    <div class="h-6 w-px bg-white/20"></div>
-
-                    <a href="<?php echo home_url('/cart'); ?>" class="relative group">
-                        <i class="fas fa-shopping-cart text-xl"></i>
-                        <?php if($cart_count > 0): ?>
-                        <span id="header-cart-count" class="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold border-2 border-primary"><?php echo $cart_count; ?></span>
-                        <?php endif; ?>
-                    </a>
-
-                    <?php if (is_user_logged_in()): ?>
-                        <a href="<?php echo home_url('/akun-saya'); ?>" class="flex items-center gap-2 bg-white/10 pl-2 pr-4 py-1.5 rounded-full hover:bg-white/20 transition backdrop-blur-sm border border-white/10">
-                            <div class="w-7 h-7 bg-yellow-100 rounded-full flex items-center justify-center text-yellow-600 overflow-hidden">
-                                <?php echo get_avatar($current_user->ID, 28); ?>
-                            </div>
-                            <span class="text-xs font-semibold max-w-[80px] truncate"><?php echo explode(' ', $current_user->display_name)[0]; ?></span>
-                        </a>
-                    <?php else: ?>
-                         <a href="<?php echo home_url('/login'); ?>" class="bg-white text-primary px-5 py-2 rounded-full text-sm font-bold shadow hover:bg-gray-100 transition">Masuk</a>
-                    <?php endif; ?>
-                </div>
+                <?php endif; ?>
             </div>
-        </header>
 
-        <!-- Script Animasi Search Mobile -->
-        <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const headerMobile = document.getElementById('mobile-header');
-            const searchToggle = document.getElementById('mobile-search-toggle');
-            const searchInput = document.getElementById('mobile-search-input');
-            const searchClose = document.getElementById('mobile-search-close');
+            <!-- Desktop Menu -->
+            <nav class="hidden md:flex space-x-8 items-center">
+                <a href="<?php echo home_url(); ?>" class="text-gray-600 hover:text-primary transition font-medium">Beranda</a>
+                <a href="<?php echo home_url('/wisata'); // Archive Wisata ?>" class="text-gray-600 hover:text-primary transition font-medium">Wisata</a>
+                <a href="<?php echo home_url('/produk'); // Archive Produk ?>" class="text-gray-600 hover:text-primary transition font-medium">Produk Desa</a>
+                <a href="<?php echo home_url('/tentang'); // Page Tentang ?>" class="text-gray-600 hover:text-primary transition font-medium">Tentang</a>
+                
+                <!-- Logic Login/Akun -->
+                <?php if (is_user_logged_in()): ?>
+                    <?php 
+                        $current_user = wp_get_current_user();
+                        $dashboard_url = home_url('/akun-saya');
+                        if(in_array('pengelola_desa', $current_user->roles)) $dashboard_url = home_url('/dashboard-desa');
+                        if(in_array('pedagang', $current_user->roles)) $dashboard_url = home_url('/dashboard-toko');
+                        if(in_array('ojek_wisata', $current_user->roles)) $dashboard_url = home_url('/dashboard-ojek');
+                    ?>
+                    <a href="<?php echo $dashboard_url; ?>" class="bg-blue-100 text-blue-700 px-4 py-2 rounded-full text-sm font-semibold hover:bg-blue-200 transition">
+                        Hi, <?php echo $current_user->display_name; ?>
+                    </a>
+                    <a href="<?php echo wp_logout_url(home_url()); ?>" class="text-red-500 hover:text-red-700 text-sm font-medium">Logout</a>
+                <?php else: ?>
+                    <a href="<?php echo home_url('/login'); ?>" class="text-gray-600 hover:text-primary transition font-medium">Login</a>
+                    <a href="<?php echo home_url('/register'); ?>" class="bg-primary text-white px-5 py-2 rounded-lg hover:bg-green-700 transition shadow-sm">Daftar</a>
+                <?php endif; ?>
 
-            // Buka Search
-            if(searchToggle) {
-                searchToggle.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    headerMobile.classList.add('search-active');
-                    setTimeout(() => searchInput.focus(), 100);
-                });
-            }
+                <!-- Cart Icon -->
+                <a href="<?php echo home_url('/cart'); ?>" class="relative text-gray-600 hover:text-primary">
+                    <i class="fas fa-shopping-cart text-xl"></i>
+                    <?php 
+                        $cart_count = isset($_SESSION['dw_cart']) ? count($_SESSION['dw_cart']) : 0;
+                        if($cart_count > 0):
+                    ?>
+                        <span class="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                            <?php echo $cart_count; ?>
+                        </span>
+                    <?php endif; ?>
+                </a>
+            </nav>
 
-            // Tutup Search
-            if(searchClose) {
-                searchClose.addEventListener('click', function() {
-                    headerMobile.classList.remove('search-active');
-                    searchInput.value = ''; 
-                });
-            }
+            <!-- Mobile Menu Button -->
+            <div class="md:hidden flex items-center">
+                <button id="mobile-menu-btn" class="text-gray-600 hover:text-primary focus:outline-none">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Menu Dropdown -->
+    <div id="mobile-menu" class="hidden md:hidden bg-white border-t border-gray-100 pb-4 shadow-lg">
+        <a href="<?php echo home_url(); ?>" class="block py-2 px-4 text-gray-700 hover:bg-gray-50">Beranda</a>
+        <a href="<?php echo home_url('/wisata'); ?>" class="block py-2 px-4 text-gray-700 hover:bg-gray-50">Wisata</a>
+        <a href="<?php echo home_url('/produk'); ?>" class="block py-2 px-4 text-gray-700 hover:bg-gray-50">Produk Desa</a>
+        <a href="<?php echo home_url('/tentang'); ?>" class="block py-2 px-4 text-gray-700 hover:bg-gray-50">Tentang</a>
+        <div class="border-t border-gray-100 my-2"></div>
+        <?php if (is_user_logged_in()): ?>
+            <a href="<?php echo $dashboard_url; ?>" class="block py-2 px-4 text-blue-600 font-semibold">Dashboard</a>
+            <a href="<?php echo wp_logout_url(home_url()); ?>" class="block py-2 px-4 text-red-500">Logout</a>
+        <?php else: ?>
+            <a href="<?php echo home_url('/login'); ?>" class="block py-2 px-4 text-gray-700 hover:bg-gray-50">Login</a>
+            <a href="<?php echo home_url('/register'); ?>" class="block py-2 px-4 text-primary font-semibold">Daftar</a>
+        <?php endif; ?>
+    </div>
+
+    <script>
+        // Simple Toggle Script for Tailwind
+        const btn = document.getElementById('mobile-menu-btn');
+        const menu = document.getElementById('mobile-menu');
+
+        btn.addEventListener('click', () => {
+            menu.classList.toggle('hidden');
         });
-        </script>
-
-        <main class="flex-1 w-full container mx-auto px-0 md:px-4 py-0 md:py-8">
+    </script>
+</header>
