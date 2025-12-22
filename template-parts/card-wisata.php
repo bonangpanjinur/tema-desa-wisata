@@ -1,68 +1,90 @@
 <?php
 /**
- * Template part for displaying Wisata Card
- * Menggunakan data dari Custom Database Table Plugin
- * * @var object $args['data'] Data row dari tabel wp_dw_wisata + join desa
+ * Template part for displaying Wisata Card (Elegant Style)
+ * Data Source: Plugin Database (wp_dw_wisata)
+ * * @var object $args['data'] Data row dari tabel database
  */
 
-// Ambil data
+// 1. Ambil Data
 $wisata = $args['data'] ?? null;
-
 if ( ! $wisata ) return;
 
-// Setup Variabel
+// 2. Setup Variabel (Validasi Data Kosong)
 $image_url   = !empty($wisata->foto_utama) ? esc_url($wisata->foto_utama) : 'https://via.placeholder.com/600x400?text=Wisata+Desa';
-$wisata_url  = home_url('/wisata/' . $wisata->slug);
-$nama_wisata = esc_html($wisata->nama_wisata);
-$nama_desa   = isset($wisata->nama_desa) ? esc_html($wisata->nama_desa) : 'Desa Wisata';
-$harga       = $wisata->harga_tiket > 0 ? tema_dw_format_rupiah($wisata->harga_tiket) : 'Gratis';
+// Link manual karena ini bukan Post WP biasa
+$link_detail = home_url('/wisata/' . ($wisata->slug ?? '#')); 
+$judul       = esc_html($wisata->nama_wisata);
+$desa        = isset($wisata->nama_desa) ? esc_html($wisata->nama_desa) : 'Desa Wisata';
+$kategori    = !empty($wisata->kategori) ? esc_html($wisata->kategori) : 'Wisata Alam'; // Default jika kosong
+$harga       = ($wisata->harga_tiket > 0) ? tema_dw_format_rupiah($wisata->harga_tiket) : 'Gratis';
 $rating      = floatval($wisata->rating_avg);
 $ulasan      = intval($wisata->total_ulasan);
+
+// Warna Badge Berdasarkan Kategori (Opsional, logika sederhana)
+$badge_color = 'bg-blue-600';
+if (stripos($kategori, 'alam') !== false) $badge_color = 'bg-green-600';
+if (stripos($kategori, 'kuliner') !== false) $badge_color = 'bg-orange-500';
+if (stripos($kategori, 'budaya') !== false) $badge_color = 'bg-purple-600';
 ?>
 
-<div class="group bg-white rounded-xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden h-full flex flex-col border border-gray-100 relative">
+<div class="group relative bg-white rounded-2xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 h-full flex flex-col overflow-hidden border border-gray-100">
     
-    <a href="<?php echo $wisata_url; ?>" class="block h-full flex flex-col">
-        <!-- Image Container -->
-        <div class="relative h-44 overflow-hidden">
+    <a href="<?php echo $link_detail; ?>" class="block h-full flex flex-col">
+        
+        <!-- BAGIAN GAMBAR -->
+        <div class="relative h-48 md:h-52 overflow-hidden">
+            <!-- Gambar Utama -->
             <img src="<?php echo $image_url; ?>" 
-                 alt="<?php echo $nama_wisata; ?>" 
-                 class="w-full h-full object-cover transform group-hover:scale-110 transition duration-700 ease-in-out"
+                 alt="<?php echo $judul; ?>" 
+                 class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                  loading="lazy">
             
-            <!-- Badge Kategori/Rating Floating -->
-            <div class="absolute top-3 right-3 flex flex-col gap-1 items-end">
-                <?php if ($rating > 0): ?>
-                <div class="bg-white/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-sm flex items-center gap-1 text-xs font-bold text-gray-800">
-                    <i class="fas fa-star text-yellow-400"></i> <?php echo number_format($rating, 1); ?>
-                </div>
-                <?php endif; ?>
+            <!-- Overlay Gradient (Agar teks putih terbaca) -->
+            <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-80"></div>
+
+            <!-- BADGE KATEGORI (Permintaan 1) -->
+            <div class="absolute top-3 left-3">
+                <span class="<?php echo $badge_color; ?> text-white text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded-full shadow-sm backdrop-blur-sm bg-opacity-90">
+                    <?php echo $kategori; ?>
+                </span>
             </div>
 
-            <!-- Gradient Overlay di Bawah Gambar agar teks putih terbaca (opsional) -->
-            <div class="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-black/50 to-transparent opacity-60"></div>
+            <!-- Rating (Glassmorphism) -->
+            <div class="absolute top-3 right-3 flex items-center gap-1 bg-white/20 backdrop-blur-md border border-white/30 px-2 py-1 rounded-lg">
+                <i class="fas fa-star text-yellow-400 text-xs"></i>
+                <span class="text-white text-xs font-bold"><?php echo number_format($rating, 1); ?></span>
+            </div>
+
+            <!-- Info Lokasi di Atas Gambar -->
+            <div class="absolute bottom-3 left-3 text-white">
+                <div class="flex items-center gap-1 text-xs font-medium opacity-90">
+                    <i class="fas fa-map-marker-alt text-red-400"></i>
+                    <span><?php echo $desa; ?></span>
+                </div>
+            </div>
         </div>
 
-        <!-- Content -->
+        <!-- BAGIAN KONTEN -->
         <div class="p-4 flex flex-col flex-grow">
-            <!-- Lokasi -->
-            <div class="flex items-center gap-1.5 mb-1.5 text-xs text-secondary font-medium uppercase tracking-wide">
-                <i class="fas fa-map-marked-alt"></i> <?php echo $nama_desa; ?>
-            </div>
-
             <!-- Judul -->
-            <h3 class="text-base font-bold text-gray-800 mb-2 leading-tight group-hover:text-primary transition-colors line-clamp-2">
-                <?php echo $nama_wisata; ?>
+            <h3 class="text-lg font-bold text-gray-800 mb-2 leading-tight line-clamp-2 group-hover:text-primary transition-colors">
+                <?php echo $judul; ?>
             </h3>
 
-            <div class="mt-auto pt-3 border-t border-gray-50 flex items-end justify-between">
+            <!-- Deskripsi Singkat / Excerpt (Opsional) -->
+            <p class="text-sm text-gray-500 line-clamp-2 mb-4 leading-relaxed">
+                <?php echo wp_trim_words($wisata->deskripsi ?? '', 10, '...'); ?>
+            </p>
+
+            <!-- Footer Card: Harga & Tombol -->
+            <div class="mt-auto pt-3 border-t border-gray-50 flex items-center justify-between">
                 <div>
-                    <p class="text-[10px] text-gray-400 mb-0.5">Tiket Masuk</p>
-                    <p class="text-sm font-bold text-primary"><?php echo $harga; ?></p>
+                    <span class="text-[10px] text-gray-400 block mb-0.5">Mulai dari</span>
+                    <span class="text-base font-bold text-primary"><?php echo $harga; ?></span>
                 </div>
                 
-                <div class="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-primary group-hover:text-white transition-colors">
-                    <i class="fas fa-arrow-right text-xs transform -rotate-45 group-hover:rotate-0 transition-transform duration-300"></i>
+                <div class="w-8 h-8 rounded-full bg-gray-50 text-gray-400 flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all duration-300">
+                    <i class="fas fa-arrow-right text-sm transform -rotate-45 group-hover:rotate-0 transition-transform"></i>
                 </div>
             </div>
         </div>

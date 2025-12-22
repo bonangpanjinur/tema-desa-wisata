@@ -1,57 +1,79 @@
 <?php
 /**
- * Template part for displaying Produk Card
- * Menggunakan data dari Custom Database Table Plugin
- * * @var object $args['data'] Data row dari tabel wp_dw_produk
+ * Template part for displaying Produk Card (Elegant Style)
+ * Data Source: Plugin Database (wp_dw_produk)
+ * * @var object $args['data'] Data row dari tabel database
  */
 
-// Ambil data dari argumen yang dikirim
+// 1. Ambil Data
 $produk = $args['data'] ?? null;
-
-// Jika tidak ada data, jangan tampilkan apa-apa
 if ( ! $produk ) return;
 
-// Setup Variabel Tampilan
-$image_url   = !empty($produk->foto_utama) ? esc_url($produk->foto_utama) : 'https://via.placeholder.com/300x300?text=Produk+Desa';
-$product_url = home_url('/produk/' . $produk->slug);
+// 2. Setup Variabel
+$image_url   = !empty($produk->foto_utama) ? esc_url($produk->foto_utama) : 'https://via.placeholder.com/300x300?text=Produk';
+$link_detail = home_url('/produk/' . ($produk->slug ?? '#'));
 $nama_produk = esc_html($produk->nama_produk);
 $harga       = tema_dw_format_rupiah($produk->harga);
 $stok        = intval($produk->stok);
 $terjual     = intval($produk->terjual);
 $rating      = floatval($produk->rating_avg);
-$nama_toko   = isset($produk->nama_toko) ? esc_html($produk->nama_toko) : 'Toko Desa';
-$lokasi      = isset($produk->kabupaten_nama) ? esc_html($produk->kabupaten_nama) : '';
 
-// Helper untuk Badge Stok
-$stok_label = '';
+// LOGIKA LOKASI: Prioritaskan Nama Desa (Permintaan 2)
+// Kita cek apakah query SQL mengirimkan 'nama_desa'. 
+// Jika tidak, kita cek 'nama_toko'. Fallback terakhir 'Desa Wisata'.
+$lokasi_label = 'Desa Wisata'; // Default
+if ( !empty($produk->nama_desa) ) {
+    $lokasi_label = $produk->nama_desa; // Prioritas 1: Nama Desa
+} elseif ( !empty($produk->kabupaten_nama) ) {
+    // Fallback jika desa kosong, tapi ada kabupaten (biar tidak blank)
+    $lokasi_label = $produk->kabupaten_nama; 
+} elseif ( !empty($produk->nama_toko) ) {
+    $lokasi_label = $produk->nama_toko;
+}
+
+// Badge Stok Habis
+$badge_stok = '';
 if ($stok <= 0) {
-    $stok_label = '<span class="absolute top-2 right-2 bg-gray-500 text-white text-[10px] font-bold px-2 py-1 rounded z-10">Habis</span>';
+    $badge_stok = '<div class="absolute inset-0 bg-white/60 backdrop-blur-[1px] z-10 flex items-center justify-center"><span class="bg-gray-800 text-white text-xs font-bold px-3 py-1 rounded-full">Habis</span></div>';
 } elseif ($stok < 5) {
-    $stok_label = '<span class="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded z-10">Sisa ' . $stok . '</span>';
+    $badge_stok = '<span class="absolute top-2 left-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-sm z-10">Sisa ' . $stok . '</span>';
 }
 ?>
 
-<div class="group bg-white rounded-lg border border-gray-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 flex flex-col h-full overflow-hidden relative">
+<div class="group bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-lg hover:border-primary/20 transition-all duration-300 flex flex-col h-full overflow-hidden relative">
     
-    <!-- Link Pembungkus Seluruh Card -->
-    <a href="<?php echo $product_url; ?>" class="block flex-grow flex flex-col h-full">
+    <a href="<?php echo $link_detail; ?>" class="block flex-grow flex flex-col h-full">
         
-        <!-- Bagian Gambar -->
+        <!-- BAGIAN GAMBAR -->
         <div class="relative w-full aspect-square bg-gray-50 overflow-hidden">
-            <?php echo $stok_label; ?>
+            <?php echo $badge_stok; ?>
+            
             <img src="<?php echo $image_url; ?>" 
                  alt="<?php echo $nama_produk; ?>" 
-                 class="w-full h-full object-cover object-center group-hover:scale-105 transition duration-500"
+                 class="w-full h-full object-cover object-center group-hover:scale-105 transition duration-500 mix-blend-multiply"
                  loading="lazy">
             
-            <!-- Overlay Transparan saat Hover -->
-            <div class="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition duration-300"></div>
+            <!-- Tombol Quick Action (Muncul saat Hover) -->
+            <?php if ($stok > 0): ?>
+            <div class="absolute bottom-0 inset-x-0 p-3 translate-y-full group-hover:translate-y-0 transition-transform duration-300 flex justify-center bg-gradient-to-t from-black/40 to-transparent pb-4">
+                <button class="bg-white text-primary hover:bg-primary hover:text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg flex items-center gap-2 transition-colors dw-add-to-cart-btn"
+                        data-product-id="<?php echo $produk->id; ?>"
+                        onclick="event.preventDefault();"> <!-- Prevent link click -->
+                    <i class="fas fa-cart-plus"></i> Beli
+                </button>
+            </div>
+            <?php endif; ?>
         </div>
 
-        <!-- Bagian Konten -->
+        <!-- BAGIAN KONTEN -->
         <div class="p-3 flex flex-col flex-grow">
+            <!-- Kategori Kecil (Opsional) -->
+            <div class="text-[10px] text-gray-400 mb-1 uppercase tracking-wide font-semibold">
+                <?php echo !empty($produk->kategori) ? esc_html($produk->kategori) : 'Produk Lokal'; ?>
+            </div>
+
             <!-- Judul Produk -->
-            <h3 class="text-sm font-medium text-gray-800 line-clamp-2 mb-1 leading-snug min-h-[2.5em] group-hover:text-primary transition-colors">
+            <h3 class="text-sm font-semibold text-gray-800 line-clamp-2 mb-1 leading-snug min-h-[2.5em] group-hover:text-primary transition-colors">
                 <?php echo $nama_produk; ?>
             </h3>
 
@@ -60,42 +82,23 @@ if ($stok <= 0) {
                 <?php echo $harga; ?>
             </div>
 
-            <!-- Spacer Flexible -->
+            <!-- Spacer -->
             <div class="mt-auto"></div>
 
-            <!-- Info Lokasi & Toko -->
-            <div class="flex items-center gap-1 text-[11px] text-gray-500 mb-2">
-                <?php if($lokasi): ?>
-                    <i class="fas fa-map-marker-alt text-gray-400 text-[10px]"></i> 
-                    <span class="truncate max-w-[100px]"><?php echo $lokasi; ?></span>
-                <?php else: ?>
-                    <i class="fas fa-store text-gray-400 text-[10px]"></i> 
-                    <span class="truncate max-w-[100px]"><?php echo $nama_toko; ?></span>
-                <?php endif; ?>
+            <!-- Info Lokasi (Desa) -->
+            <div class="flex items-center gap-1.5 text-xs text-gray-500 mb-2 pb-2 border-b border-gray-50">
+                <i class="fas fa-map-marker-alt text-primary/70"></i> 
+                <span class="truncate font-medium text-gray-600"><?php echo $lokasi_label; ?></span>
             </div>
 
             <!-- Rating & Terjual -->
-            <div class="flex items-center gap-2 border-t border-gray-50 pt-2 text-[10px]">
-                <?php if ($rating > 0) : ?>
-                    <div class="flex items-center gap-0.5 text-gray-800 font-bold">
-                        <i class="fas fa-star text-yellow-400 text-[9px]"></i> 
-                        <span><?php echo number_format($rating, 1); ?></span>
-                    </div>
-                    <span class="text-gray-300">|</span>
-                <?php endif; ?>
-                <span class="text-gray-500">Terjual <?php echo $terjual > 99 ? '99+' : $terjual; ?></span>
+            <div class="flex items-center justify-between text-[10px] text-gray-400">
+                <div class="flex items-center gap-1">
+                    <i class="fas fa-star text-yellow-400"></i>
+                    <span class="text-gray-700 font-bold"><?php echo ($rating > 0) ? number_format($rating, 1) : 'Baru'; ?></span>
+                </div>
+                <span><?php echo ($terjual > 0) ? $terjual . ' Terjual' : ''; ?></span>
             </div>
         </div>
     </a>
-
-    <!-- Tombol Keranjang (Muncul saat hover di Desktop) -->
-    <?php if ($stok > 0) : ?>
-    <div class="absolute bottom-3 right-3 opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 hidden md:block">
-        <button class="bg-primary hover:bg-primaryDark text-white w-8 h-8 rounded-full shadow-md flex items-center justify-center dw-add-to-cart-btn" 
-                data-product-id="<?php echo $produk->id; ?>" 
-                title="Tambah ke Keranjang">
-            <i class="fas fa-cart-plus text-xs"></i>
-        </button>
-    </div>
-    <?php endif; ?>
 </div>
