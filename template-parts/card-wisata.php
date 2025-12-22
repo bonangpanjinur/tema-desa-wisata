@@ -1,105 +1,130 @@
 <?php
 /**
- * Template Part: Card Wisata
- * Digunakan dalam loop arsip wisata, hasil pencarian, atau widget wisata.
- * Fitur:
- * - Menampilkan thumbnail dengan rasio seragam.
- * - Badge harga tiket (Gratis/Bayar).
- * - Informasi Lokasi.
- * - Rating Bintang.
+ * Template Part: Card Wisata (Updated to Match Product Card Style)
+ * Location: template-parts/card-wisata.php
+ * Description: Komponen kartu wisata yang disamakan gayanya dengan Card Produk (Grid Responsive).
  */
 
-// 1. Ambil ID Post saat ini
-$id_wisata   = get_the_ID();
+$w = $args['item'] ?? null;
 
-// 2. Ambil Meta Data Wisata
-// Pastikan key meta sesuai dengan yang tersimpan di database
-$harga_tiket = get_post_meta($id_wisata, 'harga_tiket', true);
-$lokasi      = get_post_meta($id_wisata, 'lokasi_wisata', true);
-$rating      = get_post_meta($id_wisata, 'rating_wisata', true); // Opsional
+if ( ! $w ) return;
+
+// =================================================================================
+// 1. LOGIKA DATA
+// =================================================================================
+
+// A. URL / PERMALINK
+$slug_wisata = ! empty( $w->slug ) ? $w->slug : sanitize_title( $w->nama_wisata );
+$link_w      = home_url( '/wisata/detail/' . $slug_wisata );
+
+// B. LOGIKA GAMBAR
+$img_w    = 'https://via.placeholder.com/400x300?text=Wisata';
+$raw_foto = $w->foto_utama ?? '';
+
+if ( ! empty( $raw_foto ) ) {
+    // Cek JSON
+    $json = json_decode( $raw_foto, true );
+    if ( json_last_error() === JSON_ERROR_NONE && is_array( $json ) && !empty($json) ) {
+        $raw_foto = $json[0];
+    }
+    
+    // Resolve ID vs URL
+    if ( is_numeric( $raw_foto ) ) {
+        $att = wp_get_attachment_image_src( $raw_foto, 'medium_large' );
+        if ( $att ) $img_w = $att[0];
+    } else {
+        $img_w = $raw_foto;
+    }
+}
+
+// C. DATA PENDUKUNG
+// Prioritas: Nama Desa -> Kabupaten -> Default
+$lokasi   = ! empty( $w->nama_desa ) ? 'Desa ' . $w->nama_desa : ( $w->kabupaten ?? 'Indonesia' );
+$rating   = isset( $w->rating_avg ) && $w->rating_avg > 0 ? $w->rating_avg : '4.8';
+$kategori = $w->kategori ?? 'Alam';
+$harga    = $w->harga_tiket ?? 0;
+
+// D. WARNA KATEGORI
+$cat_colors = [
+    'Alam'    => 'bg-green-100 text-green-700 border-green-200',
+    'Budaya'  => 'bg-purple-100 text-purple-700 border-purple-200',
+    'Edukasi' => 'bg-blue-100 text-blue-700 border-blue-200',
+    'Religi'  => 'bg-yellow-100 text-yellow-700 border-yellow-200',
+];
+$cat_class  = $cat_colors[ $kategori ] ?? 'bg-gray-100 text-gray-700 border-gray-200';
+// $cat_slug   = sanitize_title($kategori); // Tidak terlalu dibutuhkan di grid view
 ?>
 
-<div class="col-md-6 col-lg-4 mb-4">
-    <div class="card h-100 border-0 shadow-sm card-wisata-hover overflow-hidden">
+<!-- =================================================================================
+     2. TAMPILAN DESAIN (GRID STYLE - MATCHING PRODUCT CARD)
+     ================================================================================= -->
+
+<!-- Wrapper Utama: Struktur sama persis dengan card-produk.php -->
+<div class="group h-full flex flex-col bg-white rounded-xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300 relative">
+    
+    <!-- A. IMAGE WRAPPER -->
+    <!-- Note: Kita gunakan aspect-[4/3] agar foto wisata terlihat lebih luas, 
+         tetapi styling wrapper disamakan dengan produk -->
+    <div class="relative w-full aspect-[4/3] bg-gray-50 overflow-hidden">
+        <a href="<?php echo esc_url( $link_w ); ?>" class="block w-full h-full">
+            <img src="<?php echo esc_url( $img_w ); ?>" 
+                 alt="<?php echo esc_attr( $w->nama_wisata ); ?>" 
+                 class="w-full h-full object-cover object-center transform group-hover:scale-110 transition-transform duration-500 ease-out"
+                 loading="lazy"
+                 onerror="this.src='https://via.placeholder.com/400x300?text=No+Image';">
+            
+            <!-- Overlay Gelap Halus saat Hover (Sama seperti Produk) -->
+            <div class="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300"></div>
+        </a>
+
+        <!-- Badge Kategori (Pojok Kiri Atas) -->
+        <div class="absolute top-2 left-2 z-10">
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border shadow-sm uppercase tracking-wide <?php echo $cat_class; ?>">
+                <?php echo esc_html( $kategori ); ?>
+            </span>
+        </div>
+    </div>
+
+    <!-- B. KONTEN WISATA -->
+    <!-- Padding disamakan p-3 agar kompak -->
+    <div class="p-3 flex flex-col flex-grow">
         
-        <!-- BAGIAN 1: GAMBAR & BADGE HARGA -->
-        <div class="position-relative" style="height: 220px;">
-            <a href="<?php the_permalink(); ?>" class="d-block h-100">
-                <?php if ( has_post_thumbnail() ) : ?>
-                    <!-- Gambar Unggulan -->
-                    <img src="<?php the_post_thumbnail_url('large'); ?>" 
-                         class="w-100 h-100" 
-                         style="object-fit: cover; transition: transform 0.3s ease;" 
-                         alt="<?php the_title_attribute(); ?>">
-                <?php else : ?>
-                    <!-- Placeholder jika tidak ada gambar -->
-                    <div class="w-100 h-100 bg-secondary d-flex align-items-center justify-content-center text-white">
-                        <i class="bi bi-camera fs-1"></i>
-                    </div>
-                <?php endif; ?>
+        <!-- Baris Rating & Lokasi (Style text-[10px] sama dengan produk) -->
+        <div class="flex items-center justify-between mb-1.5 text-[10px] md:text-xs">
+            <div class="flex items-center gap-1 text-yellow-500 font-bold bg-yellow-50 px-1.5 py-0.5 rounded">
+                <i class="fas fa-star text-[9px]"></i> <?php echo $rating; ?>
+            </div>
+            <div class="flex items-center gap-1 text-gray-400 truncate max-w-[60%]">
+                <i class="fas fa-map-marker-alt text-[9px]"></i> 
+                <span class="truncate"><?php echo esc_html( $lokasi ); ?></span>
+            </div>
+        </div>
+
+        <!-- Judul Wisata (Style text-sm sama dengan produk) -->
+        <h3 class="text-sm font-bold text-gray-800 leading-snug mb-3 line-clamp-2 min-h-[2.5em] group-hover:text-green-600 transition-colors" title="<?php echo esc_attr( $w->nama_wisata ); ?>">
+            <a href="<?php echo esc_url( $link_w ); ?>">
+                <?php echo esc_html( $w->nama_wisata ); ?>
             </a>
+        </h3>
+
+        <!-- C. FOOTER: HARGA & TOMBOL -->
+        <!-- mt-auto memaksa bagian ini selalu di dasar kartu -->
+        <div class="mt-auto pt-3 border-t border-dashed border-gray-100 flex items-end justify-between gap-2">
             
-            <!-- Label Harga di pojok kanan bawah gambar -->
-            <div class="position-absolute bottom-0 end-0 bg-white px-3 py-1 m-2 rounded shadow-sm">
-                <?php if ($harga_tiket && (int)$harga_tiket > 0) : ?>
-                    <span class="text-success fw-bold small">
-                        Rp <?php echo number_format((float)$harga_tiket, 0, ',', '.'); ?>
-                    </span>
-                <?php else : ?>
-                    <span class="text-success fw-bold small">Gratis</span>
-                <?php endif; ?>
+            <!-- Harga -->
+            <div class="flex flex-col">
+                <span class="text-[10px] text-gray-400 mb-0.5">Tiket Masuk</span>
+                <span class="text-green-600 font-extrabold text-sm md:text-base leading-none">
+                    <?php echo ( $harga > 0 ) ? 'Rp ' . number_format( $harga, 0, ',', '.' ) : 'Gratis'; ?>
+                </span>
             </div>
-        </div>
-
-        <!-- BAGIAN 2: INFORMASI WISATA -->
-        <div class="card-body">
-            <!-- Lokasi -->
-            <?php if ($lokasi) : ?>
-                <div class="mb-2 text-muted small text-truncate">
-                    <i class="bi bi-geo-alt-fill text-danger"></i> <?php echo esc_html($lokasi); ?>
-                </div>
-            <?php endif; ?>
-
-            <!-- Judul -->
-            <h5 class="card-title mb-2">
-                <a href="<?php the_permalink(); ?>" class="text-decoration-none text-dark stretched-link">
-                    <?php the_title(); ?>
-                </a>
-            </h5>
             
-            <!-- Deskripsi Singkat (Excerpt) -->
-            <p class="card-text text-muted small">
-                <?php 
-                // Batasi panjang deskripsi agar rapi
-                echo wp_trim_words(get_the_excerpt(), 12, '...'); 
-                ?>
-            </p>
-        </div>
-
-        <!-- BAGIAN 3: FOOTER CARD (RATING & TOMBOL) -->
-        <div class="card-footer bg-transparent border-top-0 d-flex justify-content-between align-items-center pb-3 pt-0">
-            
-            <!-- Rating Bintang -->
-            <div class="text-warning small d-flex align-items-center" style="z-index: 2;">
-                <?php 
-                $current_rating = $rating ? (int)$rating : 0;
-                // Menampilkan 5 bintang
-                for($i=1; $i<=5; $i++) {
-                    if ($i <= $current_rating) {
-                        echo '<i class="bi bi-star-fill"></i>';
-                    } else {
-                        echo '<i class="bi bi-star"></i>'; // Bintang kosong
-                    }
-                    echo ' '; // spasi antar bintang
-                }
-                ?>
-                <span class="text-muted ms-1" style="font-size: 0.8rem;">(<?php echo $current_rating; ?>/5)</span>
-            </div>
-
-            <!-- Tombol Kunjungi (Opsional, karena stretched-link sudah membuat seluruh card bisa diklik) -->
-            <!-- Kita beri z-index agar tetap bisa diklik terpisah jika perlu -->
-            <a href="<?php the_permalink(); ?>" class="btn btn-sm btn-primary px-3 rounded-pill position-relative" style="z-index: 2;">
-                Kunjungi <i class="bi bi-arrow-right ms-1"></i>
+            <!-- Tombol Panah (Detail) -->
+            <!-- Ukuran tombol disamakan dengan tombol cart produk: w-8 h-8 -->
+            <a href="<?php echo esc_url( $link_w ); ?>" 
+               class="w-8 h-8 md:w-9 md:h-9 rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center hover:bg-blue-600 hover:text-white hover:shadow-md transition-all duration-300 active:scale-95 flex-shrink-0"
+               aria-label="Lihat Detail">
+                <i class="fas fa-arrow-right text-xs md:text-sm"></i>
             </a>
         </div>
 

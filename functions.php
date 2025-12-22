@@ -85,8 +85,9 @@ add_action( 'wp_enqueue_scripts', 'tema_desa_wisata_scripts' );
 
 /**
  * Register Custom Post Types: Produk, Wisata, Desa, Transaksi
+ * Prefix function renamed to 'tema_dw_' to avoid collision with plugins.
  */
-function dw_register_cpt() {
+function tema_dw_register_cpt() {
 	// 1. Produk
 	register_post_type( 'dw_produk', array(
 		'labels' => array(
@@ -144,12 +145,13 @@ function dw_register_cpt() {
         'supports'    => array( 'title', 'editor' ), // title=No Invoice
     ));
 }
-add_action( 'init', 'dw_register_cpt' );
+add_action( 'init', 'tema_dw_register_cpt' );
 
 /**
  * Register Taxonomies: Kategori Produk
+ * Prefix renamed to avoid collision
  */
-function dw_register_taxonomies() {
+function tema_dw_register_taxonomies() {
 	register_taxonomy( 'dw_kategori_produk', 'dw_produk', array(
 		'labels' => array(
 			'name' => 'Kategori Produk',
@@ -159,23 +161,23 @@ function dw_register_taxonomies() {
 		'rewrite' => array( 'slug' => 'kategori-produk' ),
 	));
 }
-add_action( 'init', 'dw_register_taxonomies' );
+add_action( 'init', 'tema_dw_register_taxonomies' );
 
 /**
  * Custom Fields (Meta Boxes)
  */
-function dw_add_meta_boxes() {
+function tema_dw_add_meta_boxes() {
     // Meta Box Produk
-    add_meta_box('dw_produk_meta', 'Data Produk', 'dw_produk_meta_callback', 'dw_produk', 'normal', 'high');
+    add_meta_box('dw_produk_meta', 'Data Produk', 'tema_dw_produk_meta_callback', 'dw_produk', 'normal', 'high');
     // Meta Box Wisata
-    add_meta_box('dw_wisata_meta', 'Data Wisata', 'dw_wisata_meta_callback', 'dw_wisata', 'normal', 'high');
+    add_meta_box('dw_wisata_meta', 'Data Wisata', 'tema_dw_wisata_meta_callback', 'dw_wisata', 'normal', 'high');
     // Meta Box Transaksi
-    add_meta_box('dw_transaksi_meta', 'Detail Transaksi', 'dw_transaksi_meta_callback', 'dw_transaksi', 'normal', 'high');
+    add_meta_box('dw_transaksi_meta', 'Detail Transaksi', 'tema_dw_transaksi_meta_callback', 'dw_transaksi', 'normal', 'high');
 }
-add_action('add_meta_boxes', 'dw_add_meta_boxes');
+add_action('add_meta_boxes', 'tema_dw_add_meta_boxes');
 
 // Callback Produk
-function dw_produk_meta_callback($post) {
+function tema_dw_produk_meta_callback($post) {
     wp_nonce_field('dw_save_meta', 'dw_meta_nonce');
     $harga = get_post_meta($post->ID, 'harga_produk', true);
     $stok = get_post_meta($post->ID, 'stok_produk', true);
@@ -191,7 +193,7 @@ function dw_produk_meta_callback($post) {
 }
 
 // Callback Wisata
-function dw_wisata_meta_callback($post) {
+function tema_dw_wisata_meta_callback($post) {
     wp_nonce_field('dw_save_meta', 'dw_meta_nonce');
     $harga = get_post_meta($post->ID, 'harga_tiket', true);
     $lokasi = get_post_meta($post->ID, 'lokasi_wisata', true);
@@ -203,7 +205,7 @@ function dw_wisata_meta_callback($post) {
 }
 
 // Callback Transaksi 
-function dw_transaksi_meta_callback($post) {
+function tema_dw_transaksi_meta_callback($post) {
     $total = get_post_meta($post->ID, 'total_transaksi', true);
     $status = get_post_meta($post->ID, 'status_transaksi', true); 
     $customer_id = get_post_meta($post->ID, 'customer_id', true);
@@ -214,7 +216,7 @@ function dw_transaksi_meta_callback($post) {
 }
 
 // Save Meta
-function dw_save_meta($post_id) {
+function tema_dw_save_meta($post_id) {
     if (!isset($_POST['dw_meta_nonce']) || !wp_verify_nonce($_POST['dw_meta_nonce'], 'dw_save_meta')) return;
     if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
     if (!current_user_can('edit_post', $post_id)) return;
@@ -230,32 +232,35 @@ function dw_save_meta($post_id) {
         }
     }
 }
-add_action('save_post', 'dw_save_meta');
+add_action('save_post', 'tema_dw_save_meta');
 
 /**
  * Handle Session Start
  */
-function dw_start_session() {
+function tema_dw_start_session() {
     if(!session_id()) {
         session_start();
     }
 }
-add_action('init', 'dw_start_session', 1);
+add_action('init', 'tema_dw_start_session', 1);
 
 /**
  * Fungsi Helper: Format Rupiah
+ * Wrapped to avoid collision with plugin
  */
-function dw_format_rupiah($angka){
-	return 'Rp ' . number_format($angka, 0, ',', '.');
+if ( ! function_exists( 'dw_format_rupiah' ) ) {
+    function dw_format_rupiah($angka){
+        return 'Rp ' . number_format($angka, 0, ',', '.');
+    }
 }
 
 /**
  * Ajax Handler: Tambah ke Keranjang
  */
-add_action('wp_ajax_dw_add_to_cart', 'dw_add_to_cart_handler');
-add_action('wp_ajax_nopriv_dw_add_to_cart', 'dw_add_to_cart_handler');
+add_action('wp_ajax_dw_add_to_cart', 'tema_dw_add_to_cart_handler');
+add_action('wp_ajax_nopriv_dw_add_to_cart', 'tema_dw_add_to_cart_handler');
 
-function dw_add_to_cart_handler() {
+function tema_dw_add_to_cart_handler() {
     // Validasi nonce idealnya dilakukan di sini
     
     $product_id = isset($_POST['product_id']) ? intval($_POST['product_id']) : 0;
@@ -287,13 +292,13 @@ function dw_add_to_cart_handler() {
 /**
  * Inisialisasi Role User Tambahan
  */
-function dw_add_roles() {
+function tema_dw_add_roles() {
     add_role( 'desa', 'Admin Desa', array( 'read' => true, 'upload_files' => true ) );
     add_role( 'pedagang', 'Pedagang Toko', array( 'read' => true, 'upload_files' => true ) );
     add_role( 'ojek', 'Ojek Wisata', array( 'read' => true ) );
     add_role( 'wisatawan', 'Wisatawan', array( 'read' => true ) );
 }
-add_action( 'init', 'dw_add_roles' );
+add_action( 'init', 'tema_dw_add_roles' );
 
 // Izinkan pedagang upload gambar
 if ( current_user_can('pedagang') && !current_user_can('upload_files') ) {
@@ -304,7 +309,7 @@ if ( current_user_can('pedagang') && !current_user_can('upload_files') ) {
 /**
  * Redirect Login berdasarkan Role
  */
-function dw_login_redirect( $url, $request, $user ) {
+function tema_dw_login_redirect( $url, $request, $user ) {
     if ( $user && is_object( $user ) && is_a( $user, 'WP_User' ) ) {
         if ( $user->has_cap( 'administrator' ) ) {
             return admin_url();
@@ -320,15 +325,15 @@ function dw_login_redirect( $url, $request, $user ) {
     }
     return $url;
 }
-add_filter( 'login_redirect', 'dw_login_redirect', 10, 3 );
+add_filter( 'login_redirect', 'tema_dw_login_redirect', 10, 3 );
 
 /**
  * Filter Arsip Produk (AJAX)
  */
-add_action('wp_ajax_filter_products', 'dw_filter_products_handler');
-add_action('wp_ajax_nopriv_filter_products', 'dw_filter_products_handler');
+add_action('wp_ajax_filter_products', 'tema_dw_filter_products_handler');
+add_action('wp_ajax_nopriv_filter_products', 'tema_dw_filter_products_handler');
 
-function dw_filter_products_handler() {
+function tema_dw_filter_products_handler() {
     // Placeholder untuk logika filter produk di masa mendatang
     // Saat ini implementasi filter mungkin ditangani langsung di file js atau page template
     wp_send_json_error(array('message' => 'Filter belum diimplementasikan sepenuhnya.'));
@@ -338,6 +343,3 @@ function dw_filter_products_handler() {
  * Require File Dependensi Lain
  */
 // Pastikan file ini ada di folder inc/
-if ( file_exists( get_template_directory() . '/inc/dependency-check.php' ) ) {
-    require get_template_directory() . '/inc/dependency-check.php';
-}

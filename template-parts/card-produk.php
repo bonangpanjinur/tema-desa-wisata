@@ -1,109 +1,171 @@
 <?php
 /**
  * Template Part: Card Produk
- * Digunakan dalam loop arsip produk, widget produk, atau hasil pencarian.
- * * Fitur:
- * - Menampilkan thumbnail dengan rasio seragam.
- * - Badge stok (Habis/Sisa Sedikit).
- * - Format harga Rupiah.
- * - Lokasi Desa/Penjual.
- * - Jumlah Terjual.
+ * Location: template-parts/card-produk.php
+ * Description: Komponen kartu standar untuk item produk dengan desain konsisten & responsif.
  */
 
-// 1. Ambil ID Post saat ini
-$id_produk = get_the_ID();
+// Ambil data dari $args yang dikirim via get_template_part
+$p = $args['item'] ?? null;
 
-// 2. Ambil Meta Data Produk
-// Pastikan key meta sesuai dengan yang tersimpan di database saat input produk
-$harga     = get_post_meta($id_produk, 'harga_produk', true);
-$stok      = get_post_meta($id_produk, 'stok_produk', true);
-$terjual   = get_post_meta($id_produk, 'terjual', true);
-$lokasi    = get_post_meta($id_produk, 'lokasi_desa', true); 
+if ( ! $p ) return;
 
-// 3. Logika Stok
-// Cek jika stok kosong atau 0
-$is_out_of_stock = ($stok !== '' && (int)$stok <= 0);
-// Cek jika stok menipis (misal di bawah 5)
-$is_low_stock    = ($stok !== '' && (int)$stok > 0 && (int)$stok < 5);
+// =================================================================================
+// 1. LOGIKA DATA (BACKEND LOGIC)
+// =================================================================================
+
+// A. URL / PERMALINK
+// Mengutamakan slug dari database, jika kosong fallback ke sanitize title
+$slug_produk = ! empty( $p->slug ) ? $p->slug : sanitize_title( $p->nama_produk );
+// Menyesuaikan struktur link sesuai request kode Anda (/produk/detail/slug)
+$link_p      = home_url( '/produk/detail/' . $slug_produk );
+
+// B. LOGIKA GAMBAR (Cerdas: JSON / ID / URL)
+$img_p    = 'https://via.placeholder.com/400x400?text=Produk'; // Placeholder default
+$raw_foto = $p->foto_utama ?? $p->foto_produk ?? ''; 
+
+if ( ! empty( $raw_foto ) ) {
+    // Cek apakah format JSON (array ID)
+    $json_data = json_decode( $raw_foto, true );
+    if ( json_last_error() === JSON_ERROR_NONE && is_array( $json_data ) && ! empty( $json_data ) ) {
+        $raw_foto = $json_data[0]; // Ambil item pertama
+    } elseif ( is_serialized( $raw_foto ) ) {
+        // Cek serialized array WP lama
+        $ser_data = @unserialize( $raw_foto );
+        if ( $ser_data && is_array( $ser_data ) ) {
+            $raw_foto = $ser_data[0];
+        }
+    }
+
+    // Resolusi ke URL Gambar
+    if ( is_numeric( $raw_foto ) ) {
+        // Jika ID Attachment
+        $img_att = wp_get_attachment_image_src( $raw_foto, 'medium_large' ); // Gunakan size medium_large agar tidak berat
+        if ( $img_att ) {
+            $img_p = $img_att[0];
+        }
+    } else {
+        // Jika URL String
+        $img_p = $raw_foto;
+    }
+}
+
+// C. DATA PENDUKUNG
+$lokasi    = ! empty( $p->nama_desa ) ? 'Desa ' . $p->nama_desa : ( $p->kabupaten ?? 'Indonesia' );
+$rating    = isset( $p->rating_avg ) && $p->rating_avg > 0 ? $p->rating_avg : '0.0';
+$kategori  = $p->kategori ?? 'Umum';
+$terjual   = $p->terjual ?? 0;
+$harga     = $p->harga ?? 0;
+$nama_toko = $p->nama_toko ?? 'UMKM Desa';
+$stok      = $p->stok ?? 0;
+
+// D. LOGIKA BADGE KATEGORI
+$cat_colors = [
+    'Makanan'   => 'bg-orange-100 text-orange-700 border-orange-200',
+    'Minuman'   => 'bg-blue-100 text-blue-700 border-blue-200',
+    'Kerajinan' => 'bg-purple-100 text-purple-700 border-purple-200',
+    'Fashion'   => 'bg-pink-100 text-pink-700 border-pink-200',
+    'Pertanian' => 'bg-green-100 text-green-700 border-green-200',
+];
+$cat_class  = $cat_colors[ $kategori ] ?? 'bg-gray-100 text-gray-700 border-gray-200';
 ?>
 
-<div class="col-6 col-md-4 col-lg-3 mb-4">
-    <div class="card h-100 border-0 shadow-sm card-hover-effect">
-        
-        <!-- BAGIAN 1: GAMBAR & BADGE -->
-        <div class="card-img-wrapper position-relative overflow-hidden" style="height: 200px;">
-            <a href="<?php the_permalink(); ?>" class="d-block h-100">
-                <?php if ( has_post_thumbnail() ) : ?>
-                    <!-- Gambar Unggulan -->
-                    <img src="<?php the_post_thumbnail_url('medium'); ?>" 
-                         class="card-img-top w-100 h-100" 
-                         style="object-fit: cover; transition: transform 0.3s ease;" 
-                         alt="<?php the_title_attribute(); ?>">
-                <?php else : ?>
-                    <!-- Placeholder jika tidak ada gambar -->
-                    <div class="w-100 h-100 bg-light d-flex align-items-center justify-content-center text-secondary">
-                        <i class="bi bi-bag fs-1"></i>
-                    </div>
-                <?php endif; ?>
-            </a>
+<!-- =================================================================================
+     2. TAMPILAN DESAIN (UPDATED UI)
+     ================================================================================= -->
+     
+<!-- Wrapper Utama: h-full penting agar tinggi kartu seragam dalam grid -->
+<div class="group h-full flex flex-col bg-white rounded-xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-300 relative">
+    
+    <!-- A. IMAGE WRAPPER (ASPECT SQUARE 1:1) -->
+    <div class="relative w-full aspect-square bg-gray-50 overflow-hidden">
+        <a href="<?php echo esc_url( $link_p ); ?>" class="block w-full h-full">
+            <img src="<?php echo esc_url( $img_p ); ?>" 
+                 alt="<?php echo esc_attr( $p->nama_produk ); ?>" 
+                 class="w-full h-full object-cover object-center transform group-hover:scale-110 transition-transform duration-500 ease-out"
+                 loading="lazy">
+            
+            <!-- Overlay Gelap Halus saat Hover -->
+            <div class="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300"></div>
+        </a>
 
-            <!-- Badge Status Stok -->
-            <?php if ($is_out_of_stock) : ?>
-                <span class="position-absolute top-0 start-0 badge bg-danger m-2 shadow-sm">Habis</span>
-            <?php elseif ($is_low_stock) : ?>
-                <span class="position-absolute top-0 start-0 badge bg-warning text-dark m-2 shadow-sm">
-                    Sisa <?php echo esc_html($stok); ?>
+        <!-- Badge Kategori (Pojok Kiri Atas) -->
+        <div class="absolute top-2 left-2 z-10">
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border shadow-sm uppercase tracking-wide <?php echo $cat_class; ?>">
+                <?php echo esc_html( $kategori ); ?>
+            </span>
+        </div>
+
+        <!-- Badge Stok Habis / Terlaris (Pojok Kanan Atas) -->
+        <div class="absolute top-2 right-2 z-10 flex flex-col gap-1 items-end">
+            <?php if ( $stok < 1 ) : ?>
+                <span class="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-sm">HABIS</span>
+            <?php elseif ( $terjual > 10 ) : ?>
+                <span class="bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-sm flex items-center gap-1">
+                    <i class="fas fa-fire"></i> Laris
                 </span>
             <?php endif; ?>
         </div>
+    </div>
 
-        <!-- BAGIAN 2: INFORMASI PRODUK -->
-        <div class="card-body d-flex flex-column p-3">
-            
-            <!-- Lokasi / Asal Desa -->
-            <?php if ($lokasi) : ?>
-                <div class="mb-1">
-                    <small class="text-muted text-truncate d-block">
-                        <i class="bi bi-geo-alt-fill text-danger small"></i> <?php echo esc_html($lokasi); ?>
-                    </small>
-                </div>
-            <?php endif; ?>
-
-            <!-- Judul Produk -->
-            <h6 class="card-title mb-2 lh-base">
-                <a href="<?php the_permalink(); ?>" class="text-decoration-none text-dark stretched-link">
-                    <?php 
-                    // Batasi panjang judul agar tampilan rapi
-                    echo wp_trim_words(get_the_title(), 8, '...'); 
-                    ?>
-                </a>
-            </h6>
-
-            <!-- Harga & Terjual (Posisi di bawah/bottom) -->
-            <div class="mt-auto pt-2">
-                <?php if ($harga) : ?>
-                    <h6 class="text-primary fw-bold mb-0">
-                        Rp <?php echo number_format((float)$harga, 0, ',', '.'); ?>
-                    </h6>
-                <?php else : ?>
-                    <h6 class="text-success fw-bold mb-0 small">Gratis / Hubungi</h6>
-                <?php endif; ?>
-
-                <!-- Info Terjual -->
-                <?php if ($terjual && (int)$terjual > 0) : ?>
-                    <small class="text-muted d-block mt-1" style="font-size: 0.75rem;">
-                        <i class="bi bi-bag-check"></i> <?php echo esc_html($terjual); ?> Terjual
-                    </small>
-                <?php endif; ?>
+    <!-- B. KONTEN PRODUK -->
+    <!-- flex-grow & flex-col penting untuk mendorong footer ke bawah -->
+    <div class="p-3 flex flex-col flex-grow">
+        
+        <!-- Baris Rating & Lokasi -->
+        <div class="flex items-center justify-between mb-1.5 text-[10px] md:text-xs">
+            <div class="flex items-center gap-1 text-yellow-500 font-bold bg-yellow-50 px-1.5 py-0.5 rounded">
+                <i class="fas fa-star text-[9px]"></i> <?php echo number_format($rating, 1); ?>
+            </div>
+            <div class="flex items-center gap-1 text-gray-400 truncate max-w-[50%]">
+                <i class="fas fa-map-marker-alt text-[9px]"></i> 
+                <span class="truncate"><?php echo esc_html( $lokasi ); ?></span>
             </div>
         </div>
 
-        <!-- BAGIAN 3: FOOTER CARD (OPSIONAL) -->
-        <!-- Tombol ini bisa disembunyikan jika ingin clean look, karena seluruh card sudah bisa diklik (stretched-link) -->
-        <div class="card-footer bg-white border-top-0 p-3 pt-0">
-            <a href="<?php the_permalink(); ?>" class="btn btn-outline-primary btn-sm w-100 rounded-pill position-relative" style="z-index: 2;">
-                Lihat Detail
+        <!-- Judul Produk -->
+        <h3 class="text-sm font-bold text-gray-800 leading-snug mb-1 line-clamp-2 min-h-[2.5em] group-hover:text-green-600 transition-colors" title="<?php echo esc_attr( $p->nama_produk ); ?>">
+            <a href="<?php echo esc_url( $link_p ); ?>">
+                <?php echo esc_html( $p->nama_produk ); ?>
             </a>
+        </h3>
+
+        <!-- Nama Toko -->
+        <div class="flex items-center gap-1.5 mb-3">
+            <div class="w-4 h-4 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-[8px] flex-shrink-0">
+                <i class="fas fa-store"></i>
+            </div>
+            <span class="text-[10px] md:text-xs text-gray-500 font-medium truncate">
+                <?php echo esc_html( $nama_toko ); ?>
+            </span>
+        </div>
+
+        <!-- C. FOOTER: HARGA & TOMBOL -->
+        <!-- mt-auto memaksa bagian ini selalu di dasar kartu -->
+        <div class="mt-auto pt-3 border-t border-dashed border-gray-100 flex items-end justify-between gap-2">
+            
+            <!-- Harga & Terjual -->
+            <div class="flex flex-col">
+                <span class="text-[10px] text-gray-400 mb-0.5"><?php echo $terjual; ?> Terjual</span>
+                <span class="text-orange-600 font-extrabold text-sm md:text-base leading-none">
+                    Rp <?php echo number_format( $harga, 0, ',', '.' ); ?>
+                </span>
+            </div>
+            
+            <!-- Tombol Keranjang -->
+            <?php if ( $stok > 0 ) : ?>
+            <button type="button" 
+                    class="btn-add-to-cart w-8 h-8 md:w-9 md:h-9 rounded-full bg-green-50 text-green-600 border border-green-100 flex items-center justify-center hover:bg-green-600 hover:text-white hover:shadow-md transition-all duration-300 active:scale-95 flex-shrink-0"
+                    data-product-id="<?php echo esc_attr( $p->id ); ?>" 
+                    data-is-custom="1" 
+                    aria-label="Tambah ke Keranjang">
+                <i class="fas fa-cart-plus text-xs md:text-sm"></i>
+            </button>
+            <?php else: ?>
+            <button disabled class="w-8 h-8 rounded-full bg-gray-100 text-gray-400 cursor-not-allowed flex items-center justify-center flex-shrink-0">
+                <i class="fas fa-times text-xs"></i>
+            </button>
+            <?php endif; ?>
         </div>
 
     </div>
