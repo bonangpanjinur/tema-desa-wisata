@@ -480,6 +480,9 @@ get_header();
 </style>
 
 <script>
+// Define Ajax URL for Frontend
+var ajaxurl = "<?php echo admin_url('admin-ajax.php'); ?>";
+
 // 1. Tab Switcher
 function switchTab(tabName) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
@@ -488,10 +491,8 @@ function switchTab(tabName) {
     document.getElementById('view-' + tabName).classList.remove('hidden');
     document.getElementById('nav-' + tabName).classList.add('active-tab');
 
-    // Trigger Load Data
     if(tabName === 'produk' && typeof loadMerchantProducts === 'function') loadMerchantProducts();
     if(tabName === 'pesanan' && typeof loadMerchantOrders === 'function') loadMerchantOrders();
-    // if(tabName === 'pengaturan') // Pengaturan sekarang dihandle PHP langsung, tidak butuh AJAX load profile
 }
 
 // 2. Modal Produk Logic
@@ -501,7 +502,6 @@ const panelP = document.getElementById('modal-produk-panel');
 function openProductModal(data = null) {
     modalP.classList.remove('hidden');
     setTimeout(() => panelP.classList.remove('translate-x-full'), 10);
-    
     document.getElementById('form-product').reset();
     document.getElementById('prod_id').value = '';
     document.getElementById('modal-title').innerText = 'Tambah Produk';
@@ -529,6 +529,144 @@ function closeProductModal() {
 document.addEventListener('DOMContentLoaded', () => {
     switchTab('ringkasan');
     if(typeof loadMerchantSummary === 'function') loadMerchantSummary();
+});
+
+// ==========================================
+// 4. REGION DROPDOWN LOGIC (Adapted from Plugin)
+// ==========================================
+jQuery(document).ready(function($) {
+    
+    // Konfigurasi Selector ID
+    var els = {
+        prov: $('#dw_provinsi'),
+        kota: $('#dw_kota'),
+        kec: $('#dw_kecamatan'),
+        desa: $('#dw_desa')
+    };
+
+    // Helper: Load Options via AJAX
+    function loadRegionOptions(action, parentId, $target, selectedId) {
+        $target.html('<option value="">Memuat...</option>').prop('disabled', true);
+        
+        var ajaxAction = '';
+        var data = {}; // Nonce handled by WordPress if open, or check if needed
+
+        // Mapping Action ke AJAX Action Plugin
+        if(action === 'get_provinces') ajaxAction = 'dw_fetch_provinces';
+        if(action === 'get_regencies') { ajaxAction = 'dw_fetch_regencies'; data.province_id = parentId; }
+        if(action === 'get_districts') { ajaxAction = 'dw_fetch_districts'; data.regency_id = parentId; }
+        if(action === 'get_villages')  { ajaxAction = 'dw_fetch_villages'; data.district_id = parentId; }
+
+        data.action = ajaxAction;
+
+        $.ajax({
+            url: ajaxurl,
+            type: 'GET',
+            dataType: 'json',
+            data: data,
+            success: function(res) {
+                $target.empty();
+                $target.append('<option value="">Pilih...</option>');
+                $target.prop('disabled', false);
+
+                if(res.success) {
+                    var items = res.data;
+                    // Handle variations in API response structure
+                    if (items && items.data) items = items.data; 
+                    
+                    if (items && Array.isArray(items)) {
+                        $.each(items, function(i, item) {
+                            var val = item.id || item.code;
+                            var txt = item.name || item.nama;
+                            var isSelected = (selectedId && String(val) === String(selectedId)) ? 'selected' : '';
+                            $target.append('<option value="' + val + '" ' + isSelected + '>' + txt + '</option>');
+                        });
+                        
+                        // Jika ada data terpilih, trigger change untuk load level selanjutnya
+                        if(selectedId && $target.val() == selectedId) {
+                            $target.trigger('change'); 
+                        }
+                    } else {
+                        $target.append('<option value="">Data kosong</option>');
+                    }
+                } else {
+                    $target.html('<option value="">Gagal memuat</option>');
+                }
+            },
+            error: function() {
+                $target.html('<option value="">Error Jaringan</option>');
+            }
+        });
+    }
+
+    // A. Init Provinsi
+    var curProv = els.prov.data('selected');
+    if(els.prov.length > 0) {
+        loadRegionOptions('get_provinces', null, els.prov, curProv);
+    }
+
+    // B. Change Provinsi -> Load Kota
+    els.prov.on('change', function() {
+        var id = $(this).val();
+        var txt = $(this).find('option:selected').text();
+        $('#input_provinsi_nama').val(txt);
+
+        els.kota.empty().prop('disabled', true);
+        els.kec.empty().prop('disabled', true);
+        els.desa.empty().prop('disabled', true);
+
+        if(id) {
+            // Cek apakah ini load otomatis saat init (punya data-selected) atau manual change
+            var curKota = els.kota.data('selected');
+            // Reset selected data agar tidak auto-select jika user mengubah provinsi secara manual
+            if (String(id) !== String(curProv)) curKota = null; 
+            
+            loadRegionOptions('get_regencies', id, els.kota, curKota);
+        }
+    });
+
+    // C. Change Kota -> Load Kecamatan
+    els.kota.on('change', function() {
+        var id = $(this).val();
+        var txt = $(this).find('option:selected').text();
+        $('#input_kabupaten_nama').val(txt);
+
+        els.kec.empty().prop('disabled', true);
+        els.desa.empty().prop('disabled', true);
+
+        if(id) {
+            var curKec = els.kec.data('selected');
+            // Reset logic similar to above
+            // Note: simple approach, pass curKec. Logic inside loadRegionOptions will select it.
+            // But if user changed Kota manually, curKec from DB is invalid. 
+            // We rely on the fact that if user changes manually, selectedId won't match new list usually.
+            loadRegionOptions('get_districts', id, els.kec, curKec);
+        }
+    });
+
+    // D. Change Kecamatan -> Load Desa
+    els.kec.on('change', function() {
+        var id = $(this).val();
+        var txt = $(this).find('option:selected').text();
+        $('#input_kecamatan_nama').val(txt);
+
+        els.desa.empty().prop('disabled', true);
+
+        if(id) {
+            var curDesa = els.desa.data('selected');
+            loadRegionOptions('get_villages', id, els.desa, curDesa);
+        }
+    });
+
+    // E. Change Desa -> Set Text
+    els.desa.on('change', function() {
+        var txt = $(this).find('option:selected').text();
+        $('#input_kelurahan_nama').val(txt);
+    });
+
+    // Clear data-selected after initial load to prevent sticky selections on manual changes
+    // Optional optimization: 
+    // setTimeout(function(){ els.prov.removeAttr('data-selected'); els.kota.removeAttr('data-selected'); ... }, 3000);
 });
 </script>
 
