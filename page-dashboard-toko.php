@@ -1,7 +1,7 @@
 <?php
 /**
  * Template Name: Dashboard Toko (Merchant)
- * Description: Halaman manajemen toko lengkap sesuai struktur database dw_pedagang.
+ * Description: Halaman manajemen toko lengkap dengan Ringkasan Statistik & Kategori Dinamis.
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -14,7 +14,9 @@ if ( ! is_user_logged_in() ) {
 
 $current_user_id = get_current_user_id();
 global $wpdb;
-$table_pedagang = $wpdb->prefix . 'dw_pedagang';
+$table_pedagang      = $wpdb->prefix . 'dw_pedagang';
+$table_transaksi_sub = $wpdb->prefix . 'dw_transaksi_sub';
+$table_produk        = $wpdb->prefix . 'dw_produk';
 
 // 2. Handle Form Submit (Simpan Pengaturan Toko)
 $msg = '';
@@ -29,9 +31,9 @@ if ( isset($_POST['save_toko']) && wp_verify_nonce($_POST['toko_nonce'], 'save_t
         'nama_toko'           => sanitize_text_field($_POST['nama_toko']),
         'nama_pemilik'        => sanitize_text_field($_POST['nama_pemilik']),
         'nomor_wa'            => sanitize_text_field($_POST['nomor_wa']),
-        'nik'                 => sanitize_text_field($_POST['nik']), // Added NIK
+        'nik'                 => sanitize_text_field($_POST['nik']),
         'alamat_lengkap'      => sanitize_textarea_field($_POST['alamat_lengkap']),
-        'url_gmaps'           => esc_url_raw($_POST['url_gmaps']), // Added Gmaps
+        'url_gmaps'           => esc_url_raw($_POST['url_gmaps']),
         
         // Data Bank
         'nama_bank'           => sanitize_text_field($_POST['nama_bank']),
@@ -50,7 +52,7 @@ if ( isset($_POST['save_toko']) && wp_verify_nonce($_POST['toko_nonce'], 'save_t
         'kecamatan_nama'      => sanitize_text_field($_POST['kecamatan_nama']),
         'kelurahan_nama'      => sanitize_text_field($_POST['kelurahan_nama']),
         
-        // Pengaturan Tambahan (Sesuai DB)
+        // Pengaturan Tambahan
         'allow_pesan_di_tempat'     => isset($_POST['allow_pesan_di_tempat']) ? 1 : 0,
         'shipping_nasional_aktif'   => isset($_POST['shipping_nasional_aktif']) ? 1 : 0,
         
@@ -58,22 +60,18 @@ if ( isset($_POST['save_toko']) && wp_verify_nonce($_POST['toko_nonce'], 'save_t
     );
 
     // b. Handle Uploads
-    // 1. QRIS
     if ( ! empty($_FILES['qris_image']['name']) ) {
         $uploaded = wp_handle_upload( $_FILES['qris_image'], array( 'test_form' => false ) );
         if ( isset( $uploaded['url'] ) ) $data['qris_image_url'] = $uploaded['url'];
     }
-    // 2. Foto Profil
     if ( ! empty($_FILES['foto_profil']['name']) ) {
         $uploaded = wp_handle_upload( $_FILES['foto_profil'], array( 'test_form' => false ) );
         if ( isset( $uploaded['url'] ) ) $data['foto_profil'] = $uploaded['url'];
     }
-    // 3. Foto Sampul
     if ( ! empty($_FILES['foto_sampul']['name']) ) {
         $uploaded = wp_handle_upload( $_FILES['foto_sampul'], array( 'test_form' => false ) );
         if ( isset( $uploaded['url'] ) ) $data['foto_sampul'] = $uploaded['url'];
     }
-    // 4. KTP
     if ( ! empty($_FILES['foto_ktp']['name']) ) {
         $uploaded = wp_handle_upload( $_FILES['foto_ktp'], array( 'test_form' => false ) );
         if ( isset( $uploaded['url'] ) ) $data['url_ktp'] = $uploaded['url'];
@@ -99,8 +97,75 @@ if ( isset($_POST['save_toko']) && wp_verify_nonce($_POST['toko_nonce'], 'save_t
     }
 }
 
-// 3. Ambil Data Toko (Untuk Pre-fill Form)
+// 3. Ambil Data Toko (Untuk Pre-fill Form & Statistik)
 $toko = $wpdb->get_row( $wpdb->prepare("SELECT * FROM $table_pedagang WHERE id_user = %d", $current_user_id) );
+$toko_id = $toko ? $toko->id : 0;
+
+// 4. Hitung Statistik Ringkasan (Lengkap dari Database)
+$stats = [
+    'pendapatan' => 0,
+    'pesanan_baru' => 0,
+    'total_produk' => 0,
+    'produk_terjual' => 0,
+    'total_ulasan' => 0,
+    'rating' => 0
+];
+
+if ($toko_id) {
+    // Pendapatan: Total transaksi sub yang selesai/dikirim
+    $stats['pendapatan'] = $wpdb->get_var($wpdb->prepare(
+        "SELECT SUM(total_pesanan_toko) FROM $table_transaksi_sub 
+         WHERE id_pedagang = %d AND status_pesanan IN ('selesai', 'dikirim_ekspedisi')", 
+        $toko_id
+    ));
+
+    // Pesanan Masuk: Status menunggu konfirmasi
+    $stats['pesanan_baru'] = $wpdb->get_var($wpdb->prepare(
+        "SELECT COUNT(*) FROM $table_transaksi_sub 
+         WHERE id_pedagang = %d AND status_pesanan = 'menunggu_konfirmasi'", 
+        $toko_id
+    ));
+
+    // Total Produk Aktif
+    $stats['total_produk'] = $wpdb->get_var($wpdb->prepare(
+        "SELECT COUNT(*) FROM $table_produk WHERE id_pedagang = %d AND status = 'aktif'", 
+        $toko_id
+    ));
+
+    // Produk Terjual: Sum kolom terjual
+    $stats['produk_terjual'] = $wpdb->get_var($wpdb->prepare(
+        "SELECT SUM(terjual) FROM $table_produk WHERE id_pedagang = %d", 
+        $toko_id
+    ));
+    
+    // Rating & Ulasan (dari tabel pedagang atau tabel ulasan jika ada relasi)
+    // Menggunakan data denormalisasi di tabel pedagang untuk performa
+    $stats['total_ulasan'] = isset($toko->total_ulasan_toko) ? $toko->total_ulasan_toko : 0;
+    $stats['rating'] = isset($toko->rating_toko) ? $toko->rating_toko : 0;
+}
+
+// 5. Ambil Kategori Produk (DINAMIS DARI DATABASE)
+// Kita ambil kategori standar + kategori yang sudah pernah tersimpan di database produk
+$default_kategori = [
+    'Makanan & Minuman',
+    'Kerajinan Tangan',
+    'Fashion & Aksesoris',
+    'Pertanian & Perkebunan',
+    'Souvenir',
+    'Jasa',
+    'Lainnya'
+];
+
+// Ambil kategori unik yang sudah ada di tabel produk (jika user pernah input manual/impor)
+$existing_cats = $wpdb->get_col("SELECT DISTINCT kategori FROM $table_produk WHERE kategori != '' AND kategori IS NOT NULL");
+
+// Gabung dan hapus duplikat
+if (!empty($existing_cats)) {
+    $kategori_list = array_unique(array_merge($default_kategori, $existing_cats));
+    sort($kategori_list); // Urutkan abjad
+} else {
+    $kategori_list = $default_kategori;
+}
 
 get_header(); 
 ?>
@@ -162,23 +227,124 @@ get_header();
             </div>
         <?php endif; ?>
 
-        <!-- 1. TAB RINGKASAN -->
+        <!-- 1. TAB RINGKASAN (LENGKAP) -->
         <div id="view-ringkasan" class="tab-content animate-fade-in">
-            <!-- (Konten Ringkasan Sama seperti sebelumnya) -->
             <h1 class="text-2xl font-bold text-gray-800 mb-6">Ringkasan Penjualan</h1>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <!-- Stat Cards -->
-                <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
-                    <div class="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-xl"><i class="fas fa-wallet"></i></div>
-                    <div><p class="text-sm text-gray-500 mb-1">Pendapatan</p><h3 class="text-2xl font-bold text-gray-800" id="stat-sales">Rp 0</h3></div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                <!-- Pendapatan -->
+                <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 hover:shadow-md transition">
+                    <div class="w-14 h-14 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center text-2xl">
+                        <i class="fas fa-wallet"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 font-medium mb-1">Total Pendapatan</p>
+                        <h3 class="text-2xl font-bold text-gray-800" id="stat-sales">
+                            <?php echo 'Rp ' . number_format($stats['pendapatan'], 0, ',', '.'); ?>
+                        </h3>
+                    </div>
                 </div>
-                <!-- ... other stats ... -->
+
+                <!-- Pesanan Baru -->
+                <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 hover:shadow-md transition">
+                    <div class="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-2xl relative">
+                        <i class="fas fa-shopping-cart"></i>
+                        <?php if($stats['pesanan_baru'] > 0): ?>
+                            <span class="absolute top-0 right-0 -mt-1 -mr-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
+                        <?php endif; ?>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 font-medium mb-1">Pesanan Baru</p>
+                        <h3 class="text-2xl font-bold text-gray-800" id="stat-orders">
+                            <?php echo number_format($stats['pesanan_baru']); ?>
+                        </h3>
+                    </div>
+                </div>
+
+                <!-- Total Produk -->
+                <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 hover:shadow-md transition">
+                    <div class="w-14 h-14 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center text-2xl">
+                        <i class="fas fa-box-open"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 font-medium mb-1">Total Produk Aktif</p>
+                        <h3 class="text-2xl font-bold text-gray-800" id="stat-products">
+                            <?php echo number_format($stats['total_produk']); ?>
+                        </h3>
+                    </div>
+                </div>
+
+                <!-- Produk Terjual -->
+                <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 hover:shadow-md transition">
+                    <div class="w-14 h-14 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center text-2xl">
+                        <i class="fas fa-tags"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 font-medium mb-1">Unit Terjual</p>
+                        <h3 class="text-2xl font-bold text-gray-800">
+                            <?php echo number_format($stats['produk_terjual'] ?? 0); ?>
+                        </h3>
+                    </div>
+                </div>
+
+                <!-- Rating Toko -->
+                <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 hover:shadow-md transition">
+                    <div class="w-14 h-14 bg-yellow-100 text-yellow-600 rounded-2xl flex items-center justify-center text-2xl">
+                        <i class="fas fa-star"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 font-medium mb-1">Rating Toko</p>
+                        <h3 class="text-2xl font-bold text-gray-800">
+                            <?php echo number_format($stats['rating'], 1); ?> 
+                            <span class="text-sm font-normal text-gray-400">/ 5.0</span>
+                        </h3>
+                    </div>
+                </div>
+
+                <!-- Ulasan -->
+                <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 hover:shadow-md transition">
+                    <div class="w-14 h-14 bg-pink-100 text-pink-600 rounded-2xl flex items-center justify-center text-2xl">
+                        <i class="fas fa-comments"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 font-medium mb-1">Total Ulasan</p>
+                        <h3 class="text-2xl font-bold text-gray-800">
+                            <?php echo number_format($stats['total_ulasan']); ?>
+                        </h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pesanan Terbaru -->
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                    <h3 class="font-bold text-gray-800">Pesanan Terbaru</h3>
+                    <button onclick="switchTab('pesanan')" class="text-sm text-primary hover:underline font-medium">Lihat Semua</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-gray-50 text-gray-500 border-b border-gray-100">
+                            <tr>
+                                <th class="px-6 py-3 font-semibold">ID</th>
+                                <th class="px-6 py-3 font-semibold">Tanggal</th>
+                                <th class="px-6 py-3 font-semibold">Status</th>
+                                <th class="px-6 py-3 font-semibold text-right">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recent-orders-body" class="divide-y divide-gray-50">
+                            <tr>
+                                <td colspan="4" class="px-6 py-8 text-center text-gray-400">
+                                    <i class="fas fa-spinner fa-spin mr-2"></i> Memuat data...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
         <!-- 2. TAB PRODUK -->
         <div id="view-produk" class="tab-content hidden animate-fade-in">
-            <!-- (Konten Produk Sama seperti sebelumnya) -->
             <div class="flex justify-between items-center mb-6">
                 <h1 class="text-2xl font-bold text-gray-800">Produk Saya</h1>
                 <button onclick="openProductModal()" class="bg-primary hover:bg-green-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg shadow-primary/20 transition hover:-translate-y-0.5">
@@ -192,13 +358,19 @@ get_header();
 
         <!-- 3. TAB PESANAN -->
         <div id="view-pesanan" class="tab-content hidden animate-fade-in">
-            <!-- (Konten Pesanan Sama seperti sebelumnya) -->
             <h1 class="text-2xl font-bold text-gray-800 mb-6">Pesanan Masuk</h1>
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm text-left">
                         <thead class="bg-gray-50 text-gray-500 uppercase font-bold text-xs border-b border-gray-100">
-                            <tr><th class="px-6 py-4">ID</th><th class="px-6 py-4">Kode Trx</th><th class="px-6 py-4">Pembeli</th><th class="px-6 py-4">Status</th><th class="px-6 py-4">Total</th><th class="px-6 py-4 text-center">Aksi</th></tr>
+                            <tr>
+                                <th class="px-6 py-4">ID</th>
+                                <th class="px-6 py-4">Kode Trx</th>
+                                <th class="px-6 py-4">Pembeli</th>
+                                <th class="px-6 py-4">Status</th>
+                                <th class="px-6 py-4">Total</th>
+                                <th class="px-6 py-4 text-center">Aksi</th>
+                            </tr>
                         </thead>
                         <tbody id="merchant-order-list" class="divide-y divide-gray-100">
                             <tr><td colspan="6" class="px-6 py-8 text-center text-gray-400"><i class="fas fa-spinner fa-spin mr-2"></i> Memuat pesanan...</td></tr>
@@ -208,7 +380,7 @@ get_header();
             </div>
         </div>
 
-        <!-- 4. TAB PENGATURAN (UPDATED FULL FORM) -->
+        <!-- 4. TAB PENGATURAN -->
         <div id="view-pengaturan" class="tab-content hidden animate-fade-in">
             <h1 class="text-2xl font-bold text-gray-800 mb-6">Pengaturan Toko</h1>
             
@@ -271,7 +443,7 @@ get_header();
 
                     </div>
 
-                    <!-- KOLOM KANAN: Form Data (Tabbed inside if needed, or long scroll) -->
+                    <!-- KOLOM KANAN: Form Data -->
                     <div class="lg:col-span-2 space-y-6">
                         
                         <!-- 1. IDENTITAS TOKO & PEMILIK -->
@@ -494,11 +666,12 @@ get_header();
                     <div>
                         <label class="block text-xs font-bold text-gray-500 mb-1">Kategori</label>
                         <select name="kategori" id="prod_kategori" class="w-full border border-gray-300 rounded-lg px-4 py-2.5 bg-white focus:ring-primary focus:border-primary">
-                            <option value="Makanan">Makanan & Minuman</option>
-                            <option value="Kerajinan">Kerajinan Tangan</option>
-                            <option value="Fashion">Fashion & Aksesoris</option>
-                            <option value="Pertanian">Hasil Tani</option>
-                            <option value="Souvenir">Souvenir</option>
+                            <!-- Kategori Dinamis Dari PHP -->
+                            <?php 
+                            foreach($kategori_list as $kat) {
+                                echo "<option value='$kat'>$kat</option>";
+                            }
+                            ?>
                         </select>
                     </div>
                     <div>
