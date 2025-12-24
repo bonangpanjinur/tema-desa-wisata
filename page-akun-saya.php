@@ -71,8 +71,7 @@ $avatar_url = get_avatar_url( $current_user->ID, ['size' => 200] );
 
                     <div class="mt-6 pt-6 border-t border-gray-100 space-y-3">
                         <a href="<?php echo home_url('/edit-profil'); ?>" class="block w-full py-2 px-4 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-xl text-sm font-bold transition">
-                            <i class="fas fa-user-edit mr-2"></i> Edit Profil
-                        </a>
+                            <i class="fas fa-user-edit mr-2"></i> Akun Saya
                         <a href="<?php echo wp_logout_url(home_url('/login')); ?>" class="block w-full py-2 px-4 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-sm font-bold transition">
                             <i class="fas fa-sign-out-alt mr-2"></i> Keluar
                         </a>
