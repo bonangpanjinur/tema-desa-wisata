@@ -22,8 +22,20 @@ $table_wisata   = $wpdb->prefix . 'dw_wisata';
 $desa_data = $wpdb->get_row( $wpdb->prepare("SELECT id, nama_desa, api_kelurahan_id FROM $table_desa WHERE id_user_desa = %d", $current_user_id) );
 $id_desa = $desa_data ? $desa_data->id : 0;
 
+// ==========================================
+// LOGIC: CEK STATUS PEMBAYARAN (PREMIUM)
+// ==========================================
+// Ganti 'false' di bawah ini dengan logika pengecekan database Anda yang sebenarnya.
+// Contoh: $akses_premium = ($desa_data->status_langganan == 'aktif');
+$akses_premium = false; // <--- UBAH INI JADI TRUE JIKA SUDAH BAYAR
+
 // --- LOGIC 1: VERIFIKASI UMKM ---
 if ( isset($_POST['action_verifikasi']) && wp_verify_nonce($_POST['verifikasi_nonce'], 'verifikasi_pedagang_action') ) {
+    // SECURITY CHECK: Apakah user punya akses premium?
+    if ( ! $akses_premium ) {
+        wp_die('<div style="text-align:center; padding:50px;"><h1>Akses Ditolak</h1><p>Fitur ini hanya untuk pengguna Premium. Silakan lakukan pembayaran.</p><a href="javascript:history.back()">Kembali</a></div>');
+    }
+
     $id_pedagang = intval($_POST['id_pedagang']);
     $status_baru = sanitize_text_field($_POST['status_keputusan']); // 'disetujui' atau 'ditolak'
     
@@ -130,11 +142,15 @@ get_header();
             </button>
             <button onclick="switchTab('verifikasi')" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition relative" id="nav-verifikasi">
                 <i class="fas fa-user-check w-5 text-center"></i> Verifikasi UMKM
-                <?php 
-                $count_pending = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table_pedagang WHERE id_desa = %d AND status_pendaftaran = 'menunggu_desa'", $id_desa));
-                if($count_pending > 0): 
-                ?>
-                <span class="absolute right-3 top-3 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                <?php if(!$akses_premium): ?>
+                    <i class="fas fa-lock text-xs text-gray-400 absolute right-4"></i>
+                <?php else: ?>
+                    <?php 
+                    $count_pending = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table_pedagang WHERE id_desa = %d AND status_pendaftaran = 'menunggu_desa'", $id_desa));
+                    if($count_pending > 0): 
+                    ?>
+                    <span class="absolute right-3 top-3 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                    <?php endif; ?>
                 <?php endif; ?>
             </button>
             <button onclick="switchTab('wisata')" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition" id="nav-wisata">
@@ -172,8 +188,10 @@ get_header();
                 </button>
                 <button onclick="switchTab('verifikasi'); toggleMobileSidebar()" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition relative" id="mob-nav-verifikasi">
                     <i class="fas fa-user-check w-5 text-center"></i> Verifikasi UMKM
-                    <?php if($count_pending > 0): ?>
-                    <span class="absolute right-3 top-3 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                    <?php if(!$akses_premium): ?>
+                        <i class="fas fa-lock text-xs text-gray-400 absolute right-4"></i>
+                    <?php elseif($count_pending > 0): ?>
+                        <span class="absolute right-3 top-3 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
                     <?php endif; ?>
                 </button>
                 <button onclick="switchTab('wisata'); toggleMobileSidebar()" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition" id="mob-nav-wisata">
@@ -270,78 +288,103 @@ get_header();
             </div>
         </div>
 
-        <!-- 2. TAB VERIFIKASI UMKM -->
+        <!-- 2. TAB VERIFIKASI UMKM (PROTECTED) -->
         <div id="view-verifikasi" class="tab-content hidden animate-fade-in">
             <h1 class="text-2xl font-bold text-gray-800 mb-6">Verifikasi Pendaftaran UMKM</h1>
             
-            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <?php 
-                $umkm_pending = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_pedagang WHERE id_desa = %d AND status_pendaftaran = 'menunggu_desa' ORDER BY created_at DESC", $id_desa));
-                ?>
-                
-                <?php if($umkm_pending): ?>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm text-left whitespace-nowrap">
-                        <thead class="bg-gray-50 text-gray-500 uppercase font-bold text-xs border-b border-gray-100">
-                            <tr>
-                                <th class="px-6 py-4">Toko</th>
-                                <th class="px-6 py-4">Pemilik</th>
-                                <th class="px-6 py-4">Alamat</th>
-                                <th class="px-6 py-4">Dokumen</th>
-                                <th class="px-6 py-4 text-center">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100">
-                            <?php foreach($umkm_pending as $u): ?>
-                            <tr class="hover:bg-gray-50 transition">
-                                <td class="px-6 py-4">
-                                    <div class="flex items-center gap-3">
-                                        <img src="<?php echo !empty($u->foto_profil) ? esc_url($u->foto_profil) : 'https://placehold.co/50'; ?>" class="w-10 h-10 rounded-full object-cover">
-                                        <span class="font-bold text-gray-800"><?php echo esc_html($u->nama_toko); ?></span>
-                                    </div>
-                                </td>
-                                <td class="px-6 py-4">
-                                    <?php echo esc_html($u->nama_pemilik); ?><br>
-                                    <span class="text-xs text-gray-400"><?php echo esc_html($u->nomor_wa); ?></span>
-                                </td>
-                                <td class="px-6 py-4 max-w-xs truncate"><?php echo esc_html($u->alamat_lengkap); ?></td>
-                                <td class="px-6 py-4">
-                                    <?php if($u->url_ktp): ?>
-                                    <a href="<?php echo esc_url($u->url_ktp); ?>" target="_blank" class="text-blue-600 hover:underline text-xs flex items-center gap-1">
-                                        <i class="fas fa-file-image"></i> Lihat KTP
-                                    </a>
-                                    <?php else: ?>
-                                    <span class="text-gray-400 text-xs">-</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td class="px-6 py-4 text-center">
-                                    <form method="POST" class="inline-flex gap-2">
-                                        <?php wp_nonce_field('verifikasi_pedagang_action', 'verifikasi_nonce'); ?>
-                                        <input type="hidden" name="id_pedagang" value="<?php echo $u->id; ?>">
-                                        <button type="submit" name="action_verifikasi" value="1" onclick="this.form.status_keputusan.value='disetujui'" class="bg-green-100 text-green-700 hover:bg-green-200 px-3 py-1.5 rounded-lg text-xs font-bold transition">
-                                            <i class="fas fa-check mr-1"></i> Terima
-                                        </button>
-                                        <button type="submit" name="action_verifikasi" value="1" onclick="this.form.status_keputusan.value='ditolak'" class="bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1.5 rounded-lg text-xs font-bold transition">
-                                            <i class="fas fa-times mr-1"></i> Tolak
-                                        </button>
-                                        <input type="hidden" name="status_keputusan" value="">
-                                    </form>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-                <?php else: ?>
-                <div class="p-12 text-center">
-                    <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4 text-gray-400">
-                        <i class="fas fa-clipboard-check text-2xl"></i>
+            <?php if ( ! $akses_premium ): ?>
+                <!-- TAMPILAN TERKUNCI / PAYWALL -->
+                <div class="bg-white rounded-3xl border border-gray-200 shadow-lg p-12 text-center relative overflow-hidden">
+                    <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500"></div>
+                    <div class="inline-flex items-center justify-center w-24 h-24 rounded-full bg-yellow-100 text-yellow-600 mb-6 animate-bounce-slow">
+                        <i class="fas fa-lock text-4xl"></i>
                     </div>
-                    <h3 class="text-lg font-medium text-gray-900">Tidak ada pengajuan baru</h3>
-                    <p class="text-gray-500 text-sm mt-1">Semua pendaftaran UMKM telah diverifikasi.</p>
+                    <h2 class="text-3xl font-bold text-gray-900 mb-3">Fitur Terkunci</h2>
+                    <p class="text-gray-500 max-w-lg mx-auto mb-8 text-lg">
+                        Menu Verifikasi UMKM adalah fitur <span class="text-yellow-600 font-bold">Premium</span>. 
+                        Silakan lakukan pembayaran untuk membuka akses verifikasi data pedagang di desa Anda.
+                    </p>
+                    
+                    <button onclick="alert('Silakan arahkan ke halaman pembayaran Anda di sini.')" class="bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white text-lg font-bold px-8 py-4 rounded-xl shadow-xl shadow-orange-500/30 transform hover:-translate-y-1 transition duration-300 flex items-center gap-3 mx-auto">
+                        <i class="fas fa-crown"></i> Buka Akses Premium
+                    </button>
+                    
+                    <div class="mt-8 text-sm text-gray-400">
+                        Sudah melakukan pembayaran? <a href="#" class="text-blue-600 hover:underline font-medium">Muat ulang halaman</a>
+                    </div>
                 </div>
-                <?php endif; ?>
-            </div>
+
+            <?php else: ?>
+                <!-- TAMPILAN NORMAL (JIKA PREMIUM) -->
+                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <?php 
+                    $umkm_pending = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_pedagang WHERE id_desa = %d AND status_pendaftaran = 'menunggu_desa' ORDER BY created_at DESC", $id_desa));
+                    ?>
+                    
+                    <?php if($umkm_pending): ?>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left whitespace-nowrap">
+                            <thead class="bg-gray-50 text-gray-500 uppercase font-bold text-xs border-b border-gray-100">
+                                <tr>
+                                    <th class="px-6 py-4">Toko</th>
+                                    <th class="px-6 py-4">Pemilik</th>
+                                    <th class="px-6 py-4">Alamat</th>
+                                    <th class="px-6 py-4">Dokumen</th>
+                                    <th class="px-6 py-4 text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                <?php foreach($umkm_pending as $u): ?>
+                                <tr class="hover:bg-gray-50 transition">
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center gap-3">
+                                            <img src="<?php echo !empty($u->foto_profil) ? esc_url($u->foto_profil) : 'https://placehold.co/50'; ?>" class="w-10 h-10 rounded-full object-cover">
+                                            <span class="font-bold text-gray-800"><?php echo esc_html($u->nama_toko); ?></span>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <?php echo esc_html($u->nama_pemilik); ?><br>
+                                        <span class="text-xs text-gray-400"><?php echo esc_html($u->nomor_wa); ?></span>
+                                    </td>
+                                    <td class="px-6 py-4 max-w-xs truncate"><?php echo esc_html($u->alamat_lengkap); ?></td>
+                                    <td class="px-6 py-4">
+                                        <?php if($u->url_ktp): ?>
+                                        <a href="<?php echo esc_url($u->url_ktp); ?>" target="_blank" class="text-blue-600 hover:underline text-xs flex items-center gap-1">
+                                            <i class="fas fa-file-image"></i> Lihat KTP
+                                        </a>
+                                        <?php else: ?>
+                                        <span class="text-gray-400 text-xs">-</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="px-6 py-4 text-center">
+                                        <form method="POST" class="inline-flex gap-2">
+                                            <?php wp_nonce_field('verifikasi_pedagang_action', 'verifikasi_nonce'); ?>
+                                            <input type="hidden" name="id_pedagang" value="<?php echo $u->id; ?>">
+                                            <button type="submit" name="action_verifikasi" value="1" onclick="this.form.status_keputusan.value='disetujui'" class="bg-green-100 text-green-700 hover:bg-green-200 px-3 py-1.5 rounded-lg text-xs font-bold transition">
+                                                <i class="fas fa-check mr-1"></i> Terima
+                                            </button>
+                                            <button type="submit" name="action_verifikasi" value="1" onclick="this.form.status_keputusan.value='ditolak'" class="bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1.5 rounded-lg text-xs font-bold transition">
+                                                <i class="fas fa-times mr-1"></i> Tolak
+                                            </button>
+                                            <input type="hidden" name="status_keputusan" value="">
+                                        </form>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <?php else: ?>
+                    <div class="p-12 text-center">
+                        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4 text-gray-400">
+                            <i class="fas fa-clipboard-check text-2xl"></i>
+                        </div>
+                        <h3 class="text-lg font-medium text-gray-900">Tidak ada pengajuan baru</h3>
+                        <p class="text-gray-500 text-sm mt-1">Semua pendaftaran UMKM telah diverifikasi.</p>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
         </div>
 
         <!-- 3. TAB KELOLA WISATA -->
