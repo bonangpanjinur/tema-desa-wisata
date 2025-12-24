@@ -1,7 +1,7 @@
 <?php
 /**
  * Template Name: Dashboard Desa
- * Description: Panel Desa untuk Verifikasi UMKM & Kelola Wisata.
+ * Description: Panel Desa untuk Verifikasi UMKM & Kelola Wisata dengan Kategori Dinamis.
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -80,10 +80,30 @@ if ( isset($_POST['save_wisata']) && wp_verify_nonce($_POST['wisata_nonce'], 'sa
 // --- LOGIC 3: HAPUS WISATA ---
 if ( isset($_GET['action']) && $_GET['action'] == 'hapus_wisata' && isset($_GET['id']) ) {
     $del_id = intval($_GET['id']);
-    // Soft delete (set status nonaktif) atau Hard delete
+    // Soft delete (set status nonaktif)
     $wpdb->update($table_wisata, ['status' => 'nonaktif'], ['id' => $del_id, 'id_desa' => $id_desa]);
     wp_redirect( remove_query_arg(['action', 'id']) );
     exit;
+}
+
+// --- LOGIC 4: AMBIL KATEGORI DINAMIS ---
+// Daftar default yang lengkap
+$default_cats = [
+    'Wisata Alam', 'Wisata Bahari', 'Wisata Budaya', 'Wisata Sejarah', 
+    'Wisata Edukasi', 'Wisata Kuliner', 'Wisata Religi', 'Wisata Buatan',
+    'Wisata Petualangan', 'Agrowisata', 'Spot Foto', 'Camping Ground'
+];
+
+// Ambil kategori yang sudah pernah disimpan di database (agar sinkron dengan backend)
+$existing_cats = $wpdb->get_col("SELECT DISTINCT kategori FROM $table_wisata WHERE kategori != '' AND kategori IS NOT NULL");
+
+// Gabungkan dan urutkan
+if (!empty($existing_cats)) {
+    $kategori_wisata = array_unique(array_merge($default_cats, $existing_cats));
+    sort($kategori_wisata);
+} else {
+    $kategori_wisata = $default_cats;
+    sort($kategori_wisata);
 }
 
 get_header(); 
@@ -325,13 +345,11 @@ get_header();
             </div>
         </div>
 
-        <!-- 4. TAB PROFIL (Placehoder untuk form profil yang sudah ada sebelumnya) -->
+        <!-- 4. TAB PROFIL -->
         <div id="view-profil" class="tab-content hidden animate-fade-in">
-            <!-- Include form profil desa yang sudah Anda miliki atau biarkan user menggunakan page-dashboard-desa.php versi sebelumnya khusus profil -->
             <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-yellow-800">
                 <i class="fas fa-info-circle mr-2"></i> Untuk mengedit profil lengkap desa (Foto, Rekening, Lokasi), silakan gunakan menu Pengaturan di sidebar.
             </div>
-            <!-- Anda bisa copy-paste form profil desa dari kode sebelumnya ke sini jika ingin satu halaman -->
         </div>
 
     </main>
@@ -362,11 +380,12 @@ get_header();
                         <div>
                             <label class="block text-xs font-bold text-gray-500 mb-1">Kategori</label>
                             <select name="kategori" id="mw_kategori" class="w-full border border-gray-300 rounded-lg px-4 py-2.5 bg-white">
-                                <option value="Alam">Wisata Alam</option>
-                                <option value="Budaya">Wisata Budaya</option>
-                                <option value="Kuliner">Wisata Kuliner</option>
-                                <option value="Edukasi">Wisata Edukasi</option>
-                                <option value="Religi">Wisata Religi</option>
+                                <!-- Kategori Dinamis -->
+                                <?php 
+                                foreach($kategori_wisata as $kat) {
+                                    echo "<option value='$kat'>$kat</option>";
+                                }
+                                ?>
                             </select>
                         </div>
                         <div>

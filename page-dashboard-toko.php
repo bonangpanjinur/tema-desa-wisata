@@ -17,6 +17,7 @@ global $wpdb;
 $table_pedagang      = $wpdb->prefix . 'dw_pedagang';
 $table_transaksi_sub = $wpdb->prefix . 'dw_transaksi_sub';
 $table_produk        = $wpdb->prefix . 'dw_produk';
+$table_desa          = $wpdb->prefix . 'dw_desa'; // Tambahkan tabel desa
 
 // 2. Handle Form Submit (Simpan Pengaturan Toko)
 $msg = '';
@@ -27,6 +28,21 @@ if ( isset($_POST['save_toko']) && wp_verify_nonce($_POST['toko_nonce'], 'save_t
     require_once( ABSPATH . 'wp-admin/includes/file.php' );
 
     // a. Siapkan Data Text
+    $api_kelurahan_id = sanitize_text_field($_POST['api_kelurahan_id']); // Ambil ID Kelurahan
+
+    // --- LOGIKA OTOMATIS HUBUNGKAN KE DESA ---
+    // Cek apakah ada desa yang memiliki api_kelurahan_id yang sama
+    $desa_terkait = $wpdb->get_row( $wpdb->prepare( "SELECT id FROM $table_desa WHERE api_kelurahan_id = %s", $api_kelurahan_id ) );
+    
+    $id_desa_relasi = NULL;
+    $is_independent = 1; // Default Independen
+
+    if ( $desa_terkait ) {
+        $id_desa_relasi = $desa_terkait->id;
+        $is_independent = 0; // Terhubung
+    }
+    // -----------------------------------------
+
     $data = array(
         'nama_toko'           => sanitize_text_field($_POST['nama_toko']),
         'nama_pemilik'        => sanitize_text_field($_POST['nama_pemilik']),
@@ -35,6 +51,10 @@ if ( isset($_POST['save_toko']) && wp_verify_nonce($_POST['toko_nonce'], 'save_t
         'alamat_lengkap'      => sanitize_textarea_field($_POST['alamat_lengkap']),
         'url_gmaps'           => esc_url_raw($_POST['url_gmaps']),
         
+        // Data Relasi Desa (Hasil Logika di atas)
+        'id_desa'             => $id_desa_relasi,
+        'is_independent'      => $is_independent,
+
         // Data Bank
         'nama_bank'           => sanitize_text_field($_POST['nama_bank']),
         'no_rekening'         => sanitize_text_field($_POST['no_rekening']),
@@ -44,7 +64,7 @@ if ( isset($_POST['save_toko']) && wp_verify_nonce($_POST['toko_nonce'], 'save_t
         'api_provinsi_id'     => sanitize_text_field($_POST['api_provinsi_id']),
         'api_kabupaten_id'    => sanitize_text_field($_POST['api_kabupaten_id']),
         'api_kecamatan_id'    => sanitize_text_field($_POST['api_kecamatan_id']),
-        'api_kelurahan_id'    => sanitize_text_field($_POST['api_kelurahan_id']),
+        'api_kelurahan_id'    => $api_kelurahan_id,
 
         // Wilayah (Nama Text)
         'provinsi_nama'       => sanitize_text_field($_POST['provinsi_nama']),
@@ -98,7 +118,14 @@ if ( isset($_POST['save_toko']) && wp_verify_nonce($_POST['toko_nonce'], 'save_t
 }
 
 // 3. Ambil Data Toko (Untuk Pre-fill Form & Statistik)
-$toko = $wpdb->get_row( $wpdb->prepare("SELECT * FROM $table_pedagang WHERE id_user = %d", $current_user_id) );
+// Join dengan tabel desa untuk mendapatkan nama desa (jika terhubung)
+$query_toko = "
+    SELECT p.*, d.nama_desa 
+    FROM $table_pedagang p 
+    LEFT JOIN $table_desa d ON p.id_desa = d.id 
+    WHERE p.id_user = %d
+";
+$toko = $wpdb->get_row( $wpdb->prepare($query_toko, $current_user_id) );
 $toko_id = $toko ? $toko->id : 0;
 
 // 4. Hitung Statistik Ringkasan (Lengkap dari Database)
@@ -139,13 +166,11 @@ if ($toko_id) {
     ));
     
     // Rating & Ulasan (dari tabel pedagang atau tabel ulasan jika ada relasi)
-    // Menggunakan data denormalisasi di tabel pedagang untuk performa
     $stats['total_ulasan'] = isset($toko->total_ulasan_toko) ? $toko->total_ulasan_toko : 0;
     $stats['rating'] = isset($toko->rating_toko) ? $toko->rating_toko : 0;
 }
 
 // 5. Ambil Kategori Produk (DINAMIS DARI DATABASE)
-// Kita ambil kategori standar + kategori yang sudah pernah tersimpan di database produk
 $default_kategori = [
     'Makanan & Minuman',
     'Kerajinan Tangan',
@@ -156,13 +181,11 @@ $default_kategori = [
     'Lainnya'
 ];
 
-// Ambil kategori unik yang sudah ada di tabel produk (jika user pernah input manual/impor)
 $existing_cats = $wpdb->get_col("SELECT DISTINCT kategori FROM $table_produk WHERE kategori != '' AND kategori IS NOT NULL");
 
-// Gabung dan hapus duplikat
 if (!empty($existing_cats)) {
     $kategori_list = array_unique(array_merge($default_kategori, $existing_cats));
-    sort($kategori_list); // Urutkan abjad
+    sort($kategori_list); 
 } else {
     $kategori_list = $default_kategori;
 }
@@ -437,6 +460,20 @@ get_header();
                                 <span class="text-sm text-gray-600">Status Toko</span>
                                 <span class="px-2 py-1 text-xs font-bold rounded-md <?php echo ($toko->status_akun == 'aktif') ? 'bg-blue-100 text-blue-600' : 'bg-red-100 text-red-600'; ?>">
                                     <?php echo ucfirst($toko->status_akun ?? 'nonaktif'); ?>
+                                </span>
+                            </div>
+                            
+                            <!-- Relasi Desa Info -->
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg mt-2">
+                                <span class="text-sm text-gray-600">Desa Wisata</span>
+                                <span class="px-2 py-1 text-xs font-bold rounded-md <?php echo ($toko->id_desa && $toko->is_independent == 0) ? 'bg-purple-100 text-purple-600' : 'bg-gray-200 text-gray-600'; ?>">
+                                    <?php 
+                                    if ($toko->id_desa && !empty($toko->nama_desa)) {
+                                        echo 'Desa ' . esc_html($toko->nama_desa);
+                                    } else {
+                                        echo 'Independen';
+                                    }
+                                    ?>
                                 </span>
                             </div>
                         </div>
