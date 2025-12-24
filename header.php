@@ -88,9 +88,9 @@
                         <?php 
                             $current_user = wp_get_current_user(); 
                             $dashboard_url = home_url('/dashboard'); // Default
-                            if (in_array('pengelola_desa', $current_user->roles)) $dashboard_url = home_url('/dashboard-desa');
-                            elseif (in_array('pedagang', $current_user->roles)) $dashboard_url = home_url('/dashboard-toko');
-                            elseif (in_array('ojek_wisata', $current_user->roles)) $dashboard_url = home_url('/dashboard-ojek');
+                            if (in_array('pengelola_desa', $current_user->roles)) $dashboard_url = home_url('/dashboard');
+                            elseif (in_array('pedagang', $current_user->roles)) $dashboard_url = home_url('/dashboard');
+                            elseif (in_array('ojek_wisata', $current_user->roles)) $dashboard_url = home_url('/dashboard');
                         ?>
                         <div class="relative group dropdown-container">
                             <button class="flex items-center gap-2 focus:outline-none">
