@@ -107,7 +107,7 @@
                             <!-- Dropdown Menu -->
                             <div class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top-right z-50">
                                 <a href="<?php echo $dashboard_url; ?>" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary"><i class="fas fa-columns w-5"></i> Dashboard</a>
-                                <a href="<?php echo home_url('/akun-saya'); ?>" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary"><i class="fas fa-user-cog w-5"></i> Edit Profil</a>
+                                <a href="<?php echo home_url('/akun-saya'); ?>" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary"><i class="fas fa-user-cog w-5"></i> Akun Saya</a>
                                 <div class="border-t border-gray-100 my-1"></div>
                                 <a href="<?php echo wp_logout_url(home_url()); ?>" class="block px-4 py-2 text-sm text-red-600 hover:bg-red-50"><i class="fas fa-sign-out-alt w-5"></i> Keluar</a>
                             </div>
