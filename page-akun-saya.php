@@ -28,7 +28,7 @@ if ( $is_admin_kabupaten ) {
     $role_class = 'bg-red-100 text-red-600';
 } elseif ( $is_admin_desa ) {
     $role_label = 'Admin Desa';
-    $role_class = 'bg-green-100 text-green-600'; // Ubah ke hijau agar beda
+    $role_class = 'bg-green-100 text-green-600';
 } elseif ( $is_pedagang ) {
     $role_label = 'Pedagang';
     $role_class = 'bg-orange-100 text-orange-600';
@@ -86,7 +86,7 @@ $avatar_url = get_avatar_url( $current_user->ID, ['size' => 200] );
 
                     <!-- 1. MENU KHUSUS ADMIN DESA -->
                     <?php if ( $is_admin_desa ) : ?>
-                        <a href="<?php echo home_url('/dashboard-desa?tab=wisata'); ?>" class="group bg-white p-6 rounded-2xl shadow-sm border border-green-100 hover:shadow-lg hover:border-green-300 transition-all duration-300 flex items-center gap-4 relative overflow-hidden">
+                        <a href="<?php echo home_url('/dashboard?tab=wisata'); ?>" class="group bg-white p-6 rounded-2xl shadow-sm border border-green-100 hover:shadow-lg hover:border-green-300 transition-all duration-300 flex items-center gap-4 relative overflow-hidden">
                             <div class="absolute top-0 right-0 w-24 h-24 bg-green-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
                             <div class="w-12 h-12 bg-green-100 text-green-600 rounded-xl flex items-center justify-center text-xl relative z-10">
                                 <i class="fas fa-map-marked-alt"></i>
@@ -97,7 +97,7 @@ $avatar_url = get_avatar_url( $current_user->ID, ['size' => 200] );
                             </div>
                         </a>
 
-                        <a href="<?php echo home_url('/dashboard-desa?tab=pedagang'); ?>" class="group bg-white p-6 rounded-2xl shadow-sm border border-blue-100 hover:shadow-lg hover:border-blue-300 transition-all duration-300 flex items-center gap-4 relative overflow-hidden">
+                        <a href="<?php echo home_url('/dashboard?tab=pedagang'); ?>" class="group bg-white p-6 rounded-2xl shadow-sm border border-blue-100 hover:shadow-lg hover:border-blue-300 transition-all duration-300 flex items-center gap-4 relative overflow-hidden">
                              <div class="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
                             <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center text-xl relative z-10">
                                 <i class="fas fa-store-alt"></i>
@@ -108,7 +108,7 @@ $avatar_url = get_avatar_url( $current_user->ID, ['size' => 200] );
                             </div>
                         </a>
                         
-                        <a href="<?php echo home_url('/dashboard-desa?tab=dashboard'); ?>" class="md:col-span-2 group bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 flex items-center gap-4">
+                        <a href="<?php echo home_url('/dashboard'); ?>" class="md:col-span-2 group bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 flex items-center gap-4">
                             <div class="w-12 h-12 bg-gray-50 text-gray-600 rounded-xl flex items-center justify-center text-xl group-hover:bg-gray-100 transition">
                                 <i class="fas fa-tachometer-alt"></i>
                             </div>
@@ -121,7 +121,7 @@ $avatar_url = get_avatar_url( $current_user->ID, ['size' => 200] );
 
                     <!-- 2. MENU KHUSUS PEDAGANG -->
                     <?php if ( $is_pedagang ) : ?>
-                        <a href="<?php echo home_url('/dashboard-toko?tab=produk'); ?>" class="group bg-white p-6 rounded-2xl shadow-sm border border-purple-100 hover:shadow-lg hover:border-purple-300 transition-all duration-300 flex items-center gap-4 relative overflow-hidden">
+                        <a href="<?php echo home_url('/dashboard?tab=produk'); ?>" class="group bg-white p-6 rounded-2xl shadow-sm border border-purple-100 hover:shadow-lg hover:border-purple-300 transition-all duration-300 flex items-center gap-4 relative overflow-hidden">
                              <div class="absolute top-0 right-0 w-24 h-24 bg-purple-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
                             <div class="w-12 h-12 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center text-xl relative z-10">
                                 <i class="fas fa-box"></i>
@@ -132,7 +132,7 @@ $avatar_url = get_avatar_url( $current_user->ID, ['size' => 200] );
                             </div>
                         </a>
 
-                        <a href="<?php echo home_url('/dashboard-toko?tab=pesanan'); ?>" class="group bg-white p-6 rounded-2xl shadow-sm border border-yellow-100 hover:shadow-lg hover:border-yellow-300 transition-all duration-300 flex items-center gap-4 relative overflow-hidden">
+                        <a href="<?php echo home_url('/dashboard?tab=pesanan'); ?>" class="group bg-white p-6 rounded-2xl shadow-sm border border-yellow-100 hover:shadow-lg hover:border-yellow-300 transition-all duration-300 flex items-center gap-4 relative overflow-hidden">
                              <div class="absolute top-0 right-0 w-24 h-24 bg-yellow-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
                             <div class="w-12 h-12 bg-yellow-100 text-yellow-600 rounded-xl flex items-center justify-center text-xl relative z-10">
                                 <i class="fas fa-receipt"></i>
