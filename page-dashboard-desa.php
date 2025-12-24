@@ -109,10 +109,11 @@ if (!empty($existing_cats)) {
 get_header(); 
 ?>
 
-<div class="bg-gray-50 min-h-screen font-sans flex">
+<div class="bg-gray-50 min-h-screen font-sans flex overflow-hidden">
     
-    <!-- SIDEBAR -->
-    <aside class="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col fixed h-full z-20">
+    <!-- ================= SIDEBAR ================= -->
+    <!-- Desktop Sidebar -->
+    <aside class="hidden md:flex w-64 bg-white border-r border-gray-200 flex-col fixed h-full z-20 overflow-y-auto">
         <div class="p-6 border-b border-gray-100 flex items-center gap-3">
             <div class="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center text-xl shadow-lg shadow-blue-500/30">
                 <i class="fas fa-landmark"></i>
@@ -130,7 +131,6 @@ get_header();
             <button onclick="switchTab('verifikasi')" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition relative" id="nav-verifikasi">
                 <i class="fas fa-user-check w-5 text-center"></i> Verifikasi UMKM
                 <?php 
-                // Badge count
                 $count_pending = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table_pedagang WHERE id_desa = %d AND status_pendaftaran = 'menunggu_desa'", $id_desa));
                 if($count_pending > 0): 
                 ?>
@@ -152,16 +152,64 @@ get_header();
         </div>
     </aside>
 
-    <!-- MOBILE HEADER -->
-    <div class="md:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-30 flex items-center justify-between px-4 shadow-sm">
-        <span class="font-bold text-gray-800 flex items-center gap-2"><i class="fas fa-landmark text-blue-600"></i> Admin Desa</span>
-        <button onclick="document.querySelector('aside').classList.toggle('hidden'); document.querySelector('aside').classList.toggle('flex');" class="text-gray-600 p-2">
-            <i class="fas fa-bars text-xl"></i>
-        </button>
+    <!-- Mobile Sidebar (Off-canvas) -->
+    <div id="mobile-sidebar" class="fixed inset-0 z-40 hidden">
+        <div class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm" onclick="toggleMobileSidebar()"></div>
+        <aside class="absolute left-0 top-0 bottom-0 w-64 bg-white shadow-2xl flex flex-col h-full transform transition-transform duration-300 -translate-x-full" id="mobile-sidebar-panel">
+            <div class="p-6 border-b border-gray-100 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 bg-blue-600 text-white rounded-lg flex items-center justify-center text-lg">
+                        <i class="fas fa-landmark"></i>
+                    </div>
+                    <span class="font-bold text-gray-800">Admin Desa</span>
+                </div>
+                <button onclick="toggleMobileSidebar()" class="text-gray-500"><i class="fas fa-times text-xl"></i></button>
+            </div>
+            
+            <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+                <button onclick="switchTab('ringkasan'); toggleMobileSidebar()" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition active-tab" id="mob-nav-ringkasan">
+                    <i class="fas fa-chart-line w-5 text-center"></i> Ringkasan
+                </button>
+                <button onclick="switchTab('verifikasi'); toggleMobileSidebar()" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition relative" id="mob-nav-verifikasi">
+                    <i class="fas fa-user-check w-5 text-center"></i> Verifikasi UMKM
+                    <?php if($count_pending > 0): ?>
+                    <span class="absolute right-3 top-3 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                    <?php endif; ?>
+                </button>
+                <button onclick="switchTab('wisata'); toggleMobileSidebar()" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition" id="mob-nav-wisata">
+                    <i class="fas fa-map-marked-alt w-5 text-center"></i> Kelola Wisata
+                </button>
+                <button onclick="switchTab('profil'); toggleMobileSidebar()" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition" id="mob-nav-profil">
+                    <i class="fas fa-cogs w-5 text-center"></i> Pengaturan Desa
+                </button>
+            </nav>
+
+            <div class="p-4 border-t border-gray-100">
+                <a href="<?php echo wp_logout_url(home_url()); ?>" class="flex items-center gap-3 px-4 py-3 text-sm font-medium text-red-600 rounded-xl hover:bg-red-50 transition w-full">
+                    <i class="fas fa-sign-out-alt w-5 text-center"></i> Keluar
+                </a>
+            </div>
+        </aside>
     </div>
 
-    <!-- MAIN CONTENT -->
-    <main class="flex-1 md:ml-64 p-4 md:p-8 pt-20 md:pt-8 overflow-y-auto h-screen pb-24">
+    <!-- ================= MOBILE HEADER ================= -->
+    <div class="md:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-30 flex items-center justify-between px-4 shadow-sm">
+        <div class="flex items-center gap-3">
+            <button onclick="toggleMobileSidebar()" class="text-gray-600 p-1">
+                <i class="fas fa-bars text-xl"></i>
+            </button>
+            <span class="font-bold text-gray-800 flex items-center gap-2">
+                <i class="fas fa-landmark text-blue-600"></i> Admin Desa
+            </span>
+        </div>
+        <!-- User Avatar Small -->
+        <div class="w-8 h-8 rounded-full bg-gray-200 overflow-hidden">
+             <img src="<?php echo get_avatar_url($current_user_id); ?>" class="w-full h-full object-cover">
+        </div>
+    </div>
+
+    <!-- ================= MAIN CONTENT ================= -->
+    <main class="flex-1 md:ml-64 p-4 md:p-8 pt-20 md:pt-8 overflow-y-auto h-screen pb-24 bg-gray-50">
         
         <!-- Notifikasi Global -->
         <?php if(isset($msg_verif)): ?>
@@ -189,7 +237,7 @@ get_header();
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <!-- Total UMKM -->
                 <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
-                    <div class="w-14 h-14 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center text-2xl">
+                    <div class="w-14 h-14 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center text-2xl shrink-0">
                         <i class="fas fa-store"></i>
                     </div>
                     <div>
@@ -200,7 +248,7 @@ get_header();
 
                 <!-- Total Wisata -->
                 <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
-                    <div class="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-2xl">
+                    <div class="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-2xl shrink-0">
                         <i class="fas fa-map-marked-alt"></i>
                     </div>
                     <div>
@@ -211,7 +259,7 @@ get_header();
 
                 <!-- Perlu Verifikasi -->
                 <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 border-l-4 border-l-yellow-400">
-                    <div class="w-14 h-14 bg-yellow-100 text-yellow-600 rounded-2xl flex items-center justify-center text-2xl">
+                    <div class="w-14 h-14 bg-yellow-100 text-yellow-600 rounded-2xl flex items-center justify-center text-2xl shrink-0">
                         <i class="fas fa-user-clock"></i>
                     </div>
                     <div>
@@ -233,7 +281,7 @@ get_header();
                 
                 <?php if($umkm_pending): ?>
                 <div class="overflow-x-auto">
-                    <table class="w-full text-sm text-left">
+                    <table class="w-full text-sm text-left whitespace-nowrap">
                         <thead class="bg-gray-50 text-gray-500 uppercase font-bold text-xs border-b border-gray-100">
                             <tr>
                                 <th class="px-6 py-4">Toko</th>
@@ -298,9 +346,9 @@ get_header();
 
         <!-- 3. TAB KELOLA WISATA -->
         <div id="view-wisata" class="tab-content hidden animate-fade-in">
-            <div class="flex justify-between items-center mb-6">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <h1 class="text-2xl font-bold text-gray-800">Daftar Objek Wisata</h1>
-                <button onclick="openWisataModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg shadow-blue-500/20">
+                <button onclick="openWisataModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg shadow-blue-500/20 w-full md:w-auto justify-center">
                     <i class="fas fa-plus"></i> Tambah Wisata
                 </button>
             </div>
@@ -432,15 +480,43 @@ get_header();
 </style>
 
 <script>
+// Define Ajax URL for Frontend
+var ajaxurl = "<?php echo admin_url('admin-ajax.php'); ?>";
+
+// 1. Sidebar Mobile Toggle
+function toggleMobileSidebar() {
+    const sidebar = document.getElementById('mobile-sidebar');
+    const panel = document.getElementById('mobile-sidebar-panel');
+    
+    if (sidebar.classList.contains('hidden')) {
+        sidebar.classList.remove('hidden');
+        setTimeout(() => {
+            panel.classList.remove('-translate-x-full');
+        }, 10);
+    } else {
+        panel.classList.add('-translate-x-full');
+        setTimeout(() => {
+            sidebar.classList.add('hidden');
+        }, 300);
+    }
+}
+
+// 2. Tab Switcher
 function switchTab(tabName) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active-tab'));
     
     document.getElementById('view-' + tabName).classList.remove('hidden');
-    document.getElementById('nav-' + tabName).classList.add('active-tab');
+    
+    // Update active tab for both desktop and mobile
+    const desktopNav = document.getElementById('nav-' + tabName);
+    const mobileNav = document.getElementById('mob-nav-' + tabName);
+    
+    if(desktopNav) desktopNav.classList.add('active-tab');
+    if(mobileNav) mobileNav.classList.add('active-tab');
 }
 
-// Modal Wisata Logic
+// 3. Modal Wisata Logic
 const mw = document.getElementById('modal-wisata');
 const mp = document.getElementById('modal-wisata-panel');
 
@@ -460,7 +536,7 @@ function openWisataModal(data = null) {
         document.getElementById('mw_kategori').value = data.kategori;
         document.getElementById('mw_harga').value = data.harga_tiket;
         document.getElementById('mw_jam').value = data.jam_buka;
-        document.getElementById('mw_deskripsi').value = data.deskripsi; // Note: strip_tags handled in display, here raw is better but simple value works
+        document.getElementById('mw_deskripsi').value = data.deskripsi;
         document.getElementById('mw_maps').value = data.lokasi_maps;
     }
 }
@@ -470,7 +546,7 @@ function closeWisataModal() {
     setTimeout(() => mw.classList.add('hidden'), 300);
 }
 
-// Init Tab from URL
+// 4. Init
 document.addEventListener('DOMContentLoaded', () => {
     const urlParams = new URLSearchParams(window.location.search);
     const tab = urlParams.get('tab') || 'ringkasan';
@@ -479,6 +555,134 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         switchTab('ringkasan');
     }
+});
+
+// ------------------------------------------
+// REGION DROPDOWN LOGIC (Frontend Version)
+// ------------------------------------------
+jQuery(document).ready(function($) {
+    // ... [SAMA SEPERTI SEBELUMNYA] ...
+    // Konfigurasi Selector ID untuk Dashboard Desa
+    var els = {
+        prov: $('#desa_provinsi'),
+        kota: $('#desa_kota'),
+        kec: $('#desa_kecamatan'),
+        desa: $('#desa_kelurahan')
+    };
+
+    // Helper: Load Options via AJAX
+    function loadRegionOptions(action, parentId, $target, selectedId) {
+        $target.html('<option value="">Memuat...</option>').prop('disabled', true);
+        
+        var ajaxAction = '';
+        var data = {};
+
+        // Mapping Action ke AJAX Action Plugin
+        if(action === 'get_provinces') ajaxAction = 'dw_fetch_provinces';
+        if(action === 'get_regencies') { ajaxAction = 'dw_fetch_regencies'; data.province_id = parentId; }
+        if(action === 'get_districts') { ajaxAction = 'dw_fetch_districts'; data.regency_id = parentId; }
+        if(action === 'get_villages')  { ajaxAction = 'dw_fetch_villages'; data.district_id = parentId; }
+
+        data.action = ajaxAction;
+
+        $.ajax({
+            url: ajaxurl,
+            type: 'GET',
+            dataType: 'json',
+            data: data,
+            success: function(res) {
+                $target.empty();
+                $target.append('<option value="">Pilih...</option>');
+                $target.prop('disabled', false);
+
+                if(res.success) {
+                    var items = res.data;
+                    if (items && items.data) items = items.data; 
+                    
+                    if (items && Array.isArray(items)) {
+                        $.each(items, function(i, item) {
+                            var val = item.id || item.code;
+                            var txt = item.name || item.nama;
+                            var isSelected = (selectedId && String(val) === String(selectedId)) ? 'selected' : '';
+                            $target.append('<option value="' + val + '" ' + isSelected + '>' + txt + '</option>');
+                        });
+                        
+                        // Jika ada data terpilih, trigger change untuk load level selanjutnya
+                        if(selectedId && $target.val() == selectedId) {
+                            $target.trigger('change'); 
+                        }
+                    } else {
+                        $target.append('<option value="">Data kosong</option>');
+                    }
+                } else {
+                    $target.html('<option value="">Gagal memuat</option>');
+                }
+            },
+            error: function() {
+                $target.html('<option value="">Error Jaringan</option>');
+            }
+        });
+    }
+
+    // A. Init Provinsi
+    var curProv = els.prov.data('selected');
+    if(els.prov.length > 0) {
+        loadRegionOptions('get_provinces', null, els.prov, curProv);
+    }
+
+    // B. Change Provinsi -> Load Kota
+    els.prov.on('change', function() {
+        var id = $(this).val();
+        var txt = $(this).find('option:selected').text();
+        $('#input_provinsi_nama').val(txt);
+
+        els.kota.empty().prop('disabled', true);
+        els.kec.empty().prop('disabled', true);
+        els.desa.empty().prop('disabled', true);
+
+        if(id) {
+            var curKota = els.kota.data('selected');
+            // Reset jika user ubah manual
+            if (String(id) !== String(curProv)) curKota = null; 
+            
+            loadRegionOptions('get_regencies', id, els.kota, curKota);
+        }
+    });
+
+    // C. Change Kota -> Load Kecamatan
+    els.kota.on('change', function() {
+        var id = $(this).val();
+        var txt = $(this).find('option:selected').text();
+        $('#input_kabupaten_nama').val(txt);
+
+        els.kec.empty().prop('disabled', true);
+        els.desa.empty().prop('disabled', true);
+
+        if(id) {
+            var curKec = els.kec.data('selected');
+            loadRegionOptions('get_districts', id, els.kec, curKec);
+        }
+    });
+
+    // D. Change Kecamatan -> Load Desa
+    els.kec.on('change', function() {
+        var id = $(this).val();
+        var txt = $(this).find('option:selected').text();
+        $('#input_kecamatan_nama').val(txt);
+
+        els.desa.empty().prop('disabled', true);
+
+        if(id) {
+            var curDesa = els.desa.data('selected');
+            loadRegionOptions('get_villages', id, els.desa, curDesa);
+        }
+    });
+
+    // E. Change Desa -> Set Text
+    els.desa.on('change', function() {
+        var txt = $(this).find('option:selected').text();
+        $('#input_kelurahan_nama').val(txt);
+    });
 });
 </script>
 

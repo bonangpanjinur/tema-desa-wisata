@@ -193,10 +193,11 @@ if (!empty($existing_cats)) {
 get_header(); 
 ?>
 
-<div class="bg-gray-50 min-h-screen font-sans flex">
+<div class="bg-gray-50 min-h-screen font-sans flex overflow-hidden">
     
     <!-- ================= SIDEBAR ================= -->
-    <aside class="w-64 bg-white border-r border-gray-200 hidden md:flex flex-col fixed h-full z-20">
+    <!-- Desktop Sidebar -->
+    <aside class="hidden md:flex w-64 bg-white border-r border-gray-200 flex-col fixed h-full z-20 overflow-y-auto">
         <div class="p-6 border-b border-gray-100 flex items-center gap-3">
             <div class="w-10 h-10 bg-primary text-white rounded-xl flex items-center justify-center text-xl shadow-lg shadow-primary/30">
                 <i class="fas fa-store"></i>
@@ -230,18 +231,61 @@ get_header();
         </div>
     </aside>
 
+    <!-- Mobile Sidebar (Off-canvas) -->
+    <div id="mobile-sidebar" class="fixed inset-0 z-40 hidden">
+        <div class="absolute inset-0 bg-gray-900/50 backdrop-blur-sm" onclick="toggleMobileSidebar()"></div>
+        <aside class="absolute left-0 top-0 bottom-0 w-64 bg-white shadow-2xl flex flex-col h-full transform transition-transform duration-300 -translate-x-full" id="mobile-sidebar-panel">
+            <div class="p-6 border-b border-gray-100 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 bg-primary text-white rounded-lg flex items-center justify-center text-lg">
+                        <i class="fas fa-store"></i>
+                    </div>
+                    <span class="font-bold text-gray-800">Merchant</span>
+                </div>
+                <button onclick="toggleMobileSidebar()" class="text-gray-500"><i class="fas fa-times text-xl"></i></button>
+            </div>
+            
+            <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+                <button onclick="switchTab('ringkasan'); toggleMobileSidebar()" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 hover:text-primary transition active-tab" id="mob-nav-ringkasan">
+                    <i class="fas fa-chart-pie w-5 text-center"></i> Ringkasan
+                </button>
+                <button onclick="switchTab('produk'); toggleMobileSidebar()" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 hover:text-primary transition" id="mob-nav-produk">
+                    <i class="fas fa-box w-5 text-center"></i> Produk Saya
+                </button>
+                <button onclick="switchTab('pesanan'); toggleMobileSidebar()" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 hover:text-primary transition" id="mob-nav-pesanan">
+                    <i class="fas fa-shopping-bag w-5 text-center"></i> Pesanan Masuk
+                </button>
+                <button onclick="switchTab('pengaturan'); toggleMobileSidebar()" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 rounded-xl hover:bg-gray-50 hover:text-primary transition" id="mob-nav-pengaturan">
+                    <i class="fas fa-cog w-5 text-center"></i> Pengaturan Toko
+                </button>
+            </nav>
+
+            <div class="p-4 border-t border-gray-100">
+                <a href="<?php echo wp_logout_url(home_url()); ?>" class="flex items-center gap-3 px-4 py-3 text-sm font-medium text-red-600 rounded-xl hover:bg-red-50 transition w-full">
+                    <i class="fas fa-sign-out-alt w-5 text-center"></i> Keluar
+                </a>
+            </div>
+        </aside>
+    </div>
+
     <!-- ================= MOBILE HEADER ================= -->
     <div class="md:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-30 flex items-center justify-between px-4 shadow-sm">
-        <span class="font-bold text-gray-800 flex items-center gap-2">
-            <i class="fas fa-store text-primary"></i> Merchant Panel
-        </span>
-        <button onclick="document.querySelector('aside').classList.toggle('hidden'); document.querySelector('aside').classList.toggle('flex');" class="text-gray-600 p-2">
-            <i class="fas fa-bars text-xl"></i>
-        </button>
+        <div class="flex items-center gap-3">
+            <button onclick="toggleMobileSidebar()" class="text-gray-600 p-1">
+                <i class="fas fa-bars text-xl"></i>
+            </button>
+            <span class="font-bold text-gray-800 flex items-center gap-2">
+                <i class="fas fa-store text-primary"></i> Merchant Panel
+            </span>
+        </div>
+        <!-- User Avatar Small -->
+        <div class="w-8 h-8 rounded-full bg-gray-200 overflow-hidden">
+             <img src="<?php echo get_avatar_url($current_user_id); ?>" class="w-full h-full object-cover">
+        </div>
     </div>
 
     <!-- ================= MAIN CONTENT ================= -->
-    <main class="flex-1 md:ml-64 p-4 md:p-8 pt-20 md:pt-8 overflow-y-auto h-screen pb-24">
+    <main class="flex-1 md:ml-64 p-4 md:p-8 pt-20 md:pt-8 overflow-y-auto h-screen pb-24 bg-gray-50">
         
         <!-- Notifikasi PHP -->
         <?php if($msg): ?>
@@ -257,12 +301,12 @@ get_header();
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                 <!-- Pendapatan -->
                 <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 hover:shadow-md transition">
-                    <div class="w-14 h-14 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center text-2xl">
+                    <div class="w-14 h-14 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center text-2xl shrink-0">
                         <i class="fas fa-wallet"></i>
                     </div>
                     <div>
                         <p class="text-sm text-gray-500 font-medium mb-1">Total Pendapatan</p>
-                        <h3 class="text-2xl font-bold text-gray-800" id="stat-sales">
+                        <h3 class="text-2xl font-bold text-gray-800 truncate" id="stat-sales">
                             <?php echo 'Rp ' . number_format($stats['pendapatan'], 0, ',', '.'); ?>
                         </h3>
                     </div>
@@ -270,7 +314,7 @@ get_header();
 
                 <!-- Pesanan Baru -->
                 <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 hover:shadow-md transition">
-                    <div class="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-2xl relative">
+                    <div class="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-2xl relative shrink-0">
                         <i class="fas fa-shopping-cart"></i>
                         <?php if($stats['pesanan_baru'] > 0): ?>
                             <span class="absolute top-0 right-0 -mt-1 -mr-1 w-4 h-4 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
@@ -286,7 +330,7 @@ get_header();
 
                 <!-- Total Produk -->
                 <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 hover:shadow-md transition">
-                    <div class="w-14 h-14 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center text-2xl">
+                    <div class="w-14 h-14 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center text-2xl shrink-0">
                         <i class="fas fa-box-open"></i>
                     </div>
                     <div>
@@ -299,7 +343,7 @@ get_header();
 
                 <!-- Produk Terjual -->
                 <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 hover:shadow-md transition">
-                    <div class="w-14 h-14 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center text-2xl">
+                    <div class="w-14 h-14 bg-orange-100 text-orange-600 rounded-2xl flex items-center justify-center text-2xl shrink-0">
                         <i class="fas fa-tags"></i>
                     </div>
                     <div>
@@ -312,7 +356,7 @@ get_header();
 
                 <!-- Rating Toko -->
                 <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 hover:shadow-md transition">
-                    <div class="w-14 h-14 bg-yellow-100 text-yellow-600 rounded-2xl flex items-center justify-center text-2xl">
+                    <div class="w-14 h-14 bg-yellow-100 text-yellow-600 rounded-2xl flex items-center justify-center text-2xl shrink-0">
                         <i class="fas fa-star"></i>
                     </div>
                     <div>
@@ -326,7 +370,7 @@ get_header();
 
                 <!-- Ulasan -->
                 <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 hover:shadow-md transition">
-                    <div class="w-14 h-14 bg-pink-100 text-pink-600 rounded-2xl flex items-center justify-center text-2xl">
+                    <div class="w-14 h-14 bg-pink-100 text-pink-600 rounded-2xl flex items-center justify-center text-2xl shrink-0">
                         <i class="fas fa-comments"></i>
                     </div>
                     <div>
@@ -340,12 +384,12 @@ get_header();
 
             <!-- Pesanan Terbaru -->
             <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                <div class="px-6 py-4 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center bg-gray-50/50 gap-4">
                     <h3 class="font-bold text-gray-800">Pesanan Terbaru</h3>
                     <button onclick="switchTab('pesanan')" class="text-sm text-primary hover:underline font-medium">Lihat Semua</button>
                 </div>
                 <div class="overflow-x-auto">
-                    <table class="w-full text-sm text-left">
+                    <table class="w-full text-sm text-left whitespace-nowrap">
                         <thead class="bg-gray-50 text-gray-500 border-b border-gray-100">
                             <tr>
                                 <th class="px-6 py-3 font-semibold">ID</th>
@@ -368,9 +412,9 @@ get_header();
 
         <!-- 2. TAB PRODUK -->
         <div id="view-produk" class="tab-content hidden animate-fade-in">
-            <div class="flex justify-between items-center mb-6">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <h1 class="text-2xl font-bold text-gray-800">Produk Saya</h1>
-                <button onclick="openProductModal()" class="bg-primary hover:bg-green-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg shadow-primary/20 transition hover:-translate-y-0.5">
+                <button onclick="openProductModal()" class="bg-primary hover:bg-green-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg shadow-primary/20 transition hover:-translate-y-0.5 w-full md:w-auto justify-center">
                     <i class="fas fa-plus"></i> Tambah Produk
                 </button>
             </div>
@@ -384,7 +428,7 @@ get_header();
             <h1 class="text-2xl font-bold text-gray-800 mb-6">Pesanan Masuk</h1>
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 <div class="overflow-x-auto">
-                    <table class="w-full text-sm text-left">
+                    <table class="w-full text-sm text-left whitespace-nowrap">
                         <thead class="bg-gray-50 text-gray-500 uppercase font-bold text-xs border-b border-gray-100">
                             <tr>
                                 <th class="px-6 py-4">ID</th>
@@ -663,7 +707,7 @@ get_header();
                 </div>
 
                 <div class="mt-8 pt-6 border-t border-gray-100 text-right">
-                    <button type="submit" name="save_toko" class="bg-gray-900 text-white font-bold py-3 px-10 rounded-xl hover:bg-gray-800 transition shadow-lg flex items-center gap-2 ml-auto">
+                    <button type="submit" name="save_toko" class="bg-gray-900 text-white font-bold py-3 px-10 rounded-xl hover:bg-gray-800 transition shadow-lg flex items-center gap-2 ml-auto w-full md:w-auto justify-center">
                         <i class="fas fa-save"></i> Simpan Perubahan
                     </button>
                 </div>
@@ -766,19 +810,43 @@ get_header();
 // Define Ajax URL for Frontend
 var ajaxurl = "<?php echo admin_url('admin-ajax.php'); ?>";
 
-// 1. Tab Switcher
+// 1. Sidebar Mobile Toggle
+function toggleMobileSidebar() {
+    const sidebar = document.getElementById('mobile-sidebar');
+    const panel = document.getElementById('mobile-sidebar-panel');
+    
+    if (sidebar.classList.contains('hidden')) {
+        sidebar.classList.remove('hidden');
+        setTimeout(() => {
+            panel.classList.remove('-translate-x-full');
+        }, 10);
+    } else {
+        panel.classList.add('-translate-x-full');
+        setTimeout(() => {
+            sidebar.classList.add('hidden');
+        }, 300);
+    }
+}
+
+// 2. Tab Switcher
 function switchTab(tabName) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active-tab'));
     
     document.getElementById('view-' + tabName).classList.remove('hidden');
-    document.getElementById('nav-' + tabName).classList.add('active-tab');
+    
+    // Update active tab for both desktop and mobile
+    const desktopNav = document.getElementById('nav-' + tabName);
+    const mobileNav = document.getElementById('mob-nav-' + tabName);
+    
+    if(desktopNav) desktopNav.classList.add('active-tab');
+    if(mobileNav) mobileNav.classList.add('active-tab');
 
     if(tabName === 'produk' && typeof loadMerchantProducts === 'function') loadMerchantProducts();
     if(tabName === 'pesanan' && typeof loadMerchantOrders === 'function') loadMerchantOrders();
 }
 
-// 2. Helper: Preview Image Input
+// 3. Helper: Preview Image Input
 function previewImage(input, previewId, iconId = null) {
     if (input.files && input.files[0]) {
         var reader = new FileReader();
@@ -792,7 +860,7 @@ function previewImage(input, previewId, iconId = null) {
     }
 }
 
-// 3. Modal Produk Logic
+// 4. Modal Produk Logic
 const modalP = document.getElementById('modal-produk');
 const panelP = document.getElementById('modal-produk-panel');
 
@@ -819,7 +887,7 @@ function closeProductModal() {
     setTimeout(() => modalP.classList.add('hidden'), 300);
 }
 
-// 4. Init
+// 5. Init
 document.addEventListener('DOMContentLoaded', () => {
     // Check URL param for tab
     const urlParams = new URLSearchParams(window.location.search);
@@ -830,7 +898,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ==========================================
-// 5. REGION DROPDOWN LOGIC (Adapted from Plugin)
+// 6. REGION DROPDOWN LOGIC (Adapted from Plugin)
 // ==========================================
 jQuery(document).ready(function($) {
     
