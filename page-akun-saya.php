@@ -143,7 +143,7 @@ $avatar_url = get_avatar_url( $current_user->ID, ['size' => 200] );
                             </div>
                         </a>
                         
-                         <a href="<?php echo home_url('/dashboard-toko'); ?>" class="md:col-span-2 group bg-white p-6 rounded-2xl shadow-sm border border-orange-100 hover:shadow-lg hover:border-orange-300 transition-all duration-300 flex items-center gap-4 relative overflow-hidden">
+                         <a href="<?php echo home_url('/dashboard'); ?>" class="md:col-span-2 group bg-white p-6 rounded-2xl shadow-sm border border-orange-100 hover:shadow-lg hover:border-orange-300 transition-all duration-300 flex items-center gap-4 relative overflow-hidden">
                             <div class="absolute top-0 right-0 w-24 h-24 bg-orange-50 rounded-bl-full -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
                             <div class="w-12 h-12 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center text-xl relative z-10">
                                 <i class="fas fa-store"></i>
