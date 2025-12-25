@@ -111,8 +111,11 @@ function tema_dw_disable_admin_bar() {
 }
 add_action('after_setup_theme', 'tema_dw_disable_admin_bar');
 
+// PERBAIKAN: Cek headers_sent() agar tidak error session_start warning
 function tema_dw_start_session() {
-    if (!session_id()) session_start();
+    if (!session_id() && !headers_sent()) {
+        session_start();
+    }
 }
 add_action('init', 'tema_dw_start_session');
 
