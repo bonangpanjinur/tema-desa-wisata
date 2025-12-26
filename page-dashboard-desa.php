@@ -2,7 +2,7 @@
 /**
  * Template Name: Dashboard Desa
  * Description: Panel Frontend Desa Lengkap (CRUD Stabil + Fitur Lengkap).
- * Status: FINAL FIX (Logic CRUD Diperbaiki Total).
+ * Status: FINAL FIX (Logic CRUD Diperbaiki Total + Data UMKM Lengkap + Profil Lengkap).
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -76,11 +76,14 @@ if ( isset($_POST['save_profil_desa']) && check_admin_referer('save_profil_desa_
     ];
 
     // Upload Files Logic
+    // PENTING: qris_desa akan disimpan ke kolom qris_image_url_desa sesuai DB
     $files_map = ['foto_desa' => 'foto', 'foto_sampul' => 'foto_sampul', 'qris_desa' => 'qris_image_url_desa'];
     foreach($files_map as $input => $col) {
         if ( ! empty($_FILES[$input]['name']) ) {
             $up = wp_handle_upload( $_FILES[$input], ['test_form' => false] );
-            if ( isset( $up['url'] ) && ! isset( $up['error'] ) ) $update_desa[$col] = $up['url'];
+            if ( isset( $up['url'] ) && ! isset( $up['error'] ) ) {
+                $update_desa[$col] = $up['url'];
+            }
         }
     }
     
@@ -330,16 +333,100 @@ get_header();
 
         <!-- 3. TAB DATA UMKM -->
         <div id="view-data-umkm" class="tab-content hidden animate-fade-in">
-            <header class="mb-8"><h1 class="text-2xl font-bold text-gray-800">Data UMKM</h1><p class="text-gray-500 text-sm">Daftar pedagang aktif.</p></header>
-            <?php $umkm_active = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_pedagang WHERE id_desa = %d AND status_pendaftaran = 'disetujui' ORDER BY nama_toko ASC", $id_desa)); ?>
+            <header class="mb-8 flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800">Data UMKM</h1>
+                    <p class="text-gray-500 text-sm">Daftar pedagang aktif di desa ini.</p>
+                </div>
+                <?php $umkm_active = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_pedagang WHERE id_desa = %d AND status_pendaftaran = 'disetujui' ORDER BY created_at DESC", $id_desa)); ?>
+                <div class="text-sm bg-blue-50 text-blue-700 px-4 py-2 rounded-lg border border-blue-100">
+                    Total: <strong><?php echo count($umkm_active ?? []); ?></strong> Mitra
+                </div>
+            </header>
+            
             <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <?php if($umkm_active): ?>
-                <div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="bg-gray-50 text-gray-500 uppercase font-bold text-xs border-b border-gray-100"><tr><th class="px-6 py-4">Toko</th><th class="px-6 py-4">Pemilik</th><th class="px-6 py-4">Kontak</th><th class="px-6 py-4 text-center">Status</th></tr></thead><tbody class="divide-y divide-gray-100">
-                <?php foreach($umkm_active as $u): ?>
-                <tr class="hover:bg-gray-50"><td class="px-6 py-4 font-bold"><?php echo esc_html($u->nama_toko); ?></td><td class="px-6 py-4"><?php echo esc_html($u->nama_pemilik); ?></td><td class="px-6 py-4"><?php echo esc_html($u->nomor_wa); ?></td><td class="px-6 py-4 text-center"><span class="px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">Aktif</span></td></tr>
-                <?php endforeach; ?>
-                </tbody></table></div>
-                <?php else: ?><div class="p-12 text-center text-gray-400">Belum ada UMKM aktif.</div><?php endif; ?>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-gray-50 text-gray-500 uppercase font-bold text-xs border-b border-gray-100">
+                            <tr>
+                                <th class="px-6 py-4">Info Toko</th>
+                                <th class="px-6 py-4">Pemilik & Lokasi</th>
+                                <th class="px-6 py-4">Statistik</th>
+                                <th class="px-6 py-4">Kontak</th>
+                                <th class="px-6 py-4 text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                        <?php foreach($umkm_active as $u): 
+                            $wa_link = 'https://wa.me/' . preg_replace('/^0/', '62', preg_replace('/[^0-9]/', '', $u->nomor_wa));
+                            $foto_url = !empty($u->foto_profil) ? esc_url($u->foto_profil) : 'https://ui-avatars.com/api/?name='.urlencode($u->nama_toko).'&background=random';
+                        ?>
+                        <tr class="hover:bg-gray-50 transition group">
+                            <!-- Info Toko -->
+                            <td class="px-6 py-4">
+                                <div class="flex items-center gap-4">
+                                    <img src="<?php echo $foto_url; ?>" class="w-12 h-12 rounded-xl object-cover border border-gray-200 shadow-sm">
+                                    <div>
+                                        <div class="font-bold text-gray-800 text-base mb-0.5"><?php echo esc_html($u->nama_toko); ?></div>
+                                        <div class="text-xs text-gray-500">Bergabung: <?php echo date('d M Y', strtotime($u->created_at)); ?></div>
+                                    </div>
+                                </div>
+                            </td>
+                            
+                            <!-- Pemilik & Lokasi -->
+                            <td class="px-6 py-4">
+                                <div class="font-medium text-gray-700 mb-1"><i class="fas fa-user-circle text-gray-400 mr-1"></i> <?php echo esc_html($u->nama_pemilik); ?></div>
+                                <div class="text-xs text-gray-500 line-clamp-2 w-48" title="<?php echo esc_attr($u->alamat_lengkap); ?>">
+                                    <i class="fas fa-map-marker-alt text-red-400 mr-1"></i> <?php echo esc_html($u->alamat_lengkap ?: 'Alamat belum diisi'); ?>
+                                </div>
+                            </td>
+
+                            <!-- Statistik -->
+                            <td class="px-6 py-4">
+                                <div class="flex flex-col gap-1">
+                                    <span class="text-xs font-medium text-gray-600 flex items-center gap-1">
+                                        <i class="fas fa-star text-yellow-400"></i> Rating: <strong><?php echo number_format($u->rating_toko, 1); ?></strong>
+                                    </span>
+                                    <span class="text-xs font-medium text-gray-600 flex items-center gap-1">
+                                        <i class="fas fa-receipt text-blue-400"></i> Kuota: <strong><?php echo number_format($u->sisa_transaksi); ?></strong>
+                                    </span>
+                                </div>
+                            </td>
+
+                            <!-- Kontak -->
+                            <td class="px-6 py-4">
+                                <a href="<?php echo $wa_link; ?>" target="_blank" class="inline-flex items-center gap-2 text-green-600 hover:text-green-700 bg-green-50 hover:bg-green-100 px-3 py-1.5 rounded-lg text-xs font-bold transition">
+                                    <i class="fab fa-whatsapp text-lg"></i> Chat
+                                </a>
+                            </td>
+
+                            <!-- Status -->
+                            <td class="px-6 py-4 text-center">
+                                <?php if($u->status_akun == 'aktif'): ?>
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> Aktif
+                                    </span>
+                                <?php else: ?>
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> Nonaktif
+                                    </span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <?php else: ?>
+                    <div class="p-16 text-center text-gray-400">
+                        <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
+                            <i class="fas fa-store-slash"></i>
+                        </div>
+                        <h3 class="text-gray-800 font-bold text-lg mb-1">Belum ada data</h3>
+                        <p>Belum ada UMKM yang terverifikasi di desa ini.</p>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -396,15 +483,48 @@ get_header();
                 <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden p-6">
                     <div class="flex flex-col md:flex-row gap-6">
                         <div class="w-full md:w-1/3">
-                            <img src="<?php echo $desa_data->foto_sampul ? esc_url($desa_data->foto_sampul) : 'https://placehold.co/400x300?text=Cover'; ?>" class="w-full h-48 object-cover rounded-xl mb-4">
-                            <h2 class="text-xl font-bold"><?php echo esc_html($desa_data->nama_desa); ?></h2>
-                            <p class="text-gray-500 text-sm"><?php echo esc_html($desa_data->kabupaten); ?></p>
+                            <img src="<?php echo $desa_data->foto_sampul ? esc_url($desa_data->foto_sampul) : 'https://placehold.co/400x300?text=Cover'; ?>" class="w-full h-48 object-cover rounded-xl mb-4 shadow-sm border border-gray-100">
+                            
+                            <!-- LOGO DESA -->
+                            <div class="flex items-center gap-4 mb-4">
+                                <img src="<?php echo $desa_data->foto ? esc_url($desa_data->foto) : 'https://placehold.co/100x100?text=Logo'; ?>" class="w-16 h-16 rounded-full border border-gray-200 object-cover shadow-sm">
+                                <div>
+                                    <h2 class="text-xl font-bold text-gray-800 leading-tight"><?php echo esc_html($desa_data->nama_desa); ?></h2>
+                                    <p class="text-gray-500 text-xs"><?php echo esc_html($desa_data->kabupaten); ?></p>
+                                </div>
+                            </div>
+                            
+                            <?php if($desa_data->qris_image_url_desa): ?>
+                                <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 text-center">
+                                    <p class="text-xs font-bold text-gray-500 uppercase mb-2">QRIS Desa</p>
+                                    <img src="<?php echo esc_url($desa_data->qris_image_url_desa); ?>" class="w-32 h-32 object-contain mx-auto mix-blend-multiply">
+                                </div>
+                            <?php endif; ?>
                         </div>
-                        <div class="w-full md:w-2/3 space-y-4">
-                            <div><label class="text-xs font-bold text-gray-400 uppercase">Deskripsi</label><p class="text-gray-700"><?php echo nl2br(esc_html($desa_data->deskripsi)); ?></p></div>
-                            <div class="grid grid-cols-2 gap-4">
-                                <div><label class="text-xs font-bold text-gray-400 uppercase">Bank</label><p><?php echo esc_html($desa_data->nama_bank_desa); ?></p></div>
-                                <div><label class="text-xs font-bold text-gray-400 uppercase">No. Rekening</label><p><?php echo esc_html($desa_data->no_rekening_desa); ?></p></div>
+                        
+                        <div class="w-full md:w-2/3 space-y-6">
+                            <div class="bg-gray-50 p-6 rounded-xl border border-gray-100">
+                                <label class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Deskripsi Desa</label>
+                                <p class="text-gray-700 leading-relaxed text-sm"><?php echo nl2br(esc_html($desa_data->deskripsi ?: 'Belum ada deskripsi.')); ?></p>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="bg-blue-50 p-5 rounded-xl border border-blue-100">
+                                    <h3 class="font-bold text-blue-800 mb-3 flex items-center gap-2"><i class="fas fa-wallet"></i> Rekening Desa</h3>
+                                    <div class="space-y-2 text-sm text-blue-900">
+                                        <div class="flex justify-between border-b border-blue-200 pb-1"><span>Bank:</span> <strong><?php echo esc_html($desa_data->nama_bank_desa ?: '-'); ?></strong></div>
+                                        <div class="flex justify-between border-b border-blue-200 pb-1"><span>No. Rek:</span> <strong class="font-mono"><?php echo esc_html($desa_data->no_rekening_desa ?: '-'); ?></strong></div>
+                                        <div class="flex justify-between"><span>A.N:</span> <strong><?php echo esc_html($desa_data->atas_nama_rekening_desa ?: '-'); ?></strong></div>
+                                    </div>
+                                </div>
+                                <div class="bg-green-50 p-5 rounded-xl border border-green-100">
+                                    <h3 class="font-bold text-green-800 mb-3 flex items-center gap-2"><i class="fas fa-map-marker-alt"></i> Lokasi</h3>
+                                    <div class="space-y-1 text-sm text-green-900">
+                                        <p><?php echo esc_html($desa_data->alamat_lengkap ?: '-'); ?></p>
+                                        <p class="text-xs mt-2 opacity-75"><?php echo esc_html($desa_data->kelurahan); ?>, <?php echo esc_html($desa_data->kecamatan); ?></p>
+                                        <p class="text-xs opacity-75"><?php echo esc_html($desa_data->kabupaten); ?>, <?php echo esc_html($desa_data->provinsi); ?></p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -417,47 +537,87 @@ get_header();
                     <h1 class="text-2xl font-bold text-gray-800">Edit Profil</h1>
                     <button onclick="toggleProfilMode('view')" class="bg-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-bold shadow hover:bg-gray-300 transition">Batal</button>
                 </header>
-                <form method="POST" enctype="multipart/form-data" class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-6">
+                <form method="POST" enctype="multipart/form-data" class="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 space-y-8">
                     <?php wp_nonce_field('save_profil_desa_action', 'profil_desa_nonce'); ?>
                     <input type="hidden" name="save_profil_desa" value="1">
                     
-                    <div class="grid md:grid-cols-2 gap-6">
-                        <div>
-                            <label class="block text-sm font-bold mb-1">Nama Desa</label>
-                            <input type="text" name="nama_desa" value="<?php echo esc_attr($desa_data->nama_desa); ?>" class="w-full border rounded p-2">
+                    <!-- FOTO -->
+                    <div class="grid md:grid-cols-3 gap-8">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Logo Desa</label>
+                                <div class="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center hover:bg-gray-50 cursor-pointer relative group">
+                                    <input type="file" name="foto_desa" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onchange="previewImage(this, 'prev_logo')">
+                                    <img id="prev_logo" src="<?php echo $desa_data->foto ? esc_url($desa_data->foto) : 'https://placehold.co/100x100?text=Logo'; ?>" class="w-20 h-20 mx-auto rounded-full object-cover mb-2">
+                                    <p class="text-xs text-blue-500 font-bold group-hover:underline">Ganti Logo</p>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-2">QRIS (Opsional)</label>
+                                <div class="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center hover:bg-gray-50 cursor-pointer relative group">
+                                    <input type="file" name="qris_desa" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onchange="previewImage(this, 'prev_qris')">
+                                    <img id="prev_qris" src="<?php echo $desa_data->qris_image_url_desa ? esc_url($desa_data->qris_image_url_desa) : 'https://placehold.co/100x100?text=QRIS'; ?>" class="w-20 h-20 mx-auto object-contain mb-2">
+                                    <p class="text-xs text-blue-500 font-bold group-hover:underline">Upload QRIS</p>
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <label class="block text-sm font-bold mb-1">Foto Sampul</label>
-                            <input type="file" name="foto_sampul" class="w-full border rounded p-1 text-sm">
+                        
+                        <div class="md:col-span-2 space-y-6">
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Nama Desa</label>
+                                <input type="text" name="nama_desa" value="<?php echo esc_attr($desa_data->nama_desa); ?>" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Foto Sampul</label>
+                                <input type="file" name="foto_sampul" class="w-full border border-gray-300 rounded-lg p-2 text-sm bg-gray-50">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Deskripsi</label>
+                                <textarea name="deskripsi" rows="4" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"><?php echo esc_textarea($desa_data->deskripsi); ?></textarea>
+                            </div>
                         </div>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-bold mb-1">Deskripsi</label>
-                        <textarea name="deskripsi" rows="4" class="w-full border rounded p-2"><?php echo esc_textarea($desa_data->deskripsi); ?></textarea>
                     </div>
                     
-                    <!-- Region (Simplified for brevity, ensure JS logic below matches IDs) -->
-                    <div id="region-data" data-prov="<?php echo esc_attr($desa_data->api_provinsi_id); ?>" data-kota="<?php echo esc_attr($desa_data->api_kabupaten_id); ?>" data-kec="<?php echo esc_attr($desa_data->api_kecamatan_id); ?>" data-desa="<?php echo esc_attr($desa_data->api_kelurahan_id); ?>"></div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div><label class="text-xs font-bold">Provinsi</label><select name="api_provinsi_id" id="dw_provinsi" class="w-full border rounded p-2"><option>Loading...</option></select></div>
-                        <div><label class="text-xs font-bold">Kabupaten</label><select name="api_kabupaten_id" id="dw_kota" class="w-full border rounded p-2" disabled></select></div>
-                        <div><label class="text-xs font-bold">Kecamatan</label><select name="api_kecamatan_id" id="dw_kecamatan" class="w-full border rounded p-2" disabled></select></div>
-                        <div><label class="text-xs font-bold">Kelurahan</label><select name="api_kelurahan_id" id="dw_desa" class="w-full border rounded p-2" disabled></select></div>
+                    <!-- WILAYAH -->
+                    <div class="pt-6 border-t border-gray-100">
+                        <h3 class="text-lg font-bold text-gray-800 mb-4">Lokasi Wilayah</h3>
+                        <div id="region-data" data-prov="<?php echo esc_attr($desa_data->api_provinsi_id); ?>" data-kota="<?php echo esc_attr($desa_data->api_kabupaten_id); ?>" data-kec="<?php echo esc_attr($desa_data->api_kecamatan_id); ?>" data-desa="<?php echo esc_attr($desa_data->api_kelurahan_id); ?>"></div>
+                        
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div><label class="text-xs font-bold block mb-1">Provinsi</label><select name="api_provinsi_id" id="dw_provinsi" class="w-full border rounded-lg p-2.5 bg-white"><option>Loading...</option></select></div>
+                            <div><label class="text-xs font-bold block mb-1">Kabupaten</label><select name="api_kabupaten_id" id="dw_kota" class="w-full border rounded-lg p-2.5 bg-white" disabled></select></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div><label class="text-xs font-bold block mb-1">Kecamatan</label><select name="api_kecamatan_id" id="dw_kecamatan" class="w-full border rounded-lg p-2.5 bg-white" disabled></select></div>
+                            <div><label class="text-xs font-bold block mb-1">Kelurahan</label><select name="api_kelurahan_id" id="dw_desa" class="w-full border rounded-lg p-2.5 bg-white" disabled></select></div>
+                        </div>
+                        
+                        <!-- Hidden Names -->
+                        <input type="hidden" name="provinsi_nama" id="input_provinsi_nama" value="<?php echo esc_attr($desa_data->provinsi); ?>">
+                        <input type="hidden" name="kabupaten_nama" id="input_kabupaten_name" value="<?php echo esc_attr($desa_data->kabupaten); ?>">
+                        <input type="hidden" name="kecamatan_nama" id="input_kecamatan_name" value="<?php echo esc_attr($desa_data->kecamatan); ?>">
+                        <input type="hidden" name="kelurahan_nama" id="input_kelurahan_name" value="<?php echo esc_attr($desa_data->kelurahan); ?>">
+                        
+                        <div>
+                            <label class="text-sm font-bold block mb-1">Alamat Lengkap</label>
+                            <textarea name="alamat_lengkap" rows="2" class="w-full border border-gray-300 rounded-lg p-2.5"><?php echo esc_textarea($desa_data->alamat_lengkap); ?></textarea>
+                        </div>
                     </div>
-                    <!-- Hidden inputs for names -->
-                    <input type="hidden" name="provinsi_nama" id="input_provinsi_nama" value="<?php echo esc_attr($desa_data->provinsi); ?>">
-                    <input type="hidden" name="kabupaten_nama" id="input_kabupaten_name" value="<?php echo esc_attr($desa_data->kabupaten); ?>">
-                    <input type="hidden" name="kecamatan_nama" id="input_kecamatan_name" value="<?php echo esc_attr($desa_data->kecamatan); ?>">
-                    <input type="hidden" name="kelurahan_nama" id="input_kelurahan_name" value="<?php echo esc_attr($desa_data->kelurahan); ?>">
 
-                    <div class="grid md:grid-cols-3 gap-4 border-t pt-4">
-                        <div><label class="block text-sm font-bold mb-1">Nama Bank</label><input type="text" name="nama_bank_desa" value="<?php echo esc_attr($desa_data->nama_bank_desa); ?>" class="w-full border rounded p-2"></div>
-                        <div><label class="block text-sm font-bold mb-1">No. Rekening</label><input type="text" name="no_rekening_desa" value="<?php echo esc_attr($desa_data->no_rekening_desa); ?>" class="w-full border rounded p-2"></div>
-                        <div><label class="block text-sm font-bold mb-1">Atas Nama</label><input type="text" name="atas_nama_rekening_desa" value="<?php echo esc_attr($desa_data->atas_nama_rekening_desa); ?>" class="w-full border rounded p-2"></div>
+                    <!-- REKENING -->
+                    <div class="pt-6 border-t border-gray-100">
+                        <h3 class="text-lg font-bold text-gray-800 mb-4">Rekening Penerimaan</h3>
+                        <div class="grid md:grid-cols-3 gap-4">
+                            <div><label class="block text-xs font-bold uppercase text-gray-500 mb-1">Nama Bank</label><input type="text" name="nama_bank_desa" value="<?php echo esc_attr($desa_data->nama_bank_desa); ?>" class="w-full border rounded-lg p-2.5"></div>
+                            <div><label class="block text-xs font-bold uppercase text-gray-500 mb-1">No. Rekening</label><input type="text" name="no_rekening_desa" value="<?php echo esc_attr($desa_data->no_rekening_desa); ?>" class="w-full border rounded-lg p-2.5 font-mono"></div>
+                            <div><label class="block text-xs font-bold uppercase text-gray-500 mb-1">Atas Nama</label><input type="text" name="atas_nama_rekening_desa" value="<?php echo esc_attr($desa_data->atas_nama_rekening_desa); ?>" class="w-full border rounded-lg p-2.5"></div>
+                        </div>
                     </div>
 
-                    <div class="text-right">
-                        <button type="submit" class="bg-gray-900 text-white px-6 py-2 rounded font-bold hover:bg-black">Simpan Perubahan</button>
+                    <div class="pt-6 text-right">
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-xl shadow-lg transition flex items-center gap-2 ml-auto">
+                            <i class="fas fa-save"></i> Simpan Perubahan
+                        </button>
                     </div>
                 </form>
             </div>
@@ -470,7 +630,8 @@ get_header();
     <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeWisataModal()"></div>
     <div class="absolute inset-y-0 right-0 w-full max-w-lg bg-white shadow-2xl transform transition-transform translate-x-full duration-300 flex flex-col" id="modal-wisata-panel">
         <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-white z-10">
-            <h2 class="text-xl font-bold text-gray-800" id="mw-title">Tambah Wisata</h2>
+            <!-- FIX: ID ini diperbaiki dari 'mw-title' menjadi 'mw_title' agar match dengan JS -->
+            <h2 class="text-xl font-bold text-gray-800" id="mw_title">Tambah Wisata</h2>
             <button onclick="closeWisataModal()" class="text-gray-500 hover:text-gray-700"><i class="fas fa-times text-xl"></i></button>
         </div>
         <div class="flex-1 overflow-y-auto p-6">
@@ -486,7 +647,7 @@ get_header();
                     
                     <div id="mw_preview_box" class="hidden mb-2">
                         <label class="text-xs font-bold text-gray-500">Foto Saat Ini:</label>
-                        <img id="mw_preview_img" src="" class="h-32 rounded border mt-1">
+                        <img id="mw_preview_img" src="" class="h-32 rounded border mt-1 object-cover w-full">
                     </div>
                     
                     <div><label class="block text-sm font-bold mb-1">Upload Foto</label><input type="file" name="foto_utama" class="w-full text-sm border rounded p-1"></div>
@@ -504,7 +665,7 @@ get_header();
                 </div>
                 
                 <div class="mt-6 pt-4 border-t">
-                    <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 rounded hover:bg-blue-700">Simpan Data</button>
+                    <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 rounded hover:bg-blue-700 shadow-lg">Simpan Data</button>
                 </div>
             </form>
         </div>
@@ -541,6 +702,15 @@ function toggleProfilMode(mode) {
     document.getElementById('profil-edit-mode').classList.toggle('hidden', mode !== 'edit');
 }
 
+// Preview Image Helper
+function previewImage(input, previewId) {
+    if (input.files && input.files[0]) {
+        var reader = new FileReader();
+        reader.onload = function(e) { document.getElementById(previewId).src = e.target.result; }
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
 // --- MODAL LOGIC YANG DIPERBAIKI ---
 const mw = document.getElementById('modal-wisata');
 const mp = document.getElementById('modal-wisata-panel');
@@ -548,7 +718,11 @@ const mp = document.getElementById('modal-wisata-panel');
 function openWisataModalNew() {
     // Mode Tambah Baru
     resetForm();
-    document.getElementById('mw_title').innerText = 'Tambah Wisata';
+    // Di sini Javascript mencari element dengan ID 'mw_title'
+    // Sebelumnya di HTML ID-nya 'mw-title' (typo), sekarang sudah diperbaiki jadi 'mw_title'
+    if(document.getElementById('mw_title')) {
+        document.getElementById('mw_title').innerText = 'Tambah Wisata';
+    }
     mw.classList.remove('hidden');
     setTimeout(() => mp.classList.remove('translate-x-full'), 10);
 }
