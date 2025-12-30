@@ -46,6 +46,10 @@ function tema_dw_scripts() {
 
     wp_enqueue_style('google-fonts', 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap', array(), null);
     wp_enqueue_style('font-awesome', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css', array(), '6.4.0');
+    
+    // Dashicons needed for frontend dashboards
+    wp_enqueue_style( 'dashicons' );
+
     wp_enqueue_style('tema-dw-style', get_stylesheet_uri());
     
     if (file_exists(get_template_directory() . '/assets/css/main.css')) {
@@ -94,12 +98,21 @@ function dw_get_desa_id() {
     return $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}dw_desa WHERE id_user_desa = %d", $user_id));
 }
 
+// Helper: Redirect Login Custom (Updated for Verifikator)
 function tema_dw_login_redirect($url, $request, $user) {
     if ($user && is_object($user) && is_a($user, 'WP_User')) {
-        if (in_array('administrator', $user->roles)) {
-            return admin_url();
-        } else {
+        // Jika Administrator, tetap bisa ke wp-admin, tapi preferensi dashboard frontend
+        // Kita arahkan semua role custom ke /dashboard frontend
+        if (in_array('administrator', $user->roles) || 
+            in_array('editor_desa', $user->roles) || 
+            in_array('pedagang', $user->roles) || 
+            in_array('dw_ojek', $user->roles) ||
+            in_array('verifikator_umkm', $user->roles) // Tambahan Verifikator
+        ) {
             return home_url('/dashboard');
+        } else {
+            // User biasa/pembeli
+            return home_url('/akun-saya');
         }
     }
     return $url;
@@ -107,7 +120,10 @@ function tema_dw_login_redirect($url, $request, $user) {
 add_filter('login_redirect', 'tema_dw_login_redirect', 10, 3);
 
 function tema_dw_disable_admin_bar() {
-    if (!current_user_can('edit_posts')) show_admin_bar(false);
+    // Sembunyikan admin bar untuk semua user kecuali admin yang sedang akses wp-admin area
+    if (!current_user_can('edit_posts') && !is_admin()) {
+        show_admin_bar(false);
+    }
 }
 add_action('after_setup_theme', 'tema_dw_disable_admin_bar');
 
@@ -137,6 +153,7 @@ function tema_dw_rewrite_rules() {
     add_rewrite_rule('^dashboard-toko/?$', 'index.php?dw_type=dashboard_toko', 'top');
     add_rewrite_rule('^dashboard-desa/?$', 'index.php?dw_type=dashboard_desa', 'top');
     add_rewrite_rule('^dashboard-ojek/?$', 'index.php?dw_type=dashboard_ojek', 'top');
+    add_rewrite_rule('^dashboard-verifikator/?$', 'index.php?dw_type=dashboard_verifikator', 'top'); // Tambahan
     add_rewrite_rule('^akun-saya/?$', 'index.php?dw_type=akun_saya', 'top');
     
     // Transaction
@@ -144,15 +161,15 @@ function tema_dw_rewrite_rules() {
     add_rewrite_rule('^checkout/?$', 'index.php?dw_type=checkout', 'top');
     add_rewrite_rule('^pembayaran/?$', 'index.php?dw_type=pembayaran', 'top');
     
-    if (get_option('tema_dw_rules_flushed_v11') !== 'yes') {
+    if (get_option('tema_dw_rules_flushed_v12') !== 'yes') {
         flush_rewrite_rules();
-        update_option('tema_dw_rules_flushed_v11', 'yes');
+        update_option('tema_dw_rules_flushed_v12', 'yes');
     }
 }
 add_action('init', 'tema_dw_rewrite_rules');
 
 add_action('after_switch_theme', function() {
-    delete_option('tema_dw_rules_flushed_v11');
+    delete_option('tema_dw_rules_flushed_v12');
 });
 
 function tema_dw_query_vars($vars) {
@@ -177,6 +194,7 @@ function tema_dw_template_include($template) {
         // Prioritas 1: Admin Desa
         if (in_array('admin_desa', $roles) || in_array('administrator', $roles)) {
             // Administrator juga bisa akses dashboard desa untuk testing
+            // Note: Jika admin ingin akses dashboard lain, bisa gunakan URL direct
             return get_template_directory() . '/page-dashboard-desa.php';
         } 
         // Prioritas 2: Pedagang
@@ -184,12 +202,16 @@ function tema_dw_template_include($template) {
             return get_template_directory() . '/page-dashboard-toko.php';
         } 
         // Prioritas 3: Ojek
-        elseif (in_array('ojek', $roles)) {
+        elseif (in_array('dw_ojek', $roles)) {
             return get_template_directory() . '/page-dashboard-ojek.php';
         } 
+        // Prioritas 4: Verifikator UMKM
+        elseif (in_array('verifikator_umkm', $roles)) {
+            return get_template_directory() . '/page-dashboard-verifikator.php';
+        }
         // Default: User Biasa / Pembeli
         else {
-            return get_template_directory() . '/page-dashboard.php';
+            return get_template_directory() . '/page-dashboard.php'; // Atau page-akun-saya.php
         }
     }
 
@@ -204,6 +226,7 @@ function tema_dw_template_include($template) {
     if ($dw_type == 'dashboard_toko') return get_template_directory() . '/page-dashboard-toko.php';
     if ($dw_type == 'dashboard_desa') return get_template_directory() . '/page-dashboard-desa.php';
     if ($dw_type == 'dashboard_ojek') return get_template_directory() . '/page-dashboard-ojek.php';
+    if ($dw_type == 'dashboard_verifikator') return get_template_directory() . '/page-dashboard-verifikator.php';
     if ($dw_type == 'akun_saya')      return get_template_directory() . '/page-akun-saya.php';
     
     return $template;
@@ -220,7 +243,7 @@ function dw_load_region_scripts() {
     
     // Load script jika user berada di URL /dashboard atau URL spesifik lainnya
     // Script ini diperlukan untuk dropdown wilayah
-    if ( $type == 'dashboard_router' || $type == 'dashboard_toko' || $type == 'dashboard_desa' || 
+    if ( $type == 'dashboard_router' || $type == 'dashboard_toko' || $type == 'dashboard_desa' || $type == 'dashboard_verifikator' ||
          is_page_template('page-dashboard-toko.php') || is_page_template('page-dashboard-desa.php') ) {
         
         if( file_exists( get_template_directory() . '/assets/js/dw-region.js' ) ) {
