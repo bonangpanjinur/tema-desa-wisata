@@ -1,7 +1,7 @@
 <?php
 /**
  * Template Name: Halaman Register Custom
- * Description: Registration for Buyer, Merchant, and Ojek with Premium UI.
+ * Description: Pendaftaran khusus Wisatawan & Pedagang (Ojek & Verifikator via Admin).
  */
 
 if ( is_user_logged_in() ) {
@@ -18,19 +18,23 @@ if ( $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['dw_register_nonce']) 
     $username   = sanitize_user($_POST['username']);
     $email      = sanitize_email($_POST['email']);
     $password   = $_POST['password'];
-    $role       = sanitize_text_field($_POST['role_type']); // 'buyer', 'pedagang', 'ojek'
+    $role_input = sanitize_text_field($_POST['role_type']); // 'buyer' atau 'pedagang'
     $nama_lengkap = sanitize_text_field($_POST['nama_lengkap']);
     
+    // Validasi Role (Hanya izinkan buyer atau pedagang)
+    $allowed_roles = ['buyer', 'pedagang'];
+    if (!in_array($role_input, $allowed_roles)) {
+        $role_input = 'buyer'; // Fallback ke buyer jika di-tamper
+    }
+
     // Validasi Dasar
     if ( username_exists($username) || email_exists($email) ) {
-        $error_message = 'Username atau Email sudah terdaftar.';
+        $error_message = 'Username atau Email sudah terdaftar. Silakan login atau gunakan email lain.';
     } else {
         // Tentukan Role WordPress
-        $wp_role = 'subscriber'; // Default pembeli
-        if ($role === 'pedagang') {
+        $wp_role = 'subscriber'; // Default pembeli/wisatawan
+        if ($role_input === 'pedagang') {
             $wp_role = 'pedagang';
-        } elseif ($role === 'ojek') {
-            $wp_role = 'ojek';
         }
 
         // Buat User WP
@@ -48,26 +52,17 @@ if ( $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['dw_register_nonce']) 
             // --- LOGIKA KHUSUS ROLE ---
             
             // 1. Logika Pedagang
-            if ( $role === 'pedagang' ) {
+            if ( $role_input === 'pedagang' ) {
                 $nama_toko = sanitize_text_field($_POST['nama_toko']);
                 $no_wa     = sanitize_text_field($_POST['no_wa']);
                 
                 update_user_meta( $user_id, 'nama_toko', $nama_toko );
                 update_user_meta( $user_id, 'no_wa', $no_wa );
-                update_user_meta( $user_id, 'status_verifikasi', 'pending' );
+                // Status verifikasi default pending, menunggu verifikasi Admin/Verifikator
+                update_user_meta( $user_id, 'status_verifikasi', 'pending' ); 
             } 
-            // 2. Logika Ojek
-            elseif ( $role === 'ojek' ) {
-                $plat_nomor = sanitize_text_field($_POST['plat_nomor']);
-                $no_wa      = sanitize_text_field($_POST['no_wa']); 
-
-                update_user_meta( $user_id, 'plat_nomor', $plat_nomor );
-                update_user_meta( $user_id, 'no_wa', $no_wa );
-                update_user_meta( $user_id, 'status_ojek', 'pending' ); 
-                update_user_meta( $user_id, 'status_ketersediaan', 'offline' );
-            }
             
-            // Auto Login
+            // Auto Login setelah daftar
             $creds = array(
                 'user_login'    => $username,
                 'user_password' => $password,
@@ -76,10 +71,8 @@ if ( $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['dw_register_nonce']) 
             $signon = wp_signon( $creds, false );
             
             // Redirect sesuai Role
-            if ( $role === 'pedagang' ) {
-                wp_redirect( home_url('/dashboard-toko') );
-            } elseif ( $role === 'ojek' ) {
-                wp_redirect( home_url('/dashboard-ojek') );
+            if ( $role_input === 'pedagang' ) {
+                wp_redirect( home_url('/dashboard-toko') ); // atau /dashboard sesuai router
             } else {
                 wp_redirect( home_url('/akun-saya') );
             }
@@ -99,7 +92,7 @@ get_header();
 
 <div class="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-sans relative overflow-hidden">
     
-    <!-- Background Decoration (Sama dengan Login) -->
+    <!-- Background Decoration -->
     <div class="absolute top-0 left-0 w-full h-[600px] bg-gradient-to-b from-orange-50 to-transparent -z-10"></div>
     <div class="absolute -top-24 -right-24 w-96 h-96 bg-yellow-100 rounded-full blur-3xl opacity-40 -z-10"></div>
     <div class="absolute top-1/2 -left-24 w-72 h-72 bg-orange-100 rounded-full blur-3xl opacity-40 -z-10"></div>
@@ -134,20 +127,21 @@ get_header();
             <form class="space-y-6" action="" method="POST" x-data="{ role: 'buyer' }">
                 <?php wp_nonce_field('dw_register_action', 'dw_register_nonce'); ?>
                 
-                <!-- Pilihan Role: Card Style -->
+                <!-- Pilihan Role: 2 Grid (Wisatawan & Pedagang) -->
                 <div>
                     <label class="block text-sm font-bold text-gray-700 mb-3 text-center uppercase tracking-wider text-xs text-gray-400">Pilih Tipe Akun</label>
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <!-- Wisatawan -->
                         <div @click="role = 'buyer'" 
                              :class="{ 'ring-2 ring-blue-500 bg-blue-50': role === 'buyer', 'border-gray-200 hover:border-blue-300 hover:bg-gray-50': role !== 'buyer' }"
                              class="cursor-pointer border rounded-xl p-4 text-center transition-all duration-200 relative group overflow-hidden">
                             <div class="mb-2">
-                                <div class="w-10 h-10 mx-auto rounded-full flex items-center justify-center" :class="role === 'buyer' ? 'bg-blue-200 text-blue-700' : 'bg-gray-100 text-gray-500 group-hover:bg-blue-100 group-hover:text-blue-600'">
-                                    <i class="fas fa-user text-lg"></i>
+                                <div class="w-12 h-12 mx-auto rounded-full flex items-center justify-center transition-colors" :class="role === 'buyer' ? 'bg-blue-200 text-blue-700' : 'bg-gray-100 text-gray-500 group-hover:bg-blue-100 group-hover:text-blue-600'">
+                                    <i class="fas fa-user text-xl"></i>
                                 </div>
                             </div>
-                            <span class="text-xs font-bold block" :class="role === 'buyer' ? 'text-blue-800' : 'text-gray-600'">Wisatawan</span>
+                            <span class="text-sm font-bold block" :class="role === 'buyer' ? 'text-blue-800' : 'text-gray-600'">Wisatawan</span>
+                            <span class="text-xs text-gray-400 mt-1 block">Untuk belanja & wisata</span>
                             <div x-show="role === 'buyer'" class="absolute top-2 right-2 text-blue-500"><i class="fas fa-check-circle"></i></div>
                         </div>
                         
@@ -156,25 +150,13 @@ get_header();
                              :class="{ 'ring-2 ring-orange-500 bg-orange-50': role === 'pedagang', 'border-gray-200 hover:border-orange-300 hover:bg-gray-50': role !== 'pedagang' }"
                              class="cursor-pointer border rounded-xl p-4 text-center transition-all duration-200 relative group overflow-hidden">
                             <div class="mb-2">
-                                <div class="w-10 h-10 mx-auto rounded-full flex items-center justify-center" :class="role === 'pedagang' ? 'bg-orange-200 text-orange-700' : 'bg-gray-100 text-gray-500 group-hover:bg-orange-100 group-hover:text-orange-600'">
-                                    <i class="fas fa-store text-lg"></i>
+                                <div class="w-12 h-12 mx-auto rounded-full flex items-center justify-center transition-colors" :class="role === 'pedagang' ? 'bg-orange-200 text-orange-700' : 'bg-gray-100 text-gray-500 group-hover:bg-orange-100 group-hover:text-orange-600'">
+                                    <i class="fas fa-store text-xl"></i>
                                 </div>
                             </div>
-                            <span class="text-xs font-bold block" :class="role === 'pedagang' ? 'text-orange-800' : 'text-gray-600'">Pedagang</span>
+                            <span class="text-sm font-bold block" :class="role === 'pedagang' ? 'text-orange-800' : 'text-gray-600'">Pedagang UMKM</span>
+                            <span class="text-xs text-gray-400 mt-1 block">Jual produk & jasa</span>
                             <div x-show="role === 'pedagang'" class="absolute top-2 right-2 text-orange-500"><i class="fas fa-check-circle"></i></div>
-                        </div>
-
-                        <!-- Ojek -->
-                        <div @click="role = 'ojek'" 
-                             :class="{ 'ring-2 ring-green-500 bg-green-50': role === 'ojek', 'border-gray-200 hover:border-green-300 hover:bg-gray-50': role !== 'ojek' }"
-                             class="cursor-pointer border rounded-xl p-4 text-center transition-all duration-200 relative group overflow-hidden">
-                            <div class="mb-2">
-                                <div class="w-10 h-10 mx-auto rounded-full flex items-center justify-center" :class="role === 'ojek' ? 'bg-green-200 text-green-700' : 'bg-gray-100 text-gray-500 group-hover:bg-green-100 group-hover:text-green-600'">
-                                    <i class="fas fa-motorcycle text-lg"></i>
-                                </div>
-                            </div>
-                            <span class="text-xs font-bold block" :class="role === 'ojek' ? 'text-green-800' : 'text-gray-600'">Ojek</span>
-                            <div x-show="role === 'ojek'" class="absolute top-2 right-2 text-green-500"><i class="fas fa-check-circle"></i></div>
                         </div>
                     </div>
                     <input type="hidden" name="role_type" :value="role" id="role_input">
@@ -219,11 +201,12 @@ get_header();
                      x-transition:enter="transition ease-out duration-200"
                      x-transition:enter-start="opacity-0 transform -translate-y-2"
                      x-transition:enter-end="opacity-100 transform translate-y-0"
-                     class="bg-orange-50 p-5 rounded-2xl border border-orange-100 space-y-4 shadow-sm">
-                    <div class="flex items-center gap-2 mb-2">
+                     class="bg-orange-50 p-5 rounded-2xl border border-orange-100 space-y-4 shadow-sm mt-4">
+                    <div class="flex items-center gap-2 mb-2 border-b border-orange-200 pb-2">
                         <i class="fas fa-store text-orange-500"></i>
                         <h4 class="text-sm font-bold text-orange-800">Detail Usaha</h4>
                     </div>
+                    
                     <div>
                         <label for="nama_toko" class="block text-sm font-medium text-gray-700 mb-1">Nama Toko / Usaha</label>
                         <input type="text" name="nama_toko" id="input_nama_toko" 
@@ -231,40 +214,15 @@ get_header();
                                class="block w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-orange-500 focus:border-orange-500 sm:text-sm bg-white"
                                placeholder="Contoh: Keripik Pisang Bu Ani">
                     </div>
-                </div>
 
-                <!-- Field Khusus Ojek -->
-                <div x-show="role === 'ojek'" 
-                     x-transition:enter="transition ease-out duration-200"
-                     x-transition:enter-start="opacity-0 transform -translate-y-2"
-                     x-transition:enter-end="opacity-100 transform translate-y-0"
-                     class="bg-green-50 p-5 rounded-2xl border border-green-100 space-y-4 shadow-sm" style="display: none;">
-                    <div class="flex items-center gap-2 mb-2">
-                        <i class="fas fa-motorcycle text-green-600"></i>
-                        <h4 class="text-sm font-bold text-green-800">Detail Kendaraan</h4>
-                    </div>
                     <div>
-                        <label for="plat_nomor" class="block text-sm font-medium text-gray-700 mb-1">Plat Nomor</label>
-                        <input type="text" name="plat_nomor" id="input_plat_nomor" 
-                               :required="role === 'ojek'"
-                               class="block w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-green-500 focus:border-green-500 sm:text-sm bg-white"
-                               placeholder="Contoh: AB 1234 XY">
-                        <p class="text-xs text-gray-500 mt-1">Nomor polisi kendaraan yang akan digunakan.</p>
-                    </div>
-                </div>
-
-                <!-- Field Kontak (Pedagang & Ojek) -->
-                <div x-show="role === 'pedagang' || role === 'ojek'" 
-                     x-transition:enter="transition ease-out duration-200"
-                     class="bg-gray-50 p-5 rounded-2xl border border-gray-200 space-y-4" style="display: none;">
-                     <div>
                         <label for="no_wa" class="block text-sm font-medium text-gray-700 mb-1">Nomor WhatsApp</label>
                         <div class="mt-1 flex rounded-xl shadow-sm">
                             <span class="inline-flex items-center px-4 rounded-l-xl border border-r-0 border-gray-300 bg-gray-100 text-gray-500 font-bold text-sm">
                                 +62
                             </span>
                             <input type="text" name="no_wa" id="input_no_wa" 
-                                   :required="role === 'pedagang' || role === 'ojek'"
+                                   :required="role === 'pedagang'"
                                    class="flex-1 min-w-0 block w-full px-4 py-3 rounded-none rounded-r-xl border border-gray-300 focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
                                    placeholder="81234567890">
                         </div>
@@ -293,6 +251,13 @@ get_header();
                     <a href="<?php echo home_url('/login'); ?>" class="text-base font-bold text-orange-600 hover:text-orange-500 transition-colors">
                         Masuk disini <i class="fas fa-arrow-right ml-1 text-sm"></i>
                     </a>
+                </div>
+                
+                <div class="mt-6 text-center">
+                    <div class="bg-blue-50 p-3 rounded-lg text-xs text-blue-700 border border-blue-100">
+                        <i class="fas fa-info-circle mr-1"></i> 
+                        <br>Untuk mendaftar <strong>Desa Wisata</strong>, silakan hubungi Admin.
+                    </div>
                 </div>
             </div>
         </div>
