@@ -5,6 +5,7 @@
  */
 
 if ( is_user_logged_in() ) {
+    // Redirect handled by functions.php logic usually, but as fallback:
     wp_redirect( home_url( '/dashboard' ) );
     exit;
 }
@@ -33,7 +34,8 @@ get_header();
             if ( is_wp_error( $user ) ) {
                 $login_error = $user->get_error_message();
             } else {
-                // Redirect based on role handled in functions.php or specific dashboard page
+                // Redirect logic based on role handled in functions.php 
+                // But we add a safety redirect here just in case
                 wp_redirect( home_url( '/dashboard' ) );
                 exit;
             }
@@ -49,11 +51,11 @@ get_header();
         <form name="loginform" id="loginform" action="" method="post" class="dw-auth-form">
             <div class="form-group">
                 <label for="user_login">Username atau Email</label>
-                <input type="text" name="log" id="user_login" class="input" value="" size="20" required>
+                <input type="text" name="log" id="user_login" class="input" value="" size="20" required placeholder="Masukkan username/email">
             </div>
             <div class="form-group">
                 <label for="user_pass">Password</label>
-                <input type="password" name="pwd" id="user_pass" class="input" value="" size="20" required>
+                <input type="password" name="pwd" id="user_pass" class="input" value="" size="20" required placeholder="Masukkan password">
             </div>
             
             <div class="form-options">
@@ -69,42 +71,63 @@ get_header();
             
             <div class="form-footer">
                 <p>Belum punya akun? <a href="<?php echo home_url('/register'); ?>">Daftar sebagai Pedagang</a></p>
-                <p><small>Atau hubungi Admin Desa untuk pendaftaran Ojek & Verifikator.</small></p>
+                <p class="small-text">Untuk pendaftaran Ojek & Verifikator, silakan hubungi Admin Desa.</p>
             </div>
         </form>
     </div>
 </div>
 
 <style>
-/* Simple Inline CSS for Login Page Consistency */
+/* CSS Khusus Halaman Login */
 .dw-auth-container {
     min-height: 80vh;
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: #f4f6f9;
-    padding: 20px;
+    background-color: #f0f2f5;
+    padding: 40px 20px;
 }
 .dw-auth-box {
     background: #fff;
     padding: 40px;
     border-radius: 12px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
     width: 100%;
-    max-width: 450px;
+    max-width: 420px;
 }
 .dw-auth-header { text-align: center; margin-bottom: 30px; }
-.dw-auth-header h2 { margin: 0 0 10px; color: #333; }
-.dw-auth-header p { color: #666; font-size: 14px; margin: 0; }
+.dw-auth-header h2 { margin: 0 0 10px; color: #1d2327; font-size: 24px; font-weight: 700; }
+.dw-auth-header p { color: #646970; font-size: 14px; margin: 0; line-height: 1.5; }
+
 .form-group { margin-bottom: 20px; }
-.form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #444; }
-.form-group .input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 6px; transition: all 0.3s; }
-.form-group .input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(34, 113, 177, 0.1); outline: none; }
-.form-options { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; font-size: 13px; }
-.btn-block { width: 100%; padding: 12px; font-size: 16px; }
-.form-footer { text-align: center; margin-top: 25px; border-top: 1px solid #eee; padding-top: 20px; }
-.dw-alert { padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 14px; }
-.dw-alert-danger { background-color: #fdecea; color: #dc3545; border: 1px solid #fccac7; }
+.form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #1d2327; font-size: 14px; }
+.form-group .input { 
+    width: 100%; 
+    padding: 12px 15px; 
+    border: 1px solid #dcdcde; 
+    border-radius: 6px; 
+    font-size: 14px; 
+    transition: all 0.2s;
+    background: #fff;
+    box-sizing: border-box;
+}
+.form-group .input:focus { border-color: #2271b1; box-shadow: 0 0 0 1px #2271b1; outline: none; }
+
+.form-options { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; font-size: 13px; color: #50575e; }
+.forgot-password { color: #2271b1; text-decoration: none; }
+.forgot-password:hover { text-decoration: underline; }
+
+.btn-block { width: 100%; padding: 12px; font-size: 16px; font-weight: 600; cursor: pointer; }
+.btn-primary { background-color: #2271b1; color: #fff; border: none; border-radius: 6px; transition: background 0.2s; }
+.btn-primary:hover { background-color: #135e96; }
+
+.form-footer { text-align: center; margin-top: 30px; border-top: 1px solid #f0f0f1; padding-top: 20px; font-size: 14px; color: #646970; }
+.form-footer a { color: #2271b1; text-decoration: none; font-weight: 600; }
+.form-footer a:hover { text-decoration: underline; }
+.form-footer .small-text { font-size: 12px; margin-top: 10px; color: #8c8f94; }
+
+.dw-alert { padding: 12px 15px; border-radius: 6px; margin-bottom: 20px; font-size: 14px; line-height: 1.4; }
+.dw-alert-danger { background-color: #fbeaea; color: #d63638; border: 1px solid #f5c6cb; }
 </style>
 
 <?php get_footer(); ?>
