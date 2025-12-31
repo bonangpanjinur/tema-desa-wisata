@@ -6,10 +6,17 @@
 
 $current_user = wp_get_current_user();
 global $wpdb;
-$table_pedagang = $wpdb->prefix . 'dw_pedagang';
+$table_pedagang    = $wpdb->prefix . 'dw_pedagang';
+$table_verifikator = $wpdb->prefix . 'dw_verifikator';
 
-// Hitung antrean untuk badge notifikasi
-$count_pending = $wpdb->get_var("SELECT COUNT(id) FROM $table_pedagang WHERE status_pendaftaran = 'menunggu'");
+// Ambil Data Verifikator (Untuk Saldo & ID)
+$verifikator = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_verifikator WHERE id_user = %d", $current_user->ID));
+$saldo       = $verifikator ? $verifikator->saldo_saat_ini : 0;
+$verif_id    = $verifikator ? $verifikator->id : 0;
+
+// Hitung Statistik untuk Badge
+$count_pending = $wpdb->get_var("SELECT COUNT(id) FROM $table_pedagang WHERE status_pendaftaran IN ('menunggu', 'menunggu_desa')");
+$count_binaan  = $wpdb->get_var($wpdb->prepare("SELECT COUNT(id) FROM $table_pedagang WHERE id_verifikator = %d", $verif_id));
 ?>
 
 <!-- BACKDROP (Mobile Only) -->
@@ -18,7 +25,7 @@ $count_pending = $wpdb->get_var("SELECT COUNT(id) FROM $table_pedagang WHERE sta
 <!-- SIDEBAR -->
 <aside id="dashboard-sidebar" class="fixed top-16 md:top-20 left-0 z-50 w-64 h-[calc(100vh-4rem)] md:h-[calc(100vh-5rem)] bg-white border-r border-gray-200 overflow-y-auto flex flex-col shadow-xl transition-all duration-300 transform -translate-x-full md:translate-x-0 group">
     
-    <!-- Profil Verifikator -->
+    <!-- Profil Verifikator & Saldo -->
     <div class="p-4 border-b border-gray-50">
         <div class="flex items-center gap-3 p-2 bg-indigo-50 rounded-xl border border-indigo-100 transition-all duration-300 overflow-hidden relative">
             <!-- Avatar -->
@@ -36,6 +43,18 @@ $count_pending = $wpdb->get_var("SELECT COUNT(id) FROM $table_pedagang WHERE sta
                 </span>
             </div>
         </div>
+
+        <!-- Info Saldo Komisi (New) -->
+        <div class="sidebar-text mt-3 px-1 transition-all duration-200 overflow-hidden whitespace-nowrap">
+            <div class="flex justify-between items-center text-xs text-gray-500 mb-1">
+                <span>Saldo Komisi</span>
+                <span class="font-bold text-gray-800">Rp <?php echo number_format($saldo, 0, ',', '.'); ?></span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                <!-- Bar visualisasi statis -->
+                <div class="bg-indigo-500 h-1.5 rounded-full w-full"></div>
+            </div>
+        </div>
     </div>
 
     <!-- Menu Navigasi -->
@@ -43,8 +62,10 @@ $count_pending = $wpdb->get_var("SELECT COUNT(id) FROM $table_pedagang WHERE sta
         <?php 
         $menu_items = [
             ['id' => 'dashboard', 'icon' => 'fa-chart-pie', 'label' => 'Ringkasan'],
-            ['id' => 'antrean', 'icon' => 'fa-clock', 'label' => 'Antrean Verifikasi', 'badge' => $count_pending],
-            ['id' => 'riwayat', 'icon' => 'fa-history', 'label' => 'Riwayat Saya'],
+            ['id' => 'antrean', 'icon' => 'fa-clock', 'label' => 'Antrean Verifikasi', 'badge' => $count_pending, 'badge_color' => 'bg-yellow-500 text-white'],
+            ['id' => 'binaan', 'icon' => 'fa-store-alt', 'label' => 'UMKM Binaan', 'badge' => $count_binaan, 'badge_color' => 'bg-indigo-100 text-indigo-600'],
+            ['id' => 'riwayat', 'icon' => 'fa-history', 'label' => 'Riwayat Kerja'],
+            ['id' => 'pengaturan', 'icon' => 'fa-cog', 'label' => 'Pengaturan Akun'],
         ];
 
         foreach($menu_items as $item): ?>
@@ -67,8 +88,10 @@ $count_pending = $wpdb->get_var("SELECT COUNT(id) FROM $table_pedagang WHERE sta
                 </span>
 
                 <!-- Badge Normal -->
-                <?php if(isset($item['badge']) && $item['badge'] > 0): ?>
-                    <span class="sidebar-text bg-red-100 text-red-600 text-xs font-bold px-2 py-0.5 rounded-full shadow-sm">
+                <?php if(isset($item['badge']) && $item['badge'] > 0): 
+                    $b_color = isset($item['badge_color']) ? $item['badge_color'] : 'bg-red-100 text-red-600';
+                ?>
+                    <span class="sidebar-text <?php echo $b_color; ?> text-xs font-bold px-2 py-0.5 rounded-full shadow-sm">
                         <?php echo $item['badge']; ?>
                     </span>
                 <?php endif; ?>
