@@ -1,8 +1,8 @@
 <?php
 /**
  * Template Name: Dashboard Desa
- * Description: Panel Frontend Desa Lengkap (CRUD Stabil + Fitur Lengkap).
- * Status: FINAL FIX (Logic CRUD Diperbaiki Total + Data UMKM Lengkap + Profil Lengkap).
+ * Description: Panel Frontend Desa Lengkap (CRUD Stabil + Fitur Lengkap + ID Generator).
+ * Status: FINAL FIX (Logic CRUD + ID Wilayah Generator).
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -51,32 +51,83 @@ $status_verifikasi = $desa_data->status_akses_verifikasi;
 $msg = '';
 $msg_type = '';
 
-// --- HANDLER 1: SIMPAN PROFIL ---
+// --- HANDLER 1: SIMPAN PROFIL + GENERATE ID WILAYAH ---
 if ( isset($_POST['save_profil_desa']) && check_admin_referer('save_profil_desa_action', 'profil_desa_nonce') ) {
     require_once( ABSPATH . 'wp-admin/includes/file.php' );
     require_once( ABSPATH . 'wp-admin/includes/image.php' );
     require_once( ABSPATH . 'wp-admin/includes/media.php' );
     
+    // Ambil Data Teks Wilayah untuk Generator
+    $prov_txt = sanitize_text_field($_POST['provinsi_nama']);
+    $kab_txt  = sanitize_text_field($_POST['kabupaten_nama']);
+    $kec_txt  = sanitize_text_field($_POST['kecamatan_nama']);
+    $kel_txt  = sanitize_text_field($_POST['kelurahan_nama']);
+
+    // --- LOGIC GENERATOR ID [BARU] ---
+    // Cek apakah ID sudah ada, jika belum generate baru
+    $kode_referral_save = $desa_data->kode_referral;
+    
+    if ( empty($kode_referral_save) && !empty($prov_txt) && !empty($kab_txt) && !empty($kel_txt) ) {
+        // Helper Function (Internal)
+        $get_code = function($text, $type = '') {
+            if (empty($text)) return 'XXX';
+            $clean = trim(strtolower($text));
+            $clean = preg_replace('/^(provinsi|kabupaten|kota|desa|kelurahan)\s+/', '', $clean);
+            
+            // Mapping Khusus
+            if ($type === 'province') {
+                if ($clean == 'jawa barat') return 'JAB';
+                if ($clean == 'jawa tengah') return 'JTG';
+                if ($clean == 'jawa timur') return 'JTM';
+                if (strpos($clean, 'jakarta') !== false) return 'DKI';
+                if (strpos($clean, 'yogyakarta') !== false) return 'DIY';
+            }
+            
+            $clean_no_space = str_replace(' ', '', $clean);
+            return strtoupper(substr($clean_no_space, 0, 3));
+        };
+
+        $c_prov = $get_code($prov_txt, 'province');
+        $c_kab  = $get_code($kab_txt);
+        $c_des  = $get_code($kel_txt);
+        $rand   = rand(1000, 9999);
+        
+        // Format Baru: PRO-KAB-DES-XXXX
+        $calon_kode = "$c_prov-$c_kab-$c_des-$rand";
+
+        // Cek Keunikan di Database
+        while( $wpdb->get_var($wpdb->prepare("SELECT id FROM $table_desa WHERE kode_referral = %s AND id != %d", $calon_kode, $id_desa)) ) {
+            $rand = rand(1000, 9999);
+            $calon_kode = "$c_prov-$c_kab-$c_des-$rand";
+        }
+        $kode_referral_save = $calon_kode;
+    }
+    // ------------------------------------
+
     $update_desa = [
         'nama_desa'               => sanitize_text_field($_POST['nama_desa']),
         'deskripsi'               => wp_kses_post($_POST['deskripsi']),
         'alamat_lengkap'          => sanitize_textarea_field($_POST['alamat_lengkap']),
+        'kode_referral'           => $kode_referral_save, // Simpan ID Baru
+        
         'nama_bank_desa'          => sanitize_text_field($_POST['nama_bank_desa']),
         'no_rekening_desa'        => sanitize_text_field($_POST['no_rekening_desa']),
         'atas_nama_rekening_desa' => sanitize_text_field($_POST['atas_nama_rekening_desa']),
+        
         'api_provinsi_id'         => sanitize_text_field($_POST['api_provinsi_id']),
         'api_kabupaten_id'        => sanitize_text_field($_POST['api_kabupaten_id']),
         'api_kecamatan_id'        => sanitize_text_field($_POST['api_kecamatan_id']),
         'api_kelurahan_id'        => sanitize_text_field($_POST['api_kelurahan_id']),
-        'provinsi'                => sanitize_text_field($_POST['provinsi_nama']),
-        'kabupaten'               => sanitize_text_field($_POST['kabupaten_nama']),
-        'kecamatan'               => sanitize_text_field($_POST['kecamatan_nama']),
-        'kelurahan'               => sanitize_text_field($_POST['kelurahan_nama']),
+        
+        'provinsi'                => $prov_txt,
+        'kabupaten'               => $kab_txt,
+        'kecamatan'               => $kec_txt,
+        'kelurahan'               => $kel_txt,
+        
         'updated_at'              => current_time('mysql')
     ];
 
     // Upload Files Logic
-    // PENTING: qris_desa akan disimpan ke kolom qris_image_url_desa sesuai DB
     $files_map = ['foto_desa' => 'foto', 'foto_sampul' => 'foto_sampul', 'qris_desa' => 'qris_image_url_desa'];
     foreach($files_map as $input => $col) {
         if ( ! empty($_FILES[$input]['name']) ) {
@@ -88,7 +139,8 @@ if ( isset($_POST['save_profil_desa']) && check_admin_referer('save_profil_desa_
     }
     
     $wpdb->update($table_desa, $update_desa, ['id' => $id_desa]);
-    $msg = "Profil desa berhasil diperbarui."; $msg_type = "success";
+    $msg = "Profil desa berhasil diperbarui. " . ($kode_referral_save ? "ID Wilayah: <strong>$kode_referral_save</strong>" : ""); 
+    $msg_type = "success";
     $desa_data = $wpdb->get_row( $wpdb->prepare("SELECT * FROM $table_desa WHERE id = %d", $id_desa) ); // Refresh
 }
 
@@ -125,7 +177,6 @@ if ( isset($_POST['action_verifikasi']) && check_admin_referer('verifikasi_pedag
             $update_data['status_akun'] = 'aktif';
             $options = get_option('dw_settings');
             $update_data['sisa_transaksi'] = isset($options['kuota_gratis_default']) ? absint($options['kuota_gratis_default']) : 0;
-            // Add Role Logic if needed
         } else {
             $update_data['status_akun'] = 'nonaktif';
         }
@@ -196,7 +247,6 @@ if ( isset($_GET['action']) && $_GET['action'] == 'hapus_wisata' && isset($_GET[
 }
 
 // --- FETCH DATA (UNTUK VIEW) ---
-// Kita ambil data wisata di awal agar bisa di-passing ke JS
 $wisata_list = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_wisata WHERE id_desa = %d AND status = 'aktif' ORDER BY created_at DESC", $id_desa));
 
 $default_cats = ['Wisata Alam', 'Wisata Bahari', 'Wisata Budaya', 'Wisata Sejarah', 'Spot Foto', 'Camping Ground', 'Edukasi'];
@@ -228,6 +278,11 @@ get_header();
             <div>
                 <h2 class="font-bold text-gray-800 leading-tight">Dashboard Desa</h2>
                 <p class="text-[11px] text-gray-400 font-medium truncate max-w-[120px]"><?php echo esc_html($desa_data->nama_desa); ?></p>
+                <!-- Tampilkan Kode Referral di Sidebar -->
+                <?php if($desa_data->kode_referral): ?>
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-100 text-blue-800 mt-1" title="ID Wilayah"><?php echo esc_html($desa_data->kode_referral); ?></span>
+                <?php endif; ?>
+                
                 <?php if($akses_premium): ?>
                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 mt-1"><i class="fas fa-crown text-[8px]"></i> Premium</span>
                 <?php else: ?>
@@ -430,13 +485,13 @@ get_header();
             </div>
         </div>
 
-        <!-- 4. TAB KELOLA WISATA (PERBAIKAN UTAMA DI SINI) -->
+        <!-- 4. TAB KELOLA WISATA -->
         <div id="view-wisata" class="tab-content hidden animate-fade-in">
             <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div><h1 class="text-2xl font-bold text-gray-800">Objek Wisata</h1><p class="text-gray-500 text-sm">Kelola destinasi wisata.</p></div>
                 <?php $limit_reached = (!$akses_premium && $total_wisata_count >= 2); ?>
                 <?php if($limit_reached): ?>
-                    <button disabled class="bg-gray-300 text-gray-500 px-5 py-2.5 rounded-xl font-bold text-sm cursor-not-allowed"><i class="fas fa-lock"></i> Kuota Penuh</button>
+                    <button onclick="alert('Kuota Penuh! Upgrade ke Premium agar bisa tambahkan wisata.'); switchTab('verifikasi');" class="bg-gray-800 hover:bg-gray-900 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg transition flex items-center gap-2"><i class="fas fa-lock"></i> Tambah Wisata</button>
                 <?php else: ?>
                     <button onclick="openWisataModalNew()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg transition"><i class="fas fa-plus"></i> Tambah</button>
                 <?php endif; ?>
@@ -456,10 +511,7 @@ get_header();
                         <div class="flex items-center justify-between pt-4 border-t border-gray-50">
                             <span class="text-blue-600 font-bold text-sm bg-blue-50 px-2 py-1 rounded-md"><?php echo ($w->harga_tiket > 0) ? 'Rp ' . number_format($w->harga_tiket, 0, ',', '.') : 'Gratis'; ?></span>
                             <div class="flex gap-2">
-                                <!-- Tombol Edit Menggunakan Index Array JS -->
                                 <button type="button" onclick="editWisata(<?php echo $index; ?>)" class="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center transition"><i class="fas fa-pen text-xs"></i></button>
-                                
-                                <!-- Tombol Hapus dengan Nonce -->
                                 <?php $del_nonce = wp_create_nonce('hapus_wisata_'.$w->id); ?>
                                 <a href="<?php echo home_url('/dashboard-desa/?tab=wisata&action=hapus_wisata&id='.$w->id.'&_wpnonce='.$del_nonce); ?>" onclick="return confirm('Yakin ingin menghapus wisata ini?');" class="w-8 h-8 rounded-full bg-red-50 hover:bg-red-100 text-red-500 flex items-center justify-center transition"><i class="fas fa-trash text-xs"></i></a>
                             </div>
@@ -472,7 +524,7 @@ get_header();
             </div>
         </div>
 
-        <!-- 5. TAB PROFIL -->
+        <!-- 5. TAB PROFIL (DENGAN GENERATOR ID) -->
         <div id="view-profil" class="tab-content hidden animate-fade-in">
             <!-- View Mode -->
             <div id="profil-view-mode">
@@ -494,6 +546,16 @@ get_header();
                                 </div>
                             </div>
                             
+                            <!-- DISPLAY ID WILAYAH -->
+                            <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 text-center mb-4">
+                                <p class="text-xs font-bold text-blue-500 uppercase mb-1">Kode ID Wilayah</p>
+                                <?php if($desa_data->kode_referral): ?>
+                                    <div class="text-xl font-mono font-bold text-blue-800 tracking-wider"><?php echo esc_html($desa_data->kode_referral); ?></div>
+                                <?php else: ?>
+                                    <div class="text-sm text-red-500 italic">Belum dibuat. Silakan lengkapi wilayah.</div>
+                                <?php endif; ?>
+                            </div>
+
                             <?php if($desa_data->qris_image_url_desa): ?>
                                 <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 text-center">
                                     <p class="text-xs font-bold text-gray-500 uppercase mb-2">QRIS Desa</p>
@@ -541,6 +603,21 @@ get_header();
                     <?php wp_nonce_field('save_profil_desa_action', 'profil_desa_nonce'); ?>
                     <input type="hidden" name="save_profil_desa" value="1">
                     
+                    <!-- ID Wilayah Info -->
+                    <?php if($desa_data->kode_referral): ?>
+                    <div class="bg-blue-50 p-4 rounded-xl border border-blue-200 flex items-center gap-4">
+                        <div class="bg-blue-200 text-blue-800 w-10 h-10 rounded-full flex items-center justify-center font-bold"><i class="fas fa-id-badge"></i></div>
+                        <div>
+                            <p class="text-xs font-bold text-blue-500 uppercase">ID Wilayah (Permanen)</p>
+                            <p class="text-lg font-mono font-bold text-gray-800"><?php echo esc_html($desa_data->kode_referral); ?></p>
+                        </div>
+                    </div>
+                    <?php else: ?>
+                    <div class="bg-yellow-50 p-4 rounded-xl border border-yellow-200 text-yellow-800 text-sm">
+                        <i class="fas fa-info-circle"></i> ID Wilayah akan dibuat otomatis setelah Anda melengkapi data Provinsi, Kabupaten, dan Kelurahan di bawah ini.
+                    </div>
+                    <?php endif; ?>
+
                     <!-- FOTO -->
                     <div class="grid md:grid-cols-3 gap-8">
                         <div class="space-y-4">
@@ -578,9 +655,10 @@ get_header();
                         </div>
                     </div>
                     
-                    <!-- WILAYAH -->
+                    <!-- WILAYAH (DROPDOWN WAJIB UTK GENERATOR ID) -->
                     <div class="pt-6 border-t border-gray-100">
                         <h3 class="text-lg font-bold text-gray-800 mb-4">Lokasi Wilayah</h3>
+                        <!-- Hidden inputs untuk menyimpan teks yang akan digunakan oleh generator ID PHP -->
                         <div id="region-data" data-prov="<?php echo esc_attr($desa_data->api_provinsi_id); ?>" data-kota="<?php echo esc_attr($desa_data->api_kabupaten_id); ?>" data-kec="<?php echo esc_attr($desa_data->api_kecamatan_id); ?>" data-desa="<?php echo esc_attr($desa_data->api_kelurahan_id); ?>"></div>
                         
                         <div class="grid grid-cols-2 gap-4 mb-4">
@@ -592,7 +670,7 @@ get_header();
                             <div><label class="text-xs font-bold block mb-1">Kelurahan</label><select name="api_kelurahan_id" id="dw_desa" class="w-full border rounded-lg p-2.5 bg-white" disabled></select></div>
                         </div>
                         
-                        <!-- Hidden Names -->
+                        <!-- Hidden Names (Untuk Backend ID Generator) -->
                         <input type="hidden" name="provinsi_nama" id="input_provinsi_nama" value="<?php echo esc_attr($desa_data->provinsi); ?>">
                         <input type="hidden" name="kabupaten_nama" id="input_kabupaten_name" value="<?php echo esc_attr($desa_data->kabupaten); ?>">
                         <input type="hidden" name="kecamatan_nama" id="input_kecamatan_name" value="<?php echo esc_attr($desa_data->kecamatan); ?>">
@@ -630,7 +708,6 @@ get_header();
     <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeWisataModal()"></div>
     <div class="absolute inset-y-0 right-0 w-full max-w-lg bg-white shadow-2xl transform transition-transform translate-x-full duration-300 flex flex-col" id="modal-wisata-panel">
         <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-white z-10">
-            <!-- FIX: ID ini diperbaiki dari 'mw-title' menjadi 'mw_title' agar match dengan JS -->
             <h2 class="text-xl font-bold text-gray-800" id="mw_title">Tambah Wisata</h2>
             <button onclick="closeWisataModal()" class="text-gray-500 hover:text-gray-700"><i class="fas fa-times text-xl"></i></button>
         </div>
@@ -638,8 +715,6 @@ get_header();
             <form method="POST" enctype="multipart/form-data" id="form-wisata">
                 <?php wp_nonce_field('save_wisata_action', 'wisata_nonce'); ?>
                 <input type="hidden" name="save_wisata" value="1">
-                
-                <!-- PENTING: ID ini menentukan Edit vs Insert -->
                 <input type="hidden" name="wisata_id" id="mw_id" value=""> 
                 
                 <div class="space-y-4">
@@ -678,9 +753,8 @@ get_header();
     .active-tab { background-color: #eff6ff; color: #2563eb; border-right: 3px solid #2563eb; }
 </style>
 
-<!-- DATA PASSING TO JS (SOLUSI STABIL) -->
+<!-- DATA PASSING TO JS -->
 <script>
-    // Menyimpan data wisata dalam variabel global JS agar aman dari error kutip/karakter
     var wisataData = <?php echo json_encode($wisata_list); ?>;
     var ajaxurl = "<?php echo admin_url('admin-ajax.php'); ?>";
 </script>
@@ -702,7 +776,6 @@ function toggleProfilMode(mode) {
     document.getElementById('profil-edit-mode').classList.toggle('hidden', mode !== 'edit');
 }
 
-// Preview Image Helper
 function previewImage(input, previewId) {
     if (input.files && input.files[0]) {
         var reader = new FileReader();
@@ -711,30 +784,20 @@ function previewImage(input, previewId) {
     }
 }
 
-// --- MODAL LOGIC YANG DIPERBAIKI ---
+// MODAL WISATA LOGIC
 const mw = document.getElementById('modal-wisata');
 const mp = document.getElementById('modal-wisata-panel');
 
 function openWisataModalNew() {
-    // Mode Tambah Baru
     resetForm();
-    // Di sini Javascript mencari element dengan ID 'mw_title'
-    // Sebelumnya di HTML ID-nya 'mw-title' (typo), sekarang sudah diperbaiki jadi 'mw_title'
-    if(document.getElementById('mw_title')) {
-        document.getElementById('mw_title').innerText = 'Tambah Wisata';
-    }
+    if(document.getElementById('mw_title')) document.getElementById('mw_title').innerText = 'Tambah Wisata';
     mw.classList.remove('hidden');
     setTimeout(() => mp.classList.remove('translate-x-full'), 10);
 }
 
 function editWisata(index) {
-    // Mode Edit
     resetForm();
-    
-    // Ambil data aman dari array JS
     var data = wisataData[index];
-    
-    // Safety check: Pastikan data dan elemen ada sebelum diisi
     if(data) {
         const setVal = (id, val) => {
             const el = document.getElementById(id);
@@ -742,7 +805,6 @@ function editWisata(index) {
         };
 
         if(document.getElementById('mw_title')) document.getElementById('mw_title').innerText = 'Edit Wisata';
-        
         setVal('mw_id', data.id);
         setVal('mw_nama', data.nama_wisata);
         setVal('mw_kategori', data.kategori);
@@ -755,7 +817,6 @@ function editWisata(index) {
         
         const previewBox = document.getElementById('mw_preview_box');
         const previewImg = document.getElementById('mw_preview_img');
-        
         if(data.foto_utama && previewBox && previewImg) {
             previewBox.classList.remove('hidden');
             previewImg.src = data.foto_utama;
@@ -769,10 +830,8 @@ function editWisata(index) {
 function resetForm() {
     const form = document.getElementById('form-wisata');
     if(form) form.reset();
-    
     const idField = document.getElementById('mw_id');
-    if(idField) idField.value = ''; // Reset ID jadi kosong (Insert mode)
-    
+    if(idField) idField.value = ''; 
     const previewBox = document.getElementById('mw_preview_box');
     if(previewBox) previewBox.classList.add('hidden');
 }
@@ -782,7 +841,7 @@ function closeWisataModal() {
     setTimeout(() => mw.classList.add('hidden'), 300);
 }
 
-// Region Logic (Simplified jQuery)
+// REGION LOGIC (JQUERY)
 jQuery(document).ready(function($) {
     var els = { prov: $('#dw_provinsi'), kota: $('#dw_kota'), kec: $('#dw_kecamatan'), desa: $('#dw_desa') };
     var data = $('#region-data').data();
@@ -809,7 +868,7 @@ jQuery(document).ready(function($) {
     
     function setText(el, target) { $(target).val($(el).find('option:selected').text()); }
 
-    // Chain Load
+    // Chain Load Logic
     if(data.prov) {
         loadR('dw_fetch_provinces', null, els.prov, data.prov, function(){
             loadR('dw_fetch_regencies', data.prov, els.kota, data.kota, function(){
