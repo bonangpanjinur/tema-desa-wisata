@@ -76,38 +76,8 @@ get_header();
 <div class="bg-gray-50 min-h-screen font-sans flex flex-col md:flex-row pt-16 md:pt-0 relative">
 
     <!-- SIDEBAR -->
-    <aside class="fixed md:sticky top-0 h-screen w-64 bg-white border-r border-gray-200 flex flex-col z-40 transition-transform duration-300 transform -translate-x-full md:translate-x-0" id="sidebar">
-        <div class="p-6 border-b border-gray-100 flex items-center gap-3">
-            <div class="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center text-xl shadow-lg shadow-indigo-200">
-                <i class="fas fa-user-shield"></i>
-            </div>
-            <div>
-                <h2 class="font-bold text-gray-800 leading-tight">Verifikator</h2>
-                <p class="text-[10px] text-gray-400 uppercase tracking-wider">Admin Panel</p>
-            </div>
-        </div>
-
-        <nav class="flex-1 p-4 space-y-1">
-            <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-xl transition">
-                <i class="fas fa-chart-pie w-5"></i> Ringkasan
-            </button>
-            <button onclick="switchTab('antrean')" id="nav-antrean" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-indigo-600 rounded-xl transition relative">
-                <i class="fas fa-clock w-5"></i> Antrean Verifikasi
-                <?php if($stats_pending > 0): ?>
-                    <span class="absolute right-3 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full"><?php echo $stats_pending; ?></span>
-                <?php endif; ?>
-            </button>
-            <button onclick="switchTab('riwayat')" id="nav-riwayat" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-indigo-600 rounded-xl transition">
-                <i class="fas fa-history w-5"></i> Riwayat Saya
-            </button>
-        </nav>
-
-        <div class="p-4 border-t border-gray-100">
-            <a href="<?php echo wp_logout_url(home_url()); ?>" class="flex items-center gap-3 px-4 py-3 text-sm font-bold text-red-600 hover:bg-red-50 rounded-xl transition w-full">
-                <i class="fas fa-sign-out-alt w-5"></i> Keluar
-            </a>
-        </div>
-    </aside>
+ <!-- SIDEBAR -->
+<?php get_template_part('template-parts/dashboard/sidebar', 'verifikator'); ?>
 
     <!-- MOBILE HEADER -->
     <div class="md:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-30 flex items-center justify-between px-4 shadow-sm">
