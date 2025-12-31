@@ -1,7 +1,7 @@
 <?php
 /**
  * Sidebar Component for Dashboard Desa
- * Args passed: $args['desa_data'], $args['akses_premium']
+ * Lokasi: template-parts/dashboard/sidebar-desa.php
  */
 
 $desa_data = isset($args['desa_data']) ? $args['desa_data'] : null;
@@ -11,78 +11,58 @@ if (!$desa_data) return;
 ?>
 
 <!-- BACKDROP (Mobile Only) -->
-<div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-black/50 z-30 hidden md:hidden transition-opacity"></div>
+<div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-black/50 z-30 hidden md:hidden transition-opacity duration-300"></div>
 
 <!-- SIDEBAR -->
-<!-- Logic: Top-16 (dibawah header), z-40 (diatas konten) -->
-<aside id="logo-sidebar" class="fixed top-16 left-0 z-40 w-64 h-[calc(100vh-4rem)] transition-transform -translate-x-full md:translate-x-0 bg-white border-r border-gray-200 overflow-y-auto" aria-label="Sidebar">
-    <div class="h-full px-3 py-4 flex flex-col">
-        
-        <!-- Info Status Mobile -->
-        <div class="mb-5 p-3 bg-blue-50 rounded-lg border border-blue-100 md:hidden">
-            <div class="font-bold text-gray-800 mb-1"><?php echo esc_html($desa_data->nama_desa); ?></div>
-            <?php if($desa_data->kode_referral): ?>
-                <div class="text-xs text-gray-500">ID: <span class="font-mono font-bold text-blue-700"><?php echo esc_html($desa_data->kode_referral); ?></span></div>
-            <?php endif; ?>
-        </div>
-
-        <!-- Status Member Sidebar -->
-        <div class="mb-4">
-            <?php if($desa_data->kode_referral): ?>
-                <div class="mb-3 px-3 py-2 bg-blue-50 rounded-lg border border-blue-100 hidden md:block">
-                    <p class="text-[10px] uppercase font-bold text-blue-500 mb-1">ID Wilayah</p>
-                    <p class="font-mono font-bold text-blue-800 text-sm"><?php echo esc_html($desa_data->kode_referral); ?></p>
-                </div>
-            <?php endif; ?>
-            
-            <?php if($akses_premium): ?>
-                <span class="block text-center w-full px-2 py-1 rounded text-xs font-bold bg-green-100 text-green-700 border border-green-200"><i class="fas fa-crown"></i> Premium</span>
-            <?php else: ?>
-                <span class="block text-center w-full px-2 py-1 rounded text-xs font-bold bg-gray-100 text-gray-600 border border-gray-200">Free Plan</span>
-            <?php endif; ?>
+<!-- 
+   LOGIC CSS RESPONSIF:
+   1. top-16 (64px) -> Sesuai tinggi header mobile di header.php
+   2. md:top-20 (80px) -> Sesuai tinggi header desktop di header.php
+   3. h-[calc(100vh-4rem)] -> Tinggi sisa layar mobile
+   4. md:h-[calc(100vh-5rem)] -> Tinggi sisa layar desktop
+   5. z-40 -> Di bawah Header (z-50) tapi di atas konten
+-->
+<aside id="dashboard-sidebar" class="fixed top-16 md:top-20 left-0 z-40 w-64 h-[calc(100vh-4rem)] md:h-[calc(100vh-5rem)] transition-transform -translate-x-full md:translate-x-0 bg-white border-r border-gray-200 overflow-y-auto">
+    <div class="p-5">
+        <!-- Profil Singkat di Sidebar -->
+        <div class="flex items-center gap-3 mb-6 p-3 bg-blue-50 rounded-xl border border-blue-100">
+            <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center text-blue-600 shadow-sm shrink-0">
+                <i class="fas fa-user-shield"></i>
+            </div>
+            <div class="overflow-hidden">
+                <h3 class="text-sm font-bold text-gray-800 truncate"><?php echo esc_html($desa_data->nama_desa); ?></h3>
+                <?php if($akses_premium): ?>
+                    <span class="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">Premium</span>
+                <?php else: ?>
+                    <span class="text-[10px] bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full font-bold">Free</span>
+                <?php endif; ?>
+            </div>
         </div>
 
         <!-- Menu Navigasi -->
-        <ul class="space-y-2 font-medium flex-1">
-            <li>
-                <button onclick="switchTab('ringkasan')" id="nav-ringkasan" class="nav-item flex items-center p-2 text-gray-900 rounded-lg hover:bg-gray-100 group w-full text-left active-tab">
-                    <i class="fas fa-chart-pie w-6 text-gray-500 transition duration-75 group-hover:text-gray-900"></i>
-                    <span class="ml-3">Ringkasan</span>
-                </button>
-            </li>
-            <li>
-                <button onclick="switchTab('verifikasi')" id="nav-verifikasi" class="nav-item flex items-center p-2 text-gray-900 rounded-lg hover:bg-gray-100 group w-full text-left">
-                    <i class="fas fa-users-cog w-6 text-gray-500 transition duration-75 group-hover:text-gray-900"></i>
-                    <span class="ml-3 flex-1 whitespace-nowrap">Verifikasi UMKM</span>
-                    <?php if(!$akses_premium): ?><span class="inline-flex items-center justify-center px-2 ml-3 text-xs font-medium text-gray-800 bg-gray-200 rounded-full"><i class="fas fa-lock"></i></span><?php endif; ?>
-                </button>
-            </li>
-            <li>
-                <button onclick="switchTab('data-umkm')" id="nav-data-umkm" class="nav-item flex items-center p-2 text-gray-900 rounded-lg hover:bg-gray-100 group w-full text-left">
-                    <i class="fas fa-store w-6 text-gray-500 transition duration-75 group-hover:text-gray-900"></i>
-                    <span class="ml-3">Data UMKM</span>
-                </button>
-            </li>
-            <li>
-                <button onclick="switchTab('wisata')" id="nav-wisata" class="nav-item flex items-center p-2 text-gray-900 rounded-lg hover:bg-gray-100 group w-full text-left">
-                    <i class="fas fa-map-location-dot w-6 text-gray-500 transition duration-75 group-hover:text-gray-900"></i>
-                    <span class="ml-3">Kelola Wisata</span>
-                </button>
-            </li>
-            <li>
-                <button onclick="switchTab('profil')" id="nav-profil" class="nav-item flex items-center p-2 text-gray-900 rounded-lg hover:bg-gray-100 group w-full text-left">
-                    <i class="fas fa-id-card-clip w-6 text-gray-500 transition duration-75 group-hover:text-gray-900"></i>
-                    <span class="ml-3">Profil Desa</span>
-                </button>
-            </li>
-        </ul>
-        
-        <!-- Tombol Keluar -->
-        <div class="mt-4 pt-4 border-t border-gray-200">
-            <a href="<?php echo wp_logout_url(home_url()); ?>" class="flex items-center p-2 text-red-600 rounded-lg hover:bg-red-50 group">
-                <i class="fas fa-sign-out-alt w-6"></i>
-                <span class="ml-3">Keluar Aplikasi</span>
-            </a>
-        </div>
+        <nav class="space-y-1">
+            <button onclick="switchTab('ringkasan')" id="nav-ringkasan" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-100 transition active-tab">
+                <i class="fas fa-chart-pie w-5 text-center"></i> Ringkasan
+            </button>
+            <button onclick="switchTab('verifikasi')" id="nav-verifikasi" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-100 transition relative">
+                <i class="fas fa-check-circle w-5 text-center"></i> Verifikasi UMKM
+                <?php if(!$akses_premium): ?><i class="fas fa-lock text-xs text-gray-400 absolute right-4"></i><?php endif; ?>
+            </button>
+            <button onclick="switchTab('data-umkm')" id="nav-data-umkm" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-100 transition">
+                <i class="fas fa-store w-5 text-center"></i> Data UMKM
+            </button>
+            <button onclick="switchTab('wisata')" id="nav-wisata" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-100 transition">
+                <i class="fas fa-map w-5 text-center"></i> Kelola Wisata
+            </button>
+            <button onclick="switchTab('profil')" id="nav-profil" class="nav-item w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-100 transition">
+                <i class="fas fa-cog w-5 text-center"></i> Profil Desa
+            </button>
+        </nav>
+    </div>
+
+    <div class="p-4 border-t border-gray-100 mt-auto">
+        <a href="<?php echo wp_logout_url(home_url()); ?>" class="flex items-center gap-3 px-4 py-3 text-sm font-medium text-red-600 rounded-lg hover:bg-red-50 transition w-full">
+            <i class="fas fa-sign-out-alt w-5 text-center"></i> Logout
+        </a>
     </div>
 </aside>
