@@ -2,7 +2,7 @@
 /**
  * Template Name: Halaman Register Custom
  * Description: Pendaftaran khusus Wisatawan & Pedagang. 
- * Fitur: Desain Alpine.js + Logika Referral Locking & Database Sync.
+ * Fix: Insert data ke tabel dw_referral_reward saat register sukses.
  */
 
 if ( is_user_logged_in() ) {
@@ -14,13 +14,12 @@ $success_message = '';
 $error_message = '';
 global $wpdb;
 
-// --- 1. LOGIKA ANALISIS KODE REFERRAL (LOCKING) ---
+// --- LOGIKA ANALISIS KODE REFERRAL (LOCKING) ---
 $ref_code_url = isset($_GET['ref']) ? sanitize_text_field($_GET['ref']) : '';
-$locked_role = ''; // 'pedagang' atau 'buyer' atau kosong (bebas)
+$locked_role = ''; 
 $lock_reason = '';
 
 if ( !empty($ref_code_url) ) {
-    // Cek pemilik kode (Desa/Verif -> Lock Pedagang, Pedagang -> Lock Buyer)
     $is_desa = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}dw_desa WHERE kode_referral = %s", $ref_code_url));
     $is_verif = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}dw_verifikator WHERE kode_referral = %s", $ref_code_url));
     $is_pedagang = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}dw_pedagang WHERE kode_referral_saya = %s", $ref_code_url));
@@ -33,7 +32,6 @@ if ( !empty($ref_code_url) ) {
         $lock_reason = 'Kode undangan khusus Wisatawan.';
     }
 }
-// --------------------------------------------------
 
 if ( $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['dw_register_nonce']) && wp_verify_nonce($_POST['dw_register_nonce'], 'dw_register_action') ) {
     
@@ -43,45 +41,29 @@ if ( $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['dw_register_nonce']) 
     $role_input   = sanitize_text_field($_POST['role_type']); 
     $nama_lengkap = sanitize_text_field($_POST['nama_lengkap']);
     $no_hp        = sanitize_text_field($_POST['no_hp']);
-    
-    // Ambil Kode Referral
     $referral_code_used = isset($_POST['kode_referral']) ? strtoupper(sanitize_text_field($_POST['kode_referral'])) : '';
 
-    // Security: Paksa role jika terkunci
-    if ( !empty($locked_role) ) {
-        $role_input = $locked_role;
-    }
+    if ( !empty($locked_role) ) { $role_input = $locked_role; }
 
-    // Validasi Dasar
     if ( username_exists($username) || email_exists($email) ) {
-        $error_message = 'Username atau Email sudah terdaftar. Silakan login.';
+        $error_message = 'Username atau Email sudah terdaftar.';
     } elseif ( empty($username) || empty($email) || empty($password) || empty($nama_lengkap) ) {
         $error_message = 'Mohon lengkapi semua kolom wajib.';
     } else {
         
-        // Buat User WP
         $user_id = wp_create_user( $username, $password, $email );
         
         if ( is_wp_error( $user_id ) ) {
             $error_message = $user_id->get_error_message();
         } else {
-            // Update Data User
-            wp_update_user([
-                'ID' => $user_id,
-                'display_name' => $nama_lengkap,
-                'first_name'   => $nama_lengkap,
-                'role'         => ($role_input == 'pedagang') ? 'pedagang' : 'subscriber' 
-            ]);
-            
+            wp_update_user([ 'ID' => $user_id, 'display_name' => $nama_lengkap, 'first_name' => $nama_lengkap, 'role' => ($role_input == 'pedagang') ? 'pedagang' : 'subscriber' ]);
             update_user_meta( $user_id, 'billing_phone', $no_hp );
-            if ( !empty($referral_code_used) ) {
-                update_user_meta( $user_id, 'dw_referral_used', $referral_code_used );
-            }
+            if ( !empty($referral_code_used) ) update_user_meta( $user_id, 'dw_referral_used', $referral_code_used );
 
-            // Insert Tabel Custom
+            // --- INSERT TABEL CUSTOM ---
+            
             if ( $role_input == 'pedagang' ) {
-                $table_pedagang = $wpdb->prefix . 'dw_pedagang';
-                $wpdb->insert($table_pedagang, [
+                $wpdb->insert($wpdb->prefix . 'dw_pedagang', [
                     'id_user' => $user_id,
                     'nama_pemilik' => $nama_lengkap,
                     'nama_toko' => $username . ' Store',
@@ -93,19 +75,39 @@ if ( $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['dw_register_nonce']) 
                     'created_at' => current_time('mysql')
                 ]);
             } else {
-                $table_pembeli = $wpdb->prefix . 'dw_pembeli';
+                // PEMBELI / WISATAWAN
                 $referrer_id = 0; $referrer_type = NULL;
                 
                 if ( !empty($referral_code_used) ) {
                     $table_pedagang_ref = $wpdb->prefix . 'dw_pedagang';
-                    $pedagang_referrer = $wpdb->get_row( $wpdb->prepare("SELECT id FROM $table_pedagang_ref WHERE kode_referral_saya = %s", $referral_code_used) );
+                    $pedagang_referrer = $wpdb->get_row( $wpdb->prepare("SELECT id, sisa_transaksi FROM $table_pedagang_ref WHERE kode_referral_saya = %s", $referral_code_used) );
+                    
                     if ( $pedagang_referrer ) {
                         $referrer_id = $pedagang_referrer->id;
                         $referrer_type = 'pedagang';
+
+                        // 1. Update Counter Total di Tabel Pedagang
                         $wpdb->query( $wpdb->prepare("UPDATE $table_pedagang_ref SET total_referral_pembeli = total_referral_pembeli + 1 WHERE id = %d", $referrer_id) );
+
+                        // --- [FIX] 2. INPUT KE TABEL REWARD ---
+                        // Misal: Bonus 5 Transaksi Gratis per referral
+                        $bonus_quota = 5; 
+                        
+                        $wpdb->insert($wpdb->prefix . 'dw_referral_reward', [
+                            'id_pedagang' => $referrer_id,
+                            'id_user_baru' => $user_id,
+                            'kode_referral_used' => $referral_code_used,
+                            'bonus_quota_diberikan' => $bonus_quota,
+                            'status' => 'verified', // Langsung verified karena register sukses
+                            'created_at' => current_time('mysql')
+                        ]);
+
+                        // 3. Tambahkan Kuota ke Pedagang (Eksekusi Reward)
+                        $wpdb->query( $wpdb->prepare("UPDATE $table_pedagang_ref SET sisa_transaksi = sisa_transaksi + %d WHERE id = %d", $bonus_quota, $referrer_id) );
                     }
                 }
-                $wpdb->insert($table_pembeli, [
+
+                $wpdb->insert($wpdb->prefix . 'dw_pembeli', [
                     'id_user' => $user_id,
                     'nama_lengkap' => $nama_lengkap,
                     'no_hp' => $no_hp,
@@ -116,7 +118,6 @@ if ( $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['dw_register_nonce']) 
                 ]);
             }
 
-            // Auto Login & Redirect
             wp_set_current_user($user_id);
             wp_set_auth_cookie($user_id);
             
@@ -126,13 +127,9 @@ if ( $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['dw_register_nonce']) 
         }
     }
 }
-
 get_header(); 
-
-// Set Default Role untuk Alpine JS
-$default_role_js = $locked_role ? $locked_role : 'buyer';
+// ... (Sisa HTML Form Register sama seperti sebelumnya) ...
 ?>
-
 <!-- Alpine.js -->
 <script src="https://cdn.jsdelivr.net/gh/alpinejs/alpine@v2.x.x/dist/alpine.min.js" defer></script>
 
@@ -180,7 +177,7 @@ $default_role_js = $locked_role ? $locked_role : 'buyer';
                 </div>
             <?php endif; ?>
 
-            <form class="space-y-6" action="" method="POST" x-data="{ role: '<?php echo $default_role_js; ?>' }">
+            <form class="space-y-6" action="" method="POST" x-data="{ role: '<?php echo $locked_role ?: 'buyer'; ?>' }">
                 <?php wp_nonce_field('dw_register_action', 'dw_register_nonce'); ?>
                 
                 <!-- Pilihan Role (Locked Aware) -->
@@ -318,5 +315,34 @@ $default_role_js = $locked_role ? $locked_role : 'buyer';
         </p>
     </div>
 </div>
+
+<script>
+    // Dinamis mengubah label referral berdasarkan pilihan (Hanya jika tidak di-lock)
+    function toggleReferralLabel(role) {
+        const lbl = document.getElementById('lbl-referral');
+        const hint = document.getElementById('hint-referral');
+        const input = document.getElementById('kode_referral');
+        
+        // Jangan ubah teks/placeholder jika sudah ada isinya dari URL (readonly)
+        if(input.hasAttribute('readonly')) return;
+
+        if (role === 'pedagang') {
+            lbl.innerText = 'Kode Referral (Dari Desa/Verifikator)';
+            input.placeholder = 'Contoh: DESA-XXX atau VER-XXX';
+            hint.innerText = 'Masukkan kode dari Admin Desa atau Verifikator Anda.';
+        } else {
+            lbl.innerText = 'Kode Referral (Dari Toko/Teman)';
+            input.placeholder = 'Kode Toko...';
+            hint.innerText = 'Masukkan kode toko untuk mendapatkan poin reward.';
+        }
+    }
+
+    // Init state saat halaman load
+    document.addEventListener("DOMContentLoaded", () => {
+        // Cek input mana yang terpilih (checked)
+        const selected = document.querySelector('input[name="role_type"]:checked');
+        if(selected) toggleReferralLabel(selected.value);
+    });
+</script>
 
 <?php get_footer(); ?>
