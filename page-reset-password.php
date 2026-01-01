@@ -1,10 +1,10 @@
 <?php
 /**
  * Template Name: Custom Reset Password
- * Description: Halaman untuk input password baru setelah klik link email.
+ * Description: Halaman untuk input password baru setelah klik link reset (Manual/Email).
  */
 
-// Jika user sudah login, lempar ke dashboard
+// 1. Jika user sudah login, tidak perlu reset, lempar ke dashboard
 if ( is_user_logged_in() ) {
     wp_redirect( home_url('/akun-saya') );
     exit;
@@ -12,22 +12,21 @@ if ( is_user_logged_in() ) {
 
 get_header();
 
-// Ambil parameter dari URL
+// 2. Ambil parameter dari URL
 $key   = isset( $_GET['key'] ) ? $_GET['key'] : '';
 $login = isset( $_GET['login'] ) ? $_GET['login'] : '';
 
 $message = '';
-$msg_type = ''; // success, error
-
-// --- LOGIC VERIFIKASI KEY ---
+$msg_type = ''; // 'success' atau 'error'
+$show_form = false;
 $user = false;
-$error_obj = null;
 
+// 3. LOGIC VERIFIKASI KEY (Saat halaman dimuat)
 if ( empty( $key ) || empty( $login ) ) {
     $msg_type = 'error';
-    $message = 'Link reset password tidak valid atau sudah kadaluarsa.';
+    $message = 'Link reset password tidak valid atau parameter kurang.';
 } else {
-    // Cek validitas key menggunakan fungsi WP
+    // Fungsi WordPress untuk cek validitas key & user
     $user = check_password_reset_key( $key, $login );
 
     if ( is_wp_error( $user ) ) {
@@ -35,133 +34,300 @@ if ( empty( $key ) || empty( $login ) ) {
         $error_code = $user->get_error_code();
         
         if ( $error_code === 'expired_key' ) {
-            $message = 'Link reset password sudah kadaluarsa. Silakan request ulang.';
+            $message = 'Link reset password sudah kadaluarsa. Silakan request ulang di halaman Lupa Password.';
         } else {
-            $message = 'Link tidak valid. Silakan request ulang.';
+            $message = 'Link tidak valid atau sudah digunakan.';
         }
+    } else {
+        // Key Valid -> Tampilkan Form
+        $show_form = true;
     }
 }
 
-// --- LOGIC SIMPAN PASSWORD BARU ---
-if ( $_SERVER['REQUEST_METHOD'] == 'POST' && ! is_wp_error( $user ) && $user ) {
+// 4. LOGIC SIMPAN PASSWORD BARU (Saat form disubmit)
+if ( $_SERVER['REQUEST_METHOD'] == 'POST' && $show_form && isset($_POST['pass1']) ) {
     $pass1 = $_POST['pass1'];
     $pass2 = $_POST['pass2'];
 
-    if ( empty( $pass1 ) || empty( $pass2 ) ) {
+    if ( empty($pass1) || empty($pass2) ) {
         $msg_type = 'error';
-        $message = 'Silakan isi kedua kolom password.';
+        $message = 'Mohon isi password baru Anda.';
     } elseif ( $pass1 !== $pass2 ) {
         $msg_type = 'error';
         $message = 'Konfirmasi password tidak cocok.';
     } elseif ( strlen($pass1) < 6 ) { // Minimal 6 karakter (opsional)
         $msg_type = 'error';
-        $message = 'Password terlalu pendek. Minimal 6 karakter.';
+        $message = 'Password terlalu pendek (min. 6 karakter).';
     } else {
-        // Reset password user
+        // PROSES RESET
         reset_password( $user, $pass1 );
-        $msg_type = 'success';
-        $message = 'Password berhasil diubah! Anda akan dialihkan ke halaman login...';
         
-        // Auto redirect script
-        echo '<script>setTimeout(function(){ window.location.href = "'.home_url('/login').'"; }, 3000);</script>';
+        $msg_type = 'success';
+        $message = 'Password berhasil diubah! Silakan login dengan password baru.';
+        $show_form = false; // Sembunyikan form setelah sukses
     }
 }
 ?>
 
-<div class="min-h-screen bg-gray-50 flex flex-col lg:flex-row font-sans">
-    
-    <!-- BAGIAN KIRI: Gambar -->
-    <div class="hidden lg:flex lg:w-1/2 bg-cover bg-center relative" 
-         style="background-image: url('<?php echo get_template_directory_uri(); ?>/assets/img/login-bg.jpg');">
-        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
-        <div class="absolute bottom-0 left-0 p-12 text-white z-10">
-            <h2 class="text-4xl font-bold mb-4">Mulai Lembaran Baru</h2>
-            <p class="text-lg text-gray-200">Buat password yang kuat untuk melindungi akun dan transaksi desa Anda.</p>
-        </div>
-    </div>
-
-    <!-- BAGIAN KANAN: Form -->
-    <div class="w-full lg:w-1/2 flex items-center justify-center p-6 lg:p-12 bg-white">
-        <div class="w-full max-w-md">
-
-            <!-- Header -->
-            <div class="text-center mb-10">
-                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-orange-100 text-orange-600 mb-6">
-                    <i class="fas fa-key text-2xl"></i>
-                </div>
-                <h1 class="text-3xl font-bold text-gray-900 mb-2">Password Baru</h1>
-                <p class="text-gray-500">Silakan masukkan password baru untuk akun <strong><?php echo esc_html($login); ?></strong>.</p>
+<div class="reset-pass-wrapper">
+    <div class="reset-pass-card">
+        
+        <!-- Header Section -->
+        <div class="reset-pass-header">
+            <div class="icon-wrapper">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
             </div>
+            <h2>Reset Password</h2>
+            <?php if ($show_form): ?>
+                <p>Buat password baru untuk akun <strong><?php echo esc_html($login); ?></strong></p>
+            <?php endif; ?>
+        </div>
 
-            <!-- Notifikasi -->
-            <?php if ( ! empty( $message ) ) : ?>
-                <div class="mb-6 p-4 rounded-xl flex items-start gap-3 <?php echo ($msg_type === 'success') ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'; ?>">
-                    <i class="fas <?php echo ($msg_type === 'success') ? 'fa-check-circle' : 'fa-exclamation-circle'; ?> mt-1"></i>
-                    <div>
-                        <span class="text-sm font-medium block"><?php echo $message; ?></span>
-                        <?php if ( $msg_type === 'error' && ( isset($error_code) || strpos($message, 'kadaluarsa') !== false ) ) : ?>
-                            <a href="<?php echo home_url('/lupa-password'); ?>" class="text-xs font-bold underline mt-1 block hover:text-red-900">Minta Link Baru</a>
-                        <?php endif; ?>
+        <!-- Notification Area -->
+        <?php if ( ! empty( $message ) ) : ?>
+            <div class="alert <?php echo ($msg_type === 'success') ? 'alert-success' : 'alert-error'; ?>">
+                <div class="alert-icon">
+                    <?php if ($msg_type === 'success'): ?>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                    <?php else: ?>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    <?php endif; ?>
+                </div>
+                <div class="alert-content">
+                    <?php echo $message; ?>
+                </div>
+            </div>
+        <?php endif; ?>
+
+        <!-- Form Reset Password -->
+        <?php if ( $show_form ) : ?>
+            <form class="reset-form" action="" method="POST">
+                
+                <!-- New Password -->
+                <div class="form-group">
+                    <label for="pass1">Password Baru</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path></svg>
+                        </span>
+                        <input id="pass1" name="pass1" type="password" required placeholder="Minimal 6 karakter" autocomplete="off">
                     </div>
                 </div>
-            <?php endif; ?>
 
-            <!-- Form hanya muncul jika Key Valid dan belum Sukses -->
-            <?php if ( ! is_wp_error( $user ) && $user && $msg_type !== 'success' ) : ?>
-                <form method="post" action="" class="space-y-6" autocomplete="off">
-                    
-                    <!-- Password Baru -->
-                    <div class="space-y-2">
-                        <label for="pass1" class="text-sm font-bold text-gray-700 block">Password Baru</label>
-                        <div class="relative group">
-                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                <i class="fas fa-lock text-gray-400 group-focus-within:text-orange-500 transition-colors"></i>
-                            </div>
-                            <input id="pass1" name="pass1" type="password" required 
-                                   class="block w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all font-medium" 
-                                   placeholder="Minimal 6 karakter">
-                        </div>
+                <!-- Confirm Password -->
+                <div class="form-group">
+                    <label for="pass2">Ulangi Password Baru</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                        </span>
+                        <input id="pass2" name="pass2" type="password" required placeholder="Ketik ulang password">
                     </div>
+                </div>
 
-                    <!-- Konfirmasi Password -->
-                    <div class="space-y-2">
-                        <label for="pass2" class="text-sm font-bold text-gray-700 block">Ulangi Password Baru</label>
-                        <div class="relative group">
-                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                <i class="fas fa-check-double text-gray-400 group-focus-within:text-orange-500 transition-colors"></i>
-                            </div>
-                            <input id="pass2" name="pass2" type="password" required 
-                                   class="block w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all font-medium" 
-                                   placeholder="Ketik ulang password">
-                        </div>
-                    </div>
+                <!-- Submit Button -->
+                <button type="submit" class="btn-submit">
+                    Simpan Password Baru
+                </button>
+            </form>
+        <?php endif; ?>
 
-                    <button type="submit" 
-                            class="w-full py-3.5 px-4 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold shadow-lg shadow-orange-500/30 transform hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center gap-2">
-                        <span>Simpan Password</span>
-                        <i class="fas fa-save text-sm"></i>
-                    </button>
-
-                </form>
-            <?php endif; ?>
-
+        <!-- Footer Actions -->
+        <div class="reset-footer">
             <?php if ( $msg_type === 'success' ) : ?>
-                <div class="mt-6 text-center">
-                    <a href="<?php echo home_url('/login'); ?>" class="inline-block py-3 px-6 bg-gray-900 text-white rounded-lg font-bold hover:bg-gray-800 transition">
-                        Login Sekarang
-                    </a>
-                </div>
-            <?php endif; ?>
-
-            <!-- Footer Links -->
-            <div class="mt-8 pt-6 border-t border-gray-100 text-center">
-                <a href="<?php echo home_url('/'); ?>" class="inline-block text-gray-400 text-sm hover:text-gray-600 transition-colors">
-                    <i class="fas fa-arrow-left mr-1"></i> Kembali ke Beranda
+                <a href="<?php echo home_url('/login'); ?>" class="link-primary">
+                    Login Sekarang &rarr;
                 </a>
-            </div>
-
+            <?php elseif ( !$show_form ) : ?>
+                <a href="<?php echo home_url('/lupa-password'); ?>" class="link-secondary">
+                    Request Ulang Link
+                </a>
+            <?php endif; ?>
+            
+            <?php if ( $show_form ) : ?>
+                <a href="<?php echo home_url('/login'); ?>" class="link-muted">
+                    Batal
+                </a>
+            <?php endif; ?>
         </div>
+
     </div>
 </div>
+
+<style>
+    /* Reset CSS sederhana untuk halaman ini */
+    .reset-pass-wrapper {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 80vh;
+        background-color: #f3f4f6;
+        padding: 20px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    .reset-pass-card {
+        background: white;
+        padding: 40px;
+        border-radius: 16px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+        width: 100%;
+        max-width: 450px;
+        border: 1px solid #e5e7eb;
+    }
+
+    .reset-pass-header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    .reset-pass-header .icon-wrapper {
+        background-color: #fff7ed;
+        color: #ea580c;
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 15px;
+    }
+
+    .reset-pass-header h2 {
+        font-size: 24px;
+        font-weight: 800;
+        color: #1f2937;
+        margin: 0 0 8px;
+    }
+
+    .reset-pass-header p {
+        font-size: 14px;
+        color: #6b7280;
+        margin: 0;
+    }
+
+    /* Form Styles */
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 8px;
+    }
+
+    .input-wrapper {
+        position: relative;
+    }
+
+    .input-icon {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        display: flex;
+    }
+
+    .input-wrapper input {
+        width: 100%;
+        padding: 12px 12px 12px 40px; /* Space for icon */
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: all 0.2s;
+        box-sizing: border-box; /* Penting agar padding tidak merusak width */
+    }
+
+    .input-wrapper input:focus {
+        outline: none;
+        border-color: #ea580c;
+        box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.1);
+    }
+
+    /* Button */
+    .btn-submit {
+        width: 100%;
+        padding: 12px;
+        background-color: #1f2937;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .btn-submit:hover {
+        background-color: #ea580c;
+        transform: translateY(-1px);
+    }
+
+    /* Alerts */
+    .alert {
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-bottom: 24px;
+        font-size: 14px;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        line-height: 1.5;
+    }
+
+    .alert-success {
+        background-color: #ecfdf5;
+        color: #065f46;
+        border: 1px solid #a7f3d0;
+    }
+
+    .alert-error {
+        background-color: #fef2f2;
+        color: #991b1b;
+        border: 1px solid #fecaca;
+    }
+
+    .alert-icon {
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+
+    /* Footer */
+    .reset-footer {
+        margin-top: 25px;
+        padding-top: 20px;
+        border-top: 1px solid #f3f4f6;
+        text-align: center;
+        display: flex;
+        justify-content: center;
+        gap: 15px;
+    }
+
+    .reset-footer a {
+        font-size: 14px;
+        text-decoration: none;
+        font-weight: 600;
+        transition: color 0.2s;
+    }
+
+    .link-primary { color: #ea580c; }
+    .link-primary:hover { color: #c2410c; }
+
+    .link-secondary { color: #6b7280; }
+    .link-secondary:hover { color: #111827; }
+    
+    .link-muted { color: #9ca3af; }
+    .link-muted:hover { color: #6b7280; }
+
+    /* Responsive */
+    @media (max-width: 480px) {
+        .reset-pass-card {
+            padding: 25px 20px;
+        }
+    }
+</style>
 
 <?php get_footer(); ?>

@@ -149,7 +149,7 @@
                     <div class="w-12 h-12 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center text-lg"><i class="fas fa-shopping-basket"></i></div>
                     <span class="text-xs font-medium text-gray-600">Produk</span>
                 </a>
-                <a href="<?php echo home_url('/page-ojek'); ?>" class="flex flex-col items-center gap-2">
+                <a href="<?php echo home_url('/ojek'); ?>" class="flex flex-col items-center gap-2">
                     <div class="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-lg"><i class="fas fa-motorcycle"></i></div>
                     <span class="text-xs font-medium text-gray-600">Ojek</span>
                 </a>
