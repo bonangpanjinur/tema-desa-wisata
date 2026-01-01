@@ -1,8 +1,8 @@
 <?php
 /**
  * Template Name: Dashboard Toko (Merchant)
- * Description: Dashboard lengkap pedagang. Integrasi penuh: Variasi Produk, Galeri, Ongkir Ojek (Zona Detail), Paket, Referral, & QR Code.
- * Status: FINAL COMPLETE (All Features Restored & Merged)
+ * Description: Dashboard lengkap pedagang. Integrasi Penuh: Variasi & Galeri Produk (Preview), Ongkir Ojek Zona, Paket, Referral, & QR Generator.
+ * Status: FINAL COMPLETE (All Features Merged + Gallery Preview)
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -218,7 +218,7 @@ if ( isset($_POST['dw_action']) && $_POST['dw_action'] == 'save_product' ) {
                     }
                 }
             }
-            // Simpan JSON jika ada upload baru
+            // Simpan JSON jika ada upload baru (Replace)
             if(!empty($galeri_urls)) {
                 $prod_data['galeri'] = json_encode($galeri_urls);
             }
@@ -338,11 +338,13 @@ $val_kel_nama  = !empty($pedagang->kelurahan_nama) ? $pedagang->kelurahan_nama :
 $val_alamat    = !empty($pedagang->alamat_lengkap) ? $pedagang->alamat_lengkap : get_user_meta($current_user_id, 'billing_address_1', true);
 $val_kodepos   = !empty($pedagang->kode_pos) ? $pedagang->kode_pos : get_user_meta($current_user_id, 'billing_postcode', true);
 
-// --- Fetch Produk (Termasuk Variasi) ---
+// --- Fetch Produk (Termasuk Variasi & Galeri Decode) ---
 $produk_list = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_produk WHERE id_pedagang = %d ORDER BY created_at DESC", $pedagang->id));
 if ($produk_list) {
     foreach ($produk_list as $p) {
         $p->variasi = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_variasi WHERE id_produk = %d ORDER BY id ASC", $p->id));
+        // Decode Galeri untuk preview di JS
+        $p->galeri_list = !empty($p->galeri) ? json_decode($p->galeri) : [];
     }
 }
 
@@ -527,9 +529,17 @@ get_header();
                          <?php else: ?>
                             <div class="flex items-center justify-center h-full text-gray-300 bg-gray-100"><i class="fas fa-image text-3xl"></i></div>
                          <?php endif; ?>
+                         
                          <div class="absolute top-2 left-2 flex gap-1">
                              <span class="bg-white/90 backdrop-blur px-2 py-1 rounded-md text-[10px] font-bold shadow-sm text-gray-700 border border-gray-100 uppercase tracking-wide"><?php echo $p->kondisi; ?></span>
                          </div>
+                         
+                         <?php if(!empty($p->galeri_list)): ?>
+                             <div class="absolute bottom-2 left-2 bg-black/50 text-white text-[10px] px-2 py-1 rounded-full flex items-center gap-1 backdrop-blur-sm">
+                                <i class="fas fa-images"></i> +<?php echo count($p->galeri_list); ?>
+                             </div>
+                         <?php endif; ?>
+
                          <?php if($p->stok < 5): ?>
                              <div class="absolute bottom-2 right-2 bg-red-100 text-red-600 px-2 py-1 rounded-md text-[10px] font-bold shadow-sm border border-red-200 flex items-center gap-1">
                                  <i class="fas fa-exclamation-circle"></i> Stok Menipis
@@ -740,61 +750,25 @@ get_header();
                 </div>
             </form>
 
-            <!-- GENERATOR QR CODE MEJA (BARU) -->
+            <!-- GENERATOR QR CODE MEJA -->
             <div class="mt-10 border-t border-gray-200 pt-8">
-                <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <i class="fas fa-qrcode text-primary"></i> Generator QR Code Meja
-                </h3>
+                <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2"><i class="fas fa-qrcode text-primary"></i> Generator QR Code Meja</h3>
                 <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-                    <p class="text-sm text-gray-500 mb-4">
-                        Gunakan fitur ini untuk membuat QR Code unik untuk setiap meja. 
-                        Tempelkan QR Code ini di meja agar pelanggan bisa melakukan pemesanan "Makan di Tempat" (Dine In).
-                    </p>
-                    
+                    <p class="text-sm text-gray-500 mb-4">Buat QR Code unik untuk pemesanan Dine In.</p>
                     <div class="flex flex-wrap items-end gap-4 mb-6">
-                        <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Dari Nomor</label>
-                            <input type="number" id="qr-start" value="1" class="w-24 border border-gray-300 rounded-lg p-2 text-sm">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Sampai Nomor</label>
-                            <input type="number" id="qr-end" value="10" class="w-24 border border-gray-300 rounded-lg p-2 text-sm">
-                        </div>
-                        <button onclick="generateQRLinks()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg font-bold text-sm transition shadow-md h-10">
-                            <i class="fas fa-magic mr-1"></i> Generate
-                        </button>
-                        <button onclick="printQRList()" class="bg-gray-800 hover:bg-gray-900 text-white px-5 py-2 rounded-lg font-bold text-sm transition shadow-md hidden h-10" id="btn-print-qr">
-                            <i class="fas fa-print mr-1"></i> Cetak Semua
-                        </button>
+                        <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Dari</label><input type="number" id="qr-start" value="1" class="w-24 border border-gray-300 rounded-lg p-2 text-sm"></div>
+                        <div><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Sampai</label><input type="number" id="qr-end" value="10" class="w-24 border border-gray-300 rounded-lg p-2 text-sm"></div>
+                        <button onclick="generateQRLinks()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg font-bold text-sm h-10">Generate</button>
+                        <button onclick="printQRList()" class="bg-gray-800 hover:bg-gray-900 text-white px-5 py-2 rounded-lg font-bold text-sm hidden h-10" id="btn-print-qr">Cetak</button>
                     </div>
-
-                    <div id="qr-result-container" class="hidden">
-                        <div class="overflow-x-auto border border-gray-200 rounded-xl">
-                            <table class="w-full text-sm text-left">
-                                <thead class="bg-gray-50 text-gray-600 border-b border-gray-200">
-                                    <tr>
-                                        <th class="p-3">Meja</th>
-                                        <th class="p-3">Link Pemesanan</th>
-                                        <th class="p-3 text-center">QR Preview</th>
-                                        <th class="p-3 text-right">Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="qr-table-body" class="divide-y divide-gray-100">
-                                    <!-- Rows generated via JS -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                    <div id="qr-result-container" class="hidden"><div class="overflow-x-auto border border-gray-200 rounded-xl"><table class="w-full text-sm text-left"><thead class="bg-gray-50 text-gray-600 border-b border-gray-200"><tr><th class="p-3">Meja</th><th class="p-3">Link</th><th class="p-3 text-center">QR</th><th class="p-3 text-right">Aksi</th></tr></thead><tbody id="qr-table-body" class="divide-y divide-gray-100"></tbody></table></div></div>
                 </div>
             </div>
-
         </div>
     </main>
 </div>
 
-<!-- ==========================================
-     MODAL PRODUK (UPDATED WITH GALLERY & VARIATIONS)
-========================================== -->
+<!-- MODAL PRODUK (UPDATED WITH GALLERY PREVIEW & VARIATIONS) -->
 <div id="modal-produk" class="fixed inset-0 z-50 hidden">
     <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" onclick="closeProductModal()"></div>
     <div class="absolute right-0 top-0 bottom-0 w-full max-w-lg bg-white shadow-2xl overflow-y-auto transform transition-transform duration-300 translate-x-full flex flex-col" id="modal-produk-panel">
@@ -824,11 +798,14 @@ get_header();
                         </label>
                     </div>
 
-                    <!-- GALERI PRODUK (BARU) -->
+                    <!-- GALERI PRODUK (PREVIEW) -->
                     <div>
                         <label class="block text-sm font-bold text-gray-700 mb-1">Galeri Foto (Opsional)</label>
                         <p class="text-xs text-gray-400 mb-2">Pilih banyak foto sekaligus untuk detail produk.</p>
-                        <input type="file" name="galeri_produk[]" multiple class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition">
+                        <input type="file" name="galeri_produk[]" multiple class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition" onchange="previewGallery(this)">
+                        
+                        <!-- Container Preview Galeri -->
+                        <div id="prev-galeri" class="grid grid-cols-4 gap-2 mt-3 empty:hidden"></div>
                     </div>
 
                     <!-- INFORMASI DASAR -->
@@ -848,7 +825,7 @@ get_header();
                         </div>
                     </div>
 
-                    <!-- SECTION VARIASI (BARU) -->
+                    <!-- SECTION VARIASI -->
                     <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
                         <div class="flex justify-between items-center mb-3">
                             <label class="block text-sm font-bold text-gray-800">Variasi Produk</label>
@@ -949,7 +926,7 @@ get_header();
     function showLoading(f) { $(f).find('button[type="submit"]').prop('disabled',true).html('<i class="fas fa-spinner fa-spin"></i> Menyimpan...'); }
 
     // =========================================
-    // MODALS & VARIATIONS
+    // MODALS & VARIATIONS (UPDATED JS)
     // =========================================
     function openProductModal() { 
         $('#form-product')[0].reset(); 
@@ -958,6 +935,7 @@ get_header();
         $('#prod-prev-img').addClass('hidden'); 
         $('#upload-placeholder').removeClass('hidden'); 
         $('#variasi-container').empty(); 
+        $('#prev-galeri').empty(); // Reset preview galeri
         $('#modal-produk').removeClass('hidden'); 
         setTimeout(()=>$('#modal-produk-panel').removeClass('translate-x-full'),10); 
     }
@@ -970,6 +948,19 @@ get_header();
     function addVariasiRow(n='',h='',s=''){
         const id=Date.now();
         $('#variasi-container').append(`<div class="flex gap-2 items-start animate-fade-in" id="row-${id}"><input type="text" name="var_nama[]" value="${n}" placeholder="Warna/Ukuran" class="w-1/2 text-xs border-gray-300 rounded-lg p-2"><input type="number" name="var_harga[]" value="${h}" placeholder="Harga" class="w-1/4 text-xs border-gray-300 rounded-lg p-2"><input type="number" name="var_stok[]" value="${s}" placeholder="Stok" class="w-1/4 text-xs border-gray-300 rounded-lg p-2"><button type="button" onclick="$('#row-${id}').remove()" class="text-red-500 p-2 hover:bg-red-50 rounded-lg transition"><i class="fas fa-times"></i></button></div>`);
+    }
+
+    function previewGallery(input) {
+        if (input.files) {
+            $('#prev-galeri').empty();
+            Array.from(input.files).forEach(file => {
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    $('#prev-galeri').append(`<div class="relative aspect-square rounded-lg overflow-hidden border border-gray-200"><img src="${e.target.result}" class="w-full h-full object-cover"></div>`);
+                }
+                reader.readAsDataURL(file);
+            });
+        }
     }
 
     function editProduk(p){
@@ -989,9 +980,18 @@ get_header();
             $('#upload-placeholder').addClass('hidden'); 
         }
         
+        // Load Variasi
         if(p.variasi && p.variasi.length > 0) {
             p.variasi.forEach(v => {
                 addVariasiRow(v.deskripsi_variasi, v.harga_variasi, v.stok_variasi);
+            });
+        }
+
+        // Load Gallery Preview (Existing)
+        $('#prev-galeri').empty();
+        if(p.galeri_list && p.galeri_list.length > 0){
+            p.galeri_list.forEach(url => {
+                $('#prev-galeri').append(`<div class="relative aspect-square rounded-lg overflow-hidden border border-gray-200"><img src="${url}" class="w-full h-full object-cover"></div>`);
             });
         }
     }
@@ -1003,7 +1003,7 @@ get_header();
     function closeOrderDetailModal() { $('#modal-order-panel').addClass('translate-x-full'); setTimeout(()=>$('#modal-order-detail').addClass('hidden'),300); }
 
     // =========================================
-    // MULTI-SELECT & ONGKIR LOGIC (FULL)
+    // MULTI-SELECT & ONGKIR LOGIC (FULL - RESTORED)
     // =========================================
     
     // Toggle Logic
@@ -1160,7 +1160,7 @@ get_header();
             document.execCommand('copy');
             alert('Link disalin: ' + text);
         } catch (err) {
-            alert('Gagal menyalin kode. Silakan salin manual.');
+            alert('Gagal menyalin. Silakan copy manual.');
         }
         document.body.removeChild(textArea);
     }
