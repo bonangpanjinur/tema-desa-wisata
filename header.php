@@ -1,3 +1,10 @@
+<?php
+/**
+ * Header Template
+ * * Menampilkan bagian atas situs: Logo, Menu Navigasi, dan User Dropdown.
+ * FIXED: Kembali ke desain lama + Menampilkan Foto Profil (Avatar).
+ */
+?>
 <!DOCTYPE html>
 <html <?php language_attributes(); ?> class="scroll-smooth">
 <head>
@@ -73,7 +80,7 @@
                 }
                 $cart_count = intval($cart_count);
                 ?>
-                <a href="<?php echo home_url('/cart'); ?>" class="relative group p-2 rounded-full hover:bg-green-50 transition-colors" aria-label="Keranjang Belanja">
+                <a href="<?php echo home_url('/keranjang'); ?>" class="relative group p-2 rounded-full hover:bg-green-50 transition-colors" aria-label="Keranjang Belanja">
                     <i class="fas fa-shopping-bag text-xl text-primary transition-colors"></i>
                     <?php if($cart_count > 0): ?>
                         <span class="dw-cart-count absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold h-4 w-4 rounded-full flex items-center justify-center border-2 border-white transform scale-100 transition-transform">
@@ -87,16 +94,30 @@
                     <?php if (is_user_logged_in()): ?>
                         <?php 
                             $current_user = wp_get_current_user(); 
-                            $dashboard_url = home_url('/dashboard'); // Default
-                            if (in_array('pengelola_desa', $current_user->roles)) $dashboard_url = home_url('/dashboard');
-                            elseif (in_array('pedagang', $current_user->roles)) $dashboard_url = home_url('/dashboard');
-                            elseif (in_array('ojek_wisata', $current_user->roles)) $dashboard_url = home_url('/dashboard');
+                            $roles = (array) $current_user->roles;
+                            
+                            // Determine Dashboard URL dynamically based on roles
+                            $dashboard_url = home_url('/akun-saya'); // Default fallback
+                            
+                            if (in_array('administrator', $roles)) {
+                                $dashboard_url = admin_url();
+                            } elseif (in_array('admin_desa', $roles)) {
+                                $dashboard_url = home_url('/dashboard-desa');
+                            } elseif (in_array('pedagang', $roles)) {
+                                $dashboard_url = home_url('/dashboard-toko');
+                            } elseif (in_array('verifikator_umkm', $roles)) {
+                                $dashboard_url = home_url('/dashboard-verifikator');
+                            }
                         ?>
                         <div class="relative group dropdown-container">
                             <button class="flex items-center gap-2 focus:outline-none">
-                                <div class="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold border border-primary/20">
-                                    <?php echo strtoupper(substr($current_user->display_name, 0, 1)); ?>
+                                <!-- [UPDATED] Foto Profil Logic: Menggunakan get_avatar_url() -->
+                                <div class="w-9 h-9 rounded-full bg-primary/10 overflow-hidden border border-primary/20 flex-shrink-0">
+                                    <img src="<?php echo get_avatar_url($current_user->ID, ['size' => 100]); ?>" 
+                                         alt="<?php echo esc_attr($current_user->display_name); ?>" 
+                                         class="w-full h-full object-cover">
                                 </div>
+
                                 <div class="text-left hidden lg:block">
                                     <span class="block text-xs text-gray-500">Halo,</span>
                                     <span class="block text-sm font-bold text-gray-800 leading-none max-w-[100px] truncate"><?php echo esc_html($current_user->display_name); ?></span>

@@ -2,6 +2,7 @@
 /**
  * Template Name: Halaman Akun Saya Custom
  * Description: Dashboard user lengkap. Sinkronisasi Foto Profil & Data ke Tabel Custom (Desa, Pedagang, Verifikator, Pembeli).
+ * UPDATE: Support Full Sync untuk semua role sesuai skema database activation.php.
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -63,15 +64,14 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
                     $phone = sanitize_text_field($_POST['billing_phone']);
                     update_user_meta($user_id, 'billing_phone', $phone);
 
-                    // Sinkronisasi No HP ke Tabel Custom
+                    // Sinkronisasi No HP ke Tabel Custom (Sesuai kolom di activation.php)
                     if ( in_array('pedagang', $roles) ) {
                         $wpdb->update($wpdb->prefix . 'dw_pedagang', ['nomor_wa' => $phone], ['id_user' => $user_id]);
-                    } elseif ( in_array('verifikator', $roles) ) {
+                    } elseif ( in_array('verifikator_umkm', $roles) ) { 
                         $wpdb->update($wpdb->prefix . 'dw_verifikator', ['nomor_wa' => $phone], ['id_user' => $user_id]);
                     } elseif ( !in_array('admin_desa', $roles) && !in_array('administrator', $roles) ) {
                          // Default: Pembeli/Member
                          $table_pembeli = $wpdb->prefix . 'dw_pembeli';
-                         // Cek dulu apakah row ada, jika tidak insert (opsional, disini kita asumsi update)
                          $cek = $wpdb->get_var($wpdb->prepare("SELECT id FROM $table_pembeli WHERE id_user = %d", $user_id));
                          if($cek) {
                              $wpdb->update($table_pembeli, ['no_hp' => $phone], ['id_user' => $user_id]);
@@ -89,18 +89,22 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
                         if ( $movefile && ! isset( $movefile['error'] ) ) {
                             $foto_url = $movefile['url']; 
                             
-                            // A. Simpan ke User Meta (Kunci agar tersambung ke Akun WP)
+                            // A. Simpan ke User Meta (Kunci agar tersambung ke Akun WP via filter)
                             update_user_meta($user_id, 'dw_custom_avatar_url', $foto_url);
 
-                            // B. Sinkronisasi ke Tabel Custom (Sesuai Role)
+                            // B. Sinkronisasi ke Tabel Custom (Sesuai Role & Skema Database)
                             if ( in_array('pedagang', $roles) ) {
+                                // Tabel dw_pedagang -> kolom 'foto_admin'
                                 $wpdb->update($wpdb->prefix . 'dw_pedagang', ['foto_admin' => $foto_url], ['id_user' => $user_id]);
                             } elseif ( in_array('admin_desa', $roles) ) {
+                                // Tabel dw_desa -> kolom 'foto_admin'
                                 $wpdb->update($wpdb->prefix . 'dw_desa', ['foto_admin' => $foto_url], ['id_user_desa' => $user_id]);
-                            } elseif ( in_array('verifikator', $roles) ) {
+                            } elseif ( in_array('verifikator_umkm', $roles) ) { 
+                                // Tabel dw_verifikator -> kolom 'foto_profil'
                                 $wpdb->update($wpdb->prefix . 'dw_verifikator', ['foto_profil' => $foto_url], ['id_user' => $user_id]);
                             } else {
                                 // Default: Pembeli / Member Biasa
+                                // Tabel dw_pembeli -> kolom 'foto_profil'
                                 $table_pembeli = $wpdb->prefix . 'dw_pembeli';
                                 $cek_pembeli = $wpdb->get_var($wpdb->prepare("SELECT id FROM $table_pembeli WHERE id_user = %d", $user_id));
                                 
@@ -159,10 +163,10 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
 
             $msg = 'Alamat pengiriman berhasil disimpan.';
 
-            // 3. Sinkronisasi Data Wilayah
+            // 3. Sinkronisasi Data Wilayah ke Tabel Custom
             $data_wilayah = [
                 'alamat_lengkap'   => $addr_input['alamat'],
-                'provinsi_nama'    => $addr_input['prov_name'], // Note: Tabel Desa pakai kolom 'provinsi' tanpa _nama
+                'provinsi_nama'    => $addr_input['prov_name'], 
                 'kabupaten_nama'   => $addr_input['city_name'],
                 'kecamatan_nama'   => $addr_input['kec_name'],
                 'kelurahan_nama'   => $addr_input['kel_name'],
@@ -175,10 +179,11 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
             ];
 
             if ( in_array('pedagang', $roles) ) {
+                // Tabel Pedagang menggunakan suffix '_nama' untuk wilayah
                 $wpdb->update($wpdb->prefix . 'dw_pedagang', $data_wilayah, ['id_user' => $user_id]);
             } 
             elseif ( in_array('admin_desa', $roles) ) {
-                // Penyesuaian nama kolom untuk tabel Desa
+                // Tabel Desa kolomnya: provinsi, kabupaten, kecamatan, kelurahan (tanpa _nama)
                 $data_desa = $data_wilayah;
                 $data_desa['provinsi']  = $data_wilayah['provinsi_nama']; unset($data_desa['provinsi_nama']);
                 $data_desa['kabupaten'] = $data_wilayah['kabupaten_nama']; unset($data_desa['kabupaten_nama']);
@@ -187,23 +192,23 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
                 
                 $wpdb->update($wpdb->prefix . 'dw_desa', $data_desa, ['id_user_desa' => $user_id]);
             }
-            elseif ( in_array('verifikator', $roles) ) {
-                // Verifikator strukturnya mirip desa (provinsi, kabupaten, dst)
+            elseif ( in_array('verifikator_umkm', $roles) ) { 
+                // Tabel Verifikator strukturnya mirip desa (tanpa _nama) & Punya kode_pos
                 $data_verif = $data_wilayah;
                 $data_verif['provinsi']  = $data_wilayah['provinsi_nama']; unset($data_verif['provinsi_nama']);
                 $data_verif['kabupaten'] = $data_wilayah['kabupaten_nama']; unset($data_verif['kabupaten_nama']);
                 $data_verif['kecamatan'] = $data_wilayah['kecamatan_nama']; unset($data_verif['kecamatan_nama']);
                 $data_verif['kelurahan'] = $data_wilayah['kelurahan_nama']; unset($data_verif['kelurahan_nama']);
-
+                
                 $wpdb->update($wpdb->prefix . 'dw_verifikator', $data_verif, ['id_user' => $user_id]);
+                $msg = 'Alamat Verifikator berhasil diperbarui.';
             }
             else {
-                // Pembeli / Member
+                // Tabel Pembeli kolomnya juga mirip desa/verifikator (tanpa _nama)
                 $table_pembeli = $wpdb->prefix . 'dw_pembeli';
                 $cek_pembeli = $wpdb->get_var($wpdb->prepare("SELECT id FROM $table_pembeli WHERE id_user = %d", $user_id));
                 
                 if ( $cek_pembeli ) {
-                    // Penyesuaian nama kolom untuk tabel Pembeli (sesuai schema)
                     $data_pembeli = $data_wilayah;
                     $data_pembeli['provinsi']  = $data_wilayah['provinsi_nama']; unset($data_pembeli['provinsi_nama']);
                     $data_pembeli['kabupaten'] = $data_wilayah['kabupaten_nama']; unset($data_pembeli['kabupaten_nama']);
@@ -220,7 +225,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
     }
 }
 
-// --- PERSIAPAN DATA TAMPILAN ---
+// --- PERSIAPAN DATA TAMPILAN (Pre-fill Form) ---
 
 // 1. Data User Meta
 $user_phone    = get_user_meta($user_id, 'billing_phone', true);
@@ -229,7 +234,6 @@ $user_postcode = get_user_meta($user_id, 'billing_postcode', true);
 
 // 2. Data Avatar Custom
 $custom_avatar = get_user_meta($user_id, 'dw_custom_avatar_url', true);
-// Gunakan custom avatar jika ada, jika tidak fallback ke WP default (Gravatar/Mystery Man)
 $display_avatar = $custom_avatar ? $custom_avatar : get_avatar_url($user_id, ['size' => 200]);
 
 // Data Wilayah
@@ -259,6 +263,7 @@ if ( in_array('pedagang', $roles) ) {
         if (!empty($pedagang_data->kode_pos)) $user_postcode = $pedagang_data->kode_pos;
         if(empty($user_phone)) $user_phone = $pedagang_data->nomor_wa;
         
+        // Prioritaskan custom avatar dari usermeta, fallback ke foto_admin di tabel
         if(empty($custom_avatar) && !empty($pedagang_data->foto_admin)) $display_avatar = $pedagang_data->foto_admin;
     }
 } 
@@ -279,7 +284,29 @@ elseif ( in_array('admin_desa', $roles) ) {
         if(empty($custom_avatar) && !empty($desa_data->foto_admin)) $display_avatar = $desa_data->foto_admin;
     }
 }
-elseif ( !in_array('pedagang', $roles) && !in_array('admin_desa', $roles) && !in_array('verifikator', $roles) && !in_array('administrator', $roles) ) {
+elseif ( in_array('verifikator_umkm', $roles) ) {
+    $verif_data = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}dw_verifikator WHERE id_user = %d", $user_id));
+    if ($verif_data) {
+        $user_address    = $verif_data->alamat_lengkap;
+        $saved_prov_id   = $verif_data->api_provinsi_id;
+        $saved_kota_id   = $verif_data->api_kabupaten_id;
+        $saved_kec_id    = $verif_data->api_kecamatan_id;
+        $saved_kel_id    = $verif_data->api_kelurahan_id;
+        $saved_prov_name = $verif_data->provinsi;
+        $saved_kota_name = $verif_data->kabupaten;
+        $saved_kec_name  = $verif_data->kecamatan;
+        $saved_kel_name  = $verif_data->kelurahan;
+        
+        if (!empty($verif_data->kode_pos)) {
+            $user_postcode = $verif_data->kode_pos;
+        }
+        
+        if(empty($user_phone)) $user_phone = $verif_data->nomor_wa;
+
+        if(empty($custom_avatar) && !empty($verif_data->foto_profil)) $display_avatar = $verif_data->foto_profil;
+    }
+}
+elseif ( !in_array('pedagang', $roles) && !in_array('admin_desa', $roles) && !in_array('administrator', $roles) ) {
     // Pembeli / Member
     $pembeli_data = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}dw_pembeli WHERE id_user = %d", $user_id));
     if ($pembeli_data) {
@@ -310,7 +337,7 @@ if ( in_array('administrator', $roles) || in_array('admin_kabupaten', $roles) ) 
     $role_label = 'Admin Desa'; $role_badge_color = 'bg-green-100 text-green-600'; $role_icon = 'fa-landmark';
 } elseif ( in_array('pedagang', $roles) ) {
     $role_label = 'Mitra UMKM'; $role_badge_color = 'bg-purple-100 text-purple-600'; $role_icon = 'fa-store';
-} elseif ( in_array('verifikator', $roles) ) {
+} elseif ( in_array('verifikator_umkm', $roles) ) { 
     $role_label = 'Verifikator'; $role_badge_color = 'bg-orange-100 text-orange-600'; $role_icon = 'fa-user-check';
 }
 
@@ -423,7 +450,7 @@ get_header();
                             </a>
                             <?php endif; ?>
 
-                             <?php if ( in_array('verifikator', $roles) ) : ?>
+                             <?php if ( in_array('verifikator_umkm', $roles) ) : ?>
                             <a href="<?php echo home_url('/dashboard-verifikator'); ?>" class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 to-red-500 text-white p-6 shadow-lg transform hover:-translate-y-1 transition duration-300 group">
                                 <div class="absolute right-0 top-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10 group-hover:scale-110 transition"></div>
                                 <div class="relative z-10">
@@ -490,7 +517,7 @@ get_header();
                                 <div class="bg-green-100 text-green-800 text-xs px-4 py-2 rounded-lg font-bold flex items-center gap-2 border border-green-200">
                                     <i class="fas fa-landmark"></i> Tersinkron dengan Desa
                                 </div>
-                            <?php elseif(in_array('verifikator', $roles)): ?>
+                            <?php elseif(in_array('verifikator_umkm', $roles)): ?>
                                 <div class="bg-orange-100 text-orange-800 text-xs px-4 py-2 rounded-lg font-bold flex items-center gap-2 border border-orange-200">
                                     <i class="fas fa-user-check"></i> Tersinkron dengan Profil Verifikator
                                 </div>
