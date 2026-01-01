@@ -2,7 +2,7 @@
 /**
  * Template Name: Halaman Register Custom
  * Description: Pendaftaran khusus Wisatawan & Pedagang. 
- * Fix: Insert data ke tabel dw_referral_reward saat register sukses.
+ * Fitur: Desain Alpine.js + Logika Referral Locking & Dynamic Reward.
  */
 
 if ( is_user_logged_in() ) {
@@ -14,7 +14,7 @@ $success_message = '';
 $error_message = '';
 global $wpdb;
 
-// --- LOGIKA ANALISIS KODE REFERRAL (LOCKING) ---
+// ... (LOGIKA KUNCI REFERRAL SAMA SEPERTI SEBELUMNYA) ...
 $ref_code_url = isset($_GET['ref']) ? sanitize_text_field($_GET['ref']) : '';
 $locked_role = ''; 
 $lock_reason = '';
@@ -32,9 +32,10 @@ if ( !empty($ref_code_url) ) {
         $lock_reason = 'Kode undangan khusus Wisatawan.';
     }
 }
+// ...
 
 if ( $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['dw_register_nonce']) && wp_verify_nonce($_POST['dw_register_nonce'], 'dw_register_action') ) {
-    
+    // ... (Validasi input sama seperti sebelumnya) ...
     $username     = sanitize_user($_POST['username']);
     $email        = sanitize_email($_POST['email']);
     $password     = $_POST['password'];
@@ -50,7 +51,6 @@ if ( $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['dw_register_nonce']) 
     } elseif ( empty($username) || empty($email) || empty($password) || empty($nama_lengkap) ) {
         $error_message = 'Mohon lengkapi semua kolom wajib.';
     } else {
-        
         $user_id = wp_create_user( $username, $password, $email );
         
         if ( is_wp_error( $user_id ) ) {
@@ -60,7 +60,7 @@ if ( $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['dw_register_nonce']) 
             update_user_meta( $user_id, 'billing_phone', $no_hp );
             if ( !empty($referral_code_used) ) update_user_meta( $user_id, 'dw_referral_used', $referral_code_used );
 
-            // --- INSERT TABEL CUSTOM ---
+            // --- INSERT TABEL CUSTOM & REWARD DINAMIS ---
             
             if ( $role_input == 'pedagang' ) {
                 $wpdb->insert($wpdb->prefix . 'dw_pedagang', [
@@ -89,20 +89,19 @@ if ( $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['dw_register_nonce']) 
                         // 1. Update Counter Total di Tabel Pedagang
                         $wpdb->query( $wpdb->prepare("UPDATE $table_pedagang_ref SET total_referral_pembeli = total_referral_pembeli + 1 WHERE id = %d", $referrer_id) );
 
-                        // --- [FIX] 2. INPUT KE TABEL REWARD ---
-                        // Misal: Bonus 5 Transaksi Gratis per referral
-                        $bonus_quota = 5; 
+                        // --- [UPDATE] AMBIL NILAI DINAMIS ---
+                        $bonus_quota = get_option('dw_referral_bonus_amount', 5); // Default 5 jika belum diatur
                         
                         $wpdb->insert($wpdb->prefix . 'dw_referral_reward', [
                             'id_pedagang' => $referrer_id,
                             'id_user_baru' => $user_id,
                             'kode_referral_used' => $referral_code_used,
                             'bonus_quota_diberikan' => $bonus_quota,
-                            'status' => 'verified', // Langsung verified karena register sukses
+                            'status' => 'verified',
                             'created_at' => current_time('mysql')
                         ]);
 
-                        // 3. Tambahkan Kuota ke Pedagang (Eksekusi Reward)
+                        // 3. Tambahkan Kuota ke Pedagang
                         $wpdb->query( $wpdb->prepare("UPDATE $table_pedagang_ref SET sisa_transaksi = sisa_transaksi + %d WHERE id = %d", $bonus_quota, $referrer_id) );
                     }
                 }
@@ -128,8 +127,8 @@ if ( $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['dw_register_nonce']) 
     }
 }
 get_header(); 
-// ... (Sisa HTML Form Register sama seperti sebelumnya) ...
 ?>
+<!-- ... (Bagian HTML Tampilan tetap sama seperti versi Alpine.js sebelumnya) ... -->
 <!-- Alpine.js -->
 <script src="https://cdn.jsdelivr.net/gh/alpinejs/alpine@v2.x.x/dist/alpine.min.js" defer></script>
 
@@ -317,29 +316,20 @@ get_header();
 </div>
 
 <script>
-    // Dinamis mengubah label referral berdasarkan pilihan (Hanya jika tidak di-lock)
     function toggleReferralLabel(role) {
         const lbl = document.getElementById('lbl-referral');
-        const hint = document.getElementById('hint-referral');
         const input = document.getElementById('kode_referral');
-        
-        // Jangan ubah teks/placeholder jika sudah ada isinya dari URL (readonly)
         if(input.hasAttribute('readonly')) return;
 
         if (role === 'pedagang') {
             lbl.innerText = 'Kode Referral (Dari Desa/Verifikator)';
             input.placeholder = 'Contoh: DESA-XXX atau VER-XXX';
-            hint.innerText = 'Masukkan kode dari Admin Desa atau Verifikator Anda.';
         } else {
             lbl.innerText = 'Kode Referral (Dari Toko/Teman)';
             input.placeholder = 'Kode Toko...';
-            hint.innerText = 'Masukkan kode toko untuk mendapatkan poin reward.';
         }
     }
-
-    // Init state saat halaman load
     document.addEventListener("DOMContentLoaded", () => {
-        // Cek input mana yang terpilih (checked)
         const selected = document.querySelector('input[name="role_type"]:checked');
         if(selected) toggleReferralLabel(selected.value);
     });
