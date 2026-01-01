@@ -1,7 +1,7 @@
 <?php
 /**
  * Template Name: Halaman Akun Saya Custom
- * Description: Dashboard user lengkap. Alamat tersinkronisasi otomatis dengan tabel Pedagang/Desa (Termasuk Kode Pos).
+ * Description: Dashboard user lengkap. Sinkronisasi Foto Profil & Data ke Tabel Custom (Desa, Pedagang, Verifikator, Pembeli).
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -10,6 +10,11 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 if ( ! is_user_logged_in() ) {
     wp_redirect( home_url('/login') );
     exit;
+}
+
+// Load library upload WP jika belum ada
+if ( ! function_exists( 'wp_handle_upload' ) ) {
+    require_once( ABSPATH . 'wp-admin/includes/file.php' );
 }
 
 global $wpdb;
@@ -22,11 +27,12 @@ $msg_type     = '';
 // --- LOGIC: HANDLE POST REQUESTS ---
 if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
     
-    // A. UPDATE PROFIL & PASSWORD
+    // A. UPDATE PROFIL, PASSWORD & FOTO
     if ( isset($_POST['dw_action']) && $_POST['dw_action'] == 'update_profile' ) {
         if ( isset($_POST['dw_profile_nonce']) && wp_verify_nonce($_POST['dw_profile_nonce'], 'dw_save_profile') ) {
             $error = false;
             
+            // 1. Update Data Dasar WP User (Nama & Email)
             $args = [
                 'ID'           => $user_id,
                 'user_email'   => sanitize_email($_POST['user_email']),
@@ -35,7 +41,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
                 'display_name' => sanitize_text_field($_POST['first_name'] . ' ' . $_POST['last_name'])
             ];
 
-            // Cek Password
+            // 2. Cek Password (Opsional)
             if ( ! empty($_POST['pass1']) ) {
                 if ( $_POST['pass1'] === $_POST['pass2'] ) {
                     $args['user_pass'] = $_POST['pass1'];
@@ -48,14 +54,72 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
 
             if ( ! $error ) {
                 $update = wp_update_user( $args );
+                
                 if ( is_wp_error( $update ) ) {
                     $msg = 'Gagal: ' . $update->get_error_message();
                     $msg_type = 'error';
                 } else {
-                    update_user_meta($user_id, 'billing_phone', sanitize_text_field($_POST['billing_phone']));
-                    $msg = 'Profil akun berhasil diperbarui.';
-                    $msg_type = 'success';
-                    $current_user = wp_get_current_user(); // Refresh data user
+                    // 3. Update Meta & Sinkronisasi No HP
+                    $phone = sanitize_text_field($_POST['billing_phone']);
+                    update_user_meta($user_id, 'billing_phone', $phone);
+
+                    // Sinkronisasi No HP ke Tabel Custom
+                    if ( in_array('pedagang', $roles) ) {
+                        $wpdb->update($wpdb->prefix . 'dw_pedagang', ['nomor_wa' => $phone], ['id_user' => $user_id]);
+                    } elseif ( in_array('verifikator', $roles) ) {
+                        $wpdb->update($wpdb->prefix . 'dw_verifikator', ['nomor_wa' => $phone], ['id_user' => $user_id]);
+                    } elseif ( !in_array('admin_desa', $roles) && !in_array('administrator', $roles) ) {
+                         // Default: Pembeli/Member
+                         $table_pembeli = $wpdb->prefix . 'dw_pembeli';
+                         // Cek dulu apakah row ada, jika tidak insert (opsional, disini kita asumsi update)
+                         $cek = $wpdb->get_var($wpdb->prepare("SELECT id FROM $table_pembeli WHERE id_user = %d", $user_id));
+                         if($cek) {
+                             $wpdb->update($table_pembeli, ['no_hp' => $phone], ['id_user' => $user_id]);
+                         }
+                    }
+                    
+                    // --- 4. HANDLE UPLOAD FOTO PROFIL ---
+                    if ( ! empty($_FILES['profile_pic']['name']) ) {
+                        $uploadedfile = $_FILES['profile_pic'];
+                        $upload_overrides = array( 'test_form' => false );
+                        
+                        // Upload ke wp-content/uploads
+                        $movefile = wp_handle_upload( $uploadedfile, $upload_overrides );
+
+                        if ( $movefile && ! isset( $movefile['error'] ) ) {
+                            $foto_url = $movefile['url']; 
+                            
+                            // A. Simpan ke User Meta (Kunci agar tersambung ke Akun WP)
+                            update_user_meta($user_id, 'dw_custom_avatar_url', $foto_url);
+
+                            // B. Sinkronisasi ke Tabel Custom (Sesuai Role)
+                            if ( in_array('pedagang', $roles) ) {
+                                $wpdb->update($wpdb->prefix . 'dw_pedagang', ['foto_admin' => $foto_url], ['id_user' => $user_id]);
+                            } elseif ( in_array('admin_desa', $roles) ) {
+                                $wpdb->update($wpdb->prefix . 'dw_desa', ['foto_admin' => $foto_url], ['id_user_desa' => $user_id]);
+                            } elseif ( in_array('verifikator', $roles) ) {
+                                $wpdb->update($wpdb->prefix . 'dw_verifikator', ['foto_profil' => $foto_url], ['id_user' => $user_id]);
+                            } else {
+                                // Default: Pembeli / Member Biasa
+                                $table_pembeli = $wpdb->prefix . 'dw_pembeli';
+                                $cek_pembeli = $wpdb->get_var($wpdb->prepare("SELECT id FROM $table_pembeli WHERE id_user = %d", $user_id));
+                                
+                                if ($cek_pembeli) {
+                                    $wpdb->update($table_pembeli, ['foto_profil' => $foto_url], ['id_user' => $user_id]);
+                                }
+                            }
+                            
+                        } else {
+                            $msg = 'Gagal upload foto: ' . $movefile['error'];
+                            $msg_type = 'error';
+                        }
+                    }
+
+                    if(empty($msg_type)) {
+                        $msg = 'Profil akun berhasil diperbarui.';
+                        $msg_type = 'success';
+                        $current_user = wp_get_current_user(); // Refresh object user
+                    }
                 }
             }
         }
@@ -79,7 +143,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
                 'kel_id'    => sanitize_text_field($_POST['api_kelurahan_id']),
             ];
 
-            // 2. Selalu Update User Meta (Standar WP/WooCommerce Fallback)
+            // 2. Selalu Update User Meta (Standar WP/WooCommerce)
             update_user_meta($user_id, 'billing_address_1', $addr_input['alamat']);
             update_user_meta($user_id, 'billing_state', $addr_input['prov_name']); 
             update_user_meta($user_id, 'billing_city', $addr_input['city_name']);
@@ -87,7 +151,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
             update_user_meta($user_id, 'billing_kelurahan', $addr_input['kel_name']);
             update_user_meta($user_id, 'billing_postcode', $addr_input['postcode']);
 
-            // Simpan ID API di user meta agar form dropdown bisa terisi otomatis nanti
+            // Simpan ID API untuk Auto-fill dropdown
             update_user_meta($user_id, 'api_provinsi_id', $addr_input['prov_id']);
             update_user_meta($user_id, 'api_kabupaten_id', $addr_input['city_id']);
             update_user_meta($user_id, 'api_kecamatan_id', $addr_input['kec_id']);
@@ -95,49 +159,59 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
 
             $msg = 'Alamat pengiriman berhasil disimpan.';
 
-            // 3. Sinkronisasi: Update Tabel PEDAGANG (Jika user adalah pedagang)
+            // 3. Sinkronisasi Data Wilayah
+            $data_wilayah = [
+                'alamat_lengkap'   => $addr_input['alamat'],
+                'provinsi_nama'    => $addr_input['prov_name'], // Note: Tabel Desa pakai kolom 'provinsi' tanpa _nama
+                'kabupaten_nama'   => $addr_input['city_name'],
+                'kecamatan_nama'   => $addr_input['kec_name'],
+                'kelurahan_nama'   => $addr_input['kel_name'],
+                'kode_pos'         => $addr_input['postcode'],
+                'api_provinsi_id'  => $addr_input['prov_id'],
+                'api_kabupaten_id' => $addr_input['city_id'],
+                'api_kecamatan_id' => $addr_input['kec_id'],
+                'api_kelurahan_id' => $addr_input['kel_id'],
+                'updated_at'       => current_time('mysql')
+            ];
+
             if ( in_array('pedagang', $roles) ) {
-                $table_pedagang = $wpdb->prefix . 'dw_pedagang';
-                // Cek eksistensi data
-                $cek_pedagang = $wpdb->get_var($wpdb->prepare("SELECT id FROM $table_pedagang WHERE id_user = %d", $user_id));
-                
-                if ( $cek_pedagang ) {
-                    $wpdb->update($table_pedagang, [
-                        'alamat_lengkap'   => $addr_input['alamat'],
-                        'provinsi_nama'    => $addr_input['prov_name'],
-                        'kabupaten_nama'   => $addr_input['city_name'],
-                        'kecamatan_nama'   => $addr_input['kec_name'],
-                        'kelurahan_nama'   => $addr_input['kel_name'],
-                        'kode_pos'         => $addr_input['postcode'],
-                        'api_provinsi_id'  => $addr_input['prov_id'],
-                        'api_kabupaten_id' => $addr_input['city_id'],
-                        'api_kecamatan_id' => $addr_input['kec_id'],
-                        'api_kelurahan_id' => $addr_input['kel_id'],
-                        'updated_at'       => current_time('mysql')
-                    ], ['id_user' => $user_id]);
-                    $msg = 'Alamat Toko & Akun berhasil diperbarui.';
-                }
+                $wpdb->update($wpdb->prefix . 'dw_pedagang', $data_wilayah, ['id_user' => $user_id]);
             } 
-            // 4. Sinkronisasi: Update Tabel DESA (Jika user adalah Admin Desa)
             elseif ( in_array('admin_desa', $roles) ) {
-                $table_desa = $wpdb->prefix . 'dw_desa';
-                $cek_desa = $wpdb->get_var($wpdb->prepare("SELECT id FROM $table_desa WHERE id_user_desa = %d", $user_id));
+                // Penyesuaian nama kolom untuk tabel Desa
+                $data_desa = $data_wilayah;
+                $data_desa['provinsi']  = $data_wilayah['provinsi_nama']; unset($data_desa['provinsi_nama']);
+                $data_desa['kabupaten'] = $data_wilayah['kabupaten_nama']; unset($data_desa['kabupaten_nama']);
+                $data_desa['kecamatan'] = $data_wilayah['kecamatan_nama']; unset($data_desa['kecamatan_nama']);
+                $data_desa['kelurahan'] = $data_wilayah['kelurahan_nama']; unset($data_desa['kelurahan_nama']);
                 
-                if ( $cek_desa ) {
-                    $wpdb->update($table_desa, [
-                        'alamat_lengkap'   => $addr_input['alamat'],
-                        'provinsi'         => $addr_input['prov_name'],
-                        'kabupaten'        => $addr_input['city_name'],
-                        'kecamatan'        => $addr_input['kec_name'],
-                        'kelurahan'        => $addr_input['kel_name'],
-                        'kode_pos'         => $addr_input['postcode'],
-                        'api_provinsi_id'  => $addr_input['prov_id'],
-                        'api_kabupaten_id' => $addr_input['city_id'],
-                        'api_kecamatan_id' => $addr_input['kec_id'],
-                        'api_kelurahan_id' => $addr_input['kel_id'],
-                        'updated_at'       => current_time('mysql')
-                    ], ['id_user_desa' => $user_id]);
-                    $msg = 'Alamat Desa & Akun berhasil diperbarui.';
+                $wpdb->update($wpdb->prefix . 'dw_desa', $data_desa, ['id_user_desa' => $user_id]);
+            }
+            elseif ( in_array('verifikator', $roles) ) {
+                // Verifikator strukturnya mirip desa (provinsi, kabupaten, dst)
+                $data_verif = $data_wilayah;
+                $data_verif['provinsi']  = $data_wilayah['provinsi_nama']; unset($data_verif['provinsi_nama']);
+                $data_verif['kabupaten'] = $data_wilayah['kabupaten_nama']; unset($data_verif['kabupaten_nama']);
+                $data_verif['kecamatan'] = $data_wilayah['kecamatan_nama']; unset($data_verif['kecamatan_nama']);
+                $data_verif['kelurahan'] = $data_wilayah['kelurahan_nama']; unset($data_verif['kelurahan_nama']);
+
+                $wpdb->update($wpdb->prefix . 'dw_verifikator', $data_verif, ['id_user' => $user_id]);
+            }
+            else {
+                // Pembeli / Member
+                $table_pembeli = $wpdb->prefix . 'dw_pembeli';
+                $cek_pembeli = $wpdb->get_var($wpdb->prepare("SELECT id FROM $table_pembeli WHERE id_user = %d", $user_id));
+                
+                if ( $cek_pembeli ) {
+                    // Penyesuaian nama kolom untuk tabel Pembeli (sesuai schema)
+                    $data_pembeli = $data_wilayah;
+                    $data_pembeli['provinsi']  = $data_wilayah['provinsi_nama']; unset($data_pembeli['provinsi_nama']);
+                    $data_pembeli['kabupaten'] = $data_wilayah['kabupaten_nama']; unset($data_pembeli['kabupaten_nama']);
+                    $data_pembeli['kecamatan'] = $data_wilayah['kecamatan_nama']; unset($data_pembeli['kecamatan_nama']);
+                    $data_pembeli['kelurahan'] = $data_wilayah['kelurahan_nama']; unset($data_pembeli['kelurahan_nama']);
+
+                    $wpdb->update($table_pembeli, $data_pembeli, ['id_user' => $user_id]);
+                    $msg = 'Alamat Profil Member berhasil diperbarui.';
                 }
             }
             
@@ -146,13 +220,19 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
     }
 }
 
-// --- PERSIAPAN DATA TAMPILAN (PRE-FILL FORM) ---
+// --- PERSIAPAN DATA TAMPILAN ---
 
-// 1. Default: Ambil dari User Meta
+// 1. Data User Meta
 $user_phone    = get_user_meta($user_id, 'billing_phone', true);
 $user_address  = get_user_meta($user_id, 'billing_address_1', true);
 $user_postcode = get_user_meta($user_id, 'billing_postcode', true);
 
+// 2. Data Avatar Custom
+$custom_avatar = get_user_meta($user_id, 'dw_custom_avatar_url', true);
+// Gunakan custom avatar jika ada, jika tidak fallback ke WP default (Gravatar/Mystery Man)
+$display_avatar = $custom_avatar ? $custom_avatar : get_avatar_url($user_id, ['size' => 200]);
+
+// Data Wilayah
 $saved_prov_id = get_user_meta($user_id, 'api_provinsi_id', true);
 $saved_kota_id = get_user_meta($user_id, 'api_kabupaten_id', true);
 $saved_kec_id  = get_user_meta($user_id, 'api_kecamatan_id', true);
@@ -163,7 +243,7 @@ $saved_kota_name = get_user_meta($user_id, 'billing_city', true);
 $saved_kec_name  = get_user_meta($user_id, 'billing_kecamatan', true);
 $saved_kel_name  = get_user_meta($user_id, 'billing_kelurahan', true);
 
-// 2. Override: Jika PEDAGANG, prioritaskan data dari tabel dw_pedagang
+// Override Data jika Role Khusus (Ambil dari tabel custom jika meta kosong)
 if ( in_array('pedagang', $roles) ) {
     $pedagang_data = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}dw_pedagang WHERE id_user = %d", $user_id));
     if ($pedagang_data) {
@@ -176,13 +256,12 @@ if ( in_array('pedagang', $roles) ) {
         $saved_kota_name = $pedagang_data->kabupaten_nama;
         $saved_kec_name  = $pedagang_data->kecamatan_nama;
         $saved_kel_name  = $pedagang_data->kelurahan_nama;
-        if (!empty($pedagang_data->kode_pos)) {
-            $user_postcode = $pedagang_data->kode_pos;
-        }
+        if (!empty($pedagang_data->kode_pos)) $user_postcode = $pedagang_data->kode_pos;
         if(empty($user_phone)) $user_phone = $pedagang_data->nomor_wa;
+        
+        if(empty($custom_avatar) && !empty($pedagang_data->foto_admin)) $display_avatar = $pedagang_data->foto_admin;
     }
 } 
-// 3. Override: Jika ADMIN DESA, prioritaskan data dari tabel dw_desa
 elseif ( in_array('admin_desa', $roles) ) {
     $desa_data = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}dw_desa WHERE id_user_desa = %d", $user_id));
     if ($desa_data) {
@@ -195,9 +274,28 @@ elseif ( in_array('admin_desa', $roles) ) {
         $saved_kota_name = $desa_data->kabupaten;
         $saved_kec_name  = $desa_data->kecamatan;
         $saved_kel_name  = $desa_data->kelurahan;
-        if (!empty($desa_data->kode_pos)) {
-            $user_postcode = $desa_data->kode_pos;
-        }
+        if (!empty($desa_data->kode_pos)) $user_postcode = $desa_data->kode_pos;
+
+        if(empty($custom_avatar) && !empty($desa_data->foto_admin)) $display_avatar = $desa_data->foto_admin;
+    }
+}
+elseif ( !in_array('pedagang', $roles) && !in_array('admin_desa', $roles) && !in_array('verifikator', $roles) && !in_array('administrator', $roles) ) {
+    // Pembeli / Member
+    $pembeli_data = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}dw_pembeli WHERE id_user = %d", $user_id));
+    if ($pembeli_data) {
+        $user_address    = $pembeli_data->alamat_lengkap;
+        $saved_prov_id   = $pembeli_data->api_provinsi_id;
+        $saved_kota_id   = $pembeli_data->api_kabupaten_id;
+        $saved_kec_id    = $pembeli_data->api_kecamatan_id;
+        $saved_kel_id    = $pembeli_data->api_kelurahan_id;
+        $saved_prov_name = $pembeli_data->provinsi;
+        $saved_kota_name = $pembeli_data->kabupaten;
+        $saved_kec_name  = $pembeli_data->kecamatan;
+        $saved_kel_name  = $pembeli_data->kelurahan;
+        if (!empty($pembeli_data->kode_pos)) $user_postcode = $pembeli_data->kode_pos;
+        if(empty($user_phone)) $user_phone = $pembeli_data->no_hp;
+
+        if(empty($custom_avatar) && !empty($pembeli_data->foto_profil)) $display_avatar = $pembeli_data->foto_profil;
     }
 }
 
@@ -212,6 +310,8 @@ if ( in_array('administrator', $roles) || in_array('admin_kabupaten', $roles) ) 
     $role_label = 'Admin Desa'; $role_badge_color = 'bg-green-100 text-green-600'; $role_icon = 'fa-landmark';
 } elseif ( in_array('pedagang', $roles) ) {
     $role_label = 'Mitra UMKM'; $role_badge_color = 'bg-purple-100 text-purple-600'; $role_icon = 'fa-store';
+} elseif ( in_array('verifikator', $roles) ) {
+    $role_label = 'Verifikator'; $role_badge_color = 'bg-orange-100 text-orange-600'; $role_icon = 'fa-user-check';
 }
 
 get_header();
@@ -221,17 +321,12 @@ get_header();
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
-    /* Custom Transitions */
     .tab-content { display: none; animation: fadeIn 0.4s ease-out; }
     .tab-content.active { display: block; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    
-    /* Sidebar Active State */
     .nav-link { transition: all 0.2s ease; }
     .nav-link.active { background-color: #f0f9ff; color: #0284c7; border-right: 3px solid #0284c7; font-weight: 600; }
     .nav-link:hover:not(.active) { background-color: #f8fafc; color: #334155; }
-    
-    /* Form Inputs */
     .form-input { transition: all 0.2s; }
     .form-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); }
 </style>
@@ -259,7 +354,7 @@ get_header();
                     <div class="px-6 pb-6 text-center relative">
                         <div class="-mt-12 mb-4 inline-block relative">
                             <div class="p-1.5 bg-white rounded-full shadow-md">
-                                <img src="<?php echo get_avatar_url($user_id, ['size' => 200]); ?>" class="w-24 h-24 rounded-full object-cover border-2 border-gray-50">
+                                <img src="<?php echo esc_url($display_avatar); ?>" class="w-24 h-24 rounded-full object-cover border-2 border-gray-50">
                             </div>
                             <div class="absolute bottom-1 right-1 w-6 h-6 bg-green-500 border-2 border-white rounded-full" title="Online"></div>
                         </div>
@@ -306,7 +401,6 @@ get_header();
                         <p class="text-gray-500 mb-8">Ini adalah dashboard akun Anda. Anda dapat melihat aktivitas terbaru dan mengelola informasi akun Anda di sini.</p>
                         
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <!-- Role Specific Card -->
                             <?php if ( in_array('pedagang', $roles) || in_array('administrator', $roles) ) : ?>
                             <a href="<?php echo home_url('/dashboard-toko'); ?>" class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-700 text-white p-6 shadow-lg transform hover:-translate-y-1 transition duration-300 group">
                                 <div class="absolute right-0 top-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10 group-hover:scale-110 transition"></div>
@@ -329,7 +423,17 @@ get_header();
                             </a>
                             <?php endif; ?>
 
-                            <!-- General Shortcut -->
+                             <?php if ( in_array('verifikator', $roles) ) : ?>
+                            <a href="<?php echo home_url('/dashboard-verifikator'); ?>" class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 to-red-500 text-white p-6 shadow-lg transform hover:-translate-y-1 transition duration-300 group">
+                                <div class="absolute right-0 top-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10 group-hover:scale-110 transition"></div>
+                                <div class="relative z-10">
+                                    <div class="w-12 h-12 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center mb-4"><i class="fas fa-user-check text-2xl"></i></div>
+                                    <h3 class="text-xl font-bold mb-1">Dashboard Verifikator</h3>
+                                    <p class="text-orange-100 text-sm">Verifikasi data UMKM di lapangan.</p>
+                                </div>
+                            </a>
+                            <?php endif; ?>
+
                             <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100 hover:border-gray-200 transition group cursor-pointer" onclick="document.querySelector('button[onclick*=\'orders\']').click()">
                                 <div class="flex items-center gap-4">
                                     <div class="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center text-blue-600 group-hover:text-blue-700"><i class="fas fa-shopping-bag text-xl"></i></div>
@@ -385,6 +489,14 @@ get_header();
                             <?php elseif(in_array('admin_desa', $roles)): ?>
                                 <div class="bg-green-100 text-green-800 text-xs px-4 py-2 rounded-lg font-bold flex items-center gap-2 border border-green-200">
                                     <i class="fas fa-landmark"></i> Tersinkron dengan Desa
+                                </div>
+                            <?php elseif(in_array('verifikator', $roles)): ?>
+                                <div class="bg-orange-100 text-orange-800 text-xs px-4 py-2 rounded-lg font-bold flex items-center gap-2 border border-orange-200">
+                                    <i class="fas fa-user-check"></i> Tersinkron dengan Profil Verifikator
+                                </div>
+                            <?php else: ?>
+                                <div class="bg-gray-100 text-gray-800 text-xs px-4 py-2 rounded-lg font-bold flex items-center gap-2 border border-gray-200">
+                                    <i class="fas fa-user"></i> Tersinkron dengan Profil Member
                                 </div>
                             <?php endif; ?>
                         </div>
@@ -478,12 +590,28 @@ get_header();
                     <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden p-6 md:p-8">
                         <div class="mb-8">
                             <h2 class="text-xl font-bold text-gray-800 mb-1">Detail Profil</h2>
-                            <p class="text-sm text-gray-500">Perbarui informasi pribadi dan keamanan akun Anda.</p>
+                            <p class="text-sm text-gray-500">Perbarui informasi pribadi dan foto profil Anda.</p>
                         </div>
                         
-                        <form method="post" action="">
+                        <!-- UPDATE: Tambahkan enctype agar bisa upload file -->
+                        <form method="post" action="" enctype="multipart/form-data">
                             <?php wp_nonce_field('dw_save_profile', 'dw_profile_nonce'); ?>
                             <input type="hidden" name="dw_action" value="update_profile">
+
+                            <!-- FOTO PROFIL SECTION -->
+                            <div class="mb-8 p-4 bg-gray-50 rounded-xl border border-gray-100 flex items-center gap-6">
+                                <div class="relative">
+                                    <img src="<?php echo esc_url($display_avatar); ?>" id="avatar-preview" class="w-20 h-20 rounded-full object-cover border-2 border-white shadow-md">
+                                    <div class="absolute bottom-0 right-0 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs border border-white">
+                                        <i class="fas fa-camera"></i>
+                                    </div>
+                                </div>
+                                <div class="flex-1">
+                                    <label class="block text-sm font-bold text-gray-700 mb-1">Ganti Foto Profil</label>
+                                    <input type="file" name="profile_pic" accept="image/*" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" onchange="previewImage(this)">
+                                    <p class="text-xs text-gray-400 mt-1">Format: JPG/PNG, Maks 2MB. Gambar ini akan digunakan sebagai Avatar akun Anda.</p>
+                                </div>
+                            </div>
 
                             <!-- Personal Info -->
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -572,6 +700,17 @@ get_header();
         const hash = window.location.hash.substring(1);
         const btn = document.querySelector(`button[onclick*='${hash}']`);
         if(btn) btn.click();
+    }
+
+    // Preview Image Logic
+    function previewImage(input) {
+        if (input.files && input.files[0]) {
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                $('#avatar-preview').attr('src', e.target.result);
+            }
+            reader.readAsDataURL(input.files[0]);
+        }
     }
 
     // --- LOGIC ADDRESS API (AJAX CHAINING) ---

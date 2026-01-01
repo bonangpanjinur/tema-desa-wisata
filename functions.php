@@ -119,6 +119,34 @@ function tema_dw_login_redirect($url, $request, $user) {
 }
 add_filter('login_redirect', 'tema_dw_login_redirect', 10, 3);
 
+// Tambahkan filter ini di file functions.php
+add_filter( 'get_avatar_url', 'dw_custom_avatar_url', 10, 3 );
+
+function dw_custom_avatar_url( $url, $id_or_email, $args ) {
+    $user_id = 0;
+    
+    // Deteksi User ID dari berbagai format input
+    if ( is_numeric( $id_or_email ) ) {
+        $user_id = $id_or_email;
+    } elseif ( is_string( $id_or_email ) && ( $user = get_user_by( 'email', $id_or_email ) ) ) {
+        $user_id = $user->ID;
+    } elseif ( is_object( $id_or_email ) && ! empty( $id_or_email->user_id ) ) {
+        $user_id = $id_or_email->user_id;
+    } elseif ( $id_or_email instanceof WP_User ) {
+        $user_id = $id_or_email->ID;
+    }
+
+    // Jika User ID ketemu, cek custom meta
+    if ( $user_id ) {
+        $custom_avatar = get_user_meta( $user_id, 'dw_custom_avatar_url', true );
+        if ( $custom_avatar ) {
+            return $custom_avatar; // Pakai foto upload kita
+        }
+    }
+    
+    return $url; // Balik ke default jika tidak ada
+}
+
 function tema_dw_disable_admin_bar() {
     // Sembunyikan admin bar untuk semua user kecuali admin yang sedang akses wp-admin area
     if (!current_user_can('edit_posts') && !is_admin()) {
