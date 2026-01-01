@@ -1,8 +1,8 @@
 <?php
 /**
  * Template Name: Dashboard Toko (Merchant)
- * Description: Dashboard lengkap pedagang. Fitur Ongkir Ojek Lokal (Fixed Zones), Detail Pesanan, Manajemen Paket, dan Referral.
- * Status: FINAL COMPLETE (UI/UX + Full Logic + Referral Card)
+ * Description: Dashboard lengkap pedagang. Integrasi penuh: Variasi Produk, Galeri, Ongkir Ojek (Zona Detail), Paket, Referral, & QR Code.
+ * Status: FINAL COMPLETE (All Features Restored & Merged)
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -19,9 +19,10 @@ global $wpdb;
 // Definisi Tabel
 $table_pedagang      = $wpdb->prefix . 'dw_pedagang';
 $table_produk        = $wpdb->prefix . 'dw_produk';
-$table_transaksi     = $wpdb->prefix . 'dw_transaksi'; // Data Pembeli Utama
-$table_transaksi_sub = $wpdb->prefix . 'dw_transaksi_sub'; // Data Pesanan Toko
-$table_items         = $wpdb->prefix . 'dw_transaksi_items'; // Item Barang
+$table_variasi       = $wpdb->prefix . 'dw_produk_variasi'; // Tabel Variasi
+$table_transaksi     = $wpdb->prefix . 'dw_transaksi';
+$table_transaksi_sub = $wpdb->prefix . 'dw_transaksi_sub';
+$table_items         = $wpdb->prefix . 'dw_transaksi_items';
 $table_paket         = $wpdb->prefix . 'dw_paket_transaksi';
 $table_pembelian     = $wpdb->prefix . 'dw_pembelian_paket';
 $table_desa          = $wpdb->prefix . 'dw_desa';
@@ -36,8 +37,8 @@ if (!$pedagang) {
         <div class="text-center p-8 bg-white rounded-2xl shadow-xl border border-gray-100 max-w-md w-full">
             <div class="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center text-4xl mx-auto mb-6"><i class="fas fa-store-slash"></i></div>
             <h2 class="text-2xl font-bold text-gray-800 mb-3">Akses Ditolak</h2>
-            <p class="text-gray-500 mb-8 leading-relaxed">Maaf, akun Anda belum terdaftar sebagai Mitra UMKM di platform Desa Wisata ini.</p>
-            <a href="'.home_url('/daftar-pedagang').'" class="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold block w-full hover:bg-blue-700 transition shadow-lg shadow-blue-600/20 transform hover:-translate-y-1">Daftar Sekarang</a>
+            <p class="text-gray-500 mb-8 leading-relaxed">Maaf, akun Anda belum terdaftar sebagai Mitra UMKM.</p>
+            <a href="'.home_url('/daftar-pedagang').'" class="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold block w-full hover:bg-blue-700 transition shadow-lg">Daftar Sekarang</a>
         </div>
     </div>';
     get_footer();
@@ -51,7 +52,7 @@ $msg_type = '';
 // FORM HANDLERS
 // ==========================================
 
-// --- HANDLER 1: SIMPAN PENGATURAN TOKO ---
+// --- HANDLER 1: SIMPAN PENGATURAN TOKO (LENGKAP DENGAN ONGKIR ZONE) ---
 if ( isset($_POST['dw_action']) && $_POST['dw_action'] == 'save_store_settings' ) {
     if ( isset($_POST['dw_settings_nonce']) && wp_verify_nonce($_POST['dw_settings_nonce'], 'dw_save_settings') ) {
         
@@ -84,7 +85,7 @@ if ( isset($_POST['dw_action']) && $_POST['dw_action'] == 'save_store_settings' 
         if(!empty($_POST['api_kecamatan_id'])) $update_data['api_kecamatan_id'] = sanitize_text_field($_POST['api_kecamatan_id']);
         if($kel_id_baru) $update_data['api_kelurahan_id'] = $kel_id_baru;
 
-        // Logic Relasi Desa (Otomatis link ke desa jika terdaftar)
+        // Logic Relasi Desa
         if ($kel_id_baru) {
             $desa_terkait = $wpdb->get_row( $wpdb->prepare( "SELECT id FROM $table_desa WHERE api_kelurahan_id = %s", $kel_id_baru ) );
             if ( $desa_terkait ) {
@@ -105,7 +106,7 @@ if ( isset($_POST['dw_action']) && $_POST['dw_action'] == 'save_store_settings' 
         $update_data['shipping_nasional_aktif']   = isset($_POST['shipping_nasional_aktif']) ? 1 : 0;
         $update_data['shipping_nasional_harga']   = floatval($_POST['shipping_nasional_harga']);
 
-        // --- LOGIKA PENYIMPANAN ZONA OJEK ---
+        // --- LOGIKA PENYIMPANAN ZONA OJEK (FULL) ---
         $safe_array_map = function($input) {
             return isset($input) && is_array($input) ? array_map('sanitize_text_field', $input) : [];
         };
@@ -153,7 +154,7 @@ if ( isset($_POST['dw_action']) && $_POST['dw_action'] == 'save_store_settings' 
 
         $wpdb->update($table_pedagang, $update_data, ['id' => $pedagang->id]);
         
-        // Sinkronisasi User Meta WP
+        // Sync User Meta
         update_user_meta($current_user_id, 'billing_address_1', $update_data['alamat_lengkap']);
         update_user_meta($current_user_id, 'billing_postcode', $update_data['kode_pos']);
         update_user_meta($current_user_id, 'billing_phone', $update_data['nomor_wa']);
@@ -171,11 +172,11 @@ if ( isset($_POST['dw_action']) && $_POST['dw_action'] == 'save_store_settings' 
     }
 }
 
-// --- HANDLER 2: PRODUK ---
+// --- HANDLER 2: PRODUK (SAVE/UPDATE + VARIASI + GALERI) ---
 if ( isset($_POST['dw_action']) && $_POST['dw_action'] == 'save_product' ) {
     if ( isset($_POST['dw_product_nonce']) && wp_verify_nonce($_POST['dw_product_nonce'], 'dw_save_product') ) {
-        require_once( ABSPATH . 'wp-admin/includes/file.php' );
-        require_once( ABSPATH . 'wp-admin/includes/image.php' );
+        require_once( ABSPATH . 'wp-admin/includes/file.php');
+        require_once( ABSPATH . 'wp-admin/includes/image.php');
         
         $prod_data = [
             'id_pedagang' => $pedagang->id,
@@ -190,6 +191,7 @@ if ( isset($_POST['dw_action']) && $_POST['dw_action'] == 'save_product' ) {
             'updated_at'  => current_time('mysql')
         ];
 
+        // 1. Upload Foto Utama
         if (!empty($_FILES['foto_produk']['name'])) {
             $upload = wp_handle_upload($_FILES['foto_produk'], ['test_form' => false]);
             if (isset($upload['url']) && !isset($upload['error'])) {
@@ -197,22 +199,79 @@ if ( isset($_POST['dw_action']) && $_POST['dw_action'] == 'save_product' ) {
             }
         }
 
+        // 2. Upload Galeri (Multiple Files)
+        if (!empty($_FILES['galeri_produk']['name'][0])) {
+            $galeri_urls = [];
+            $files = $_FILES['galeri_produk'];
+            foreach ($files['name'] as $key => $value) {
+                if ($files['name'][$key]) {
+                    $file = [
+                        'name' => $files['name'][$key],
+                        'type' => $files['type'][$key],
+                        'tmp_name' => $files['tmp_name'][$key],
+                        'error' => $files['error'][$key],
+                        'size' => $files['size'][$key]
+                    ];
+                    $upload = wp_handle_upload($file, ['test_form' => false]);
+                    if (!isset($upload['error']) && isset($upload['url'])) {
+                        $galeri_urls[] = $upload['url'];
+                    }
+                }
+            }
+            // Simpan JSON jika ada upload baru
+            if(!empty($galeri_urls)) {
+                $prod_data['galeri'] = json_encode($galeri_urls);
+            }
+        }
+
+        $prod_id = 0;
         if(!empty($_POST['produk_id'])) {
-            $wpdb->update($table_produk, $prod_data, ['id' => intval($_POST['produk_id']), 'id_pedagang' => $pedagang->id]);
+            // Update
+            $prod_id = intval($_POST['produk_id']);
+            $wpdb->update($table_produk, $prod_data, ['id' => $prod_id, 'id_pedagang' => $pedagang->id]);
             $msg = 'Produk berhasil diperbarui.';
         } else {
+            // Insert
             $prod_data['slug'] = sanitize_title($_POST['nama_produk']) . '-' . time();
             $prod_data['created_at'] = current_time('mysql');
             $wpdb->insert($table_produk, $prod_data);
+            $prod_id = $wpdb->insert_id;
             $msg = 'Produk berhasil ditambahkan.';
         }
+
+        // 3. Handle Variasi Produk
+        // Hapus variasi lama jika update (cara paling aman untuk sinkronisasi)
+        if ($prod_id > 0) {
+            $wpdb->delete($table_variasi, ['id_produk' => $prod_id]);
+            
+            if (isset($_POST['var_nama']) && is_array($_POST['var_nama'])) {
+                $var_nama  = $_POST['var_nama'];
+                $var_harga = $_POST['var_harga'];
+                $var_stok  = $_POST['var_stok'];
+                
+                foreach ($var_nama as $k => $nm) {
+                    if (!empty($nm)) {
+                        $wpdb->insert($table_variasi, [
+                            'id_produk'         => $prod_id,
+                            'deskripsi_variasi' => sanitize_text_field($nm),
+                            'harga_variasi'     => floatval($var_harga[$k]),
+                            'stok_variasi'      => intval($var_stok[$k]),
+                            'is_default'        => ($k === 0) ? 1 : 0
+                        ]);
+                    }
+                }
+            }
+        }
+
         $msg_type = 'success';
     }
 }
 
 // --- HANDLER 3: HAPUS PRODUK ---
 if ( isset($_GET['act']) && $_GET['act'] == 'del_prod' && isset($_GET['id']) ) {
-     $wpdb->delete($table_produk, ['id' => intval($_GET['id']), 'id_pedagang' => $pedagang->id]);
+     $id_del = intval($_GET['id']);
+     $wpdb->delete($table_produk, ['id' => $id_del, 'id_pedagang' => $pedagang->id]);
+     $wpdb->delete($table_variasi, ['id_produk' => $id_del]); // Hapus variasi juga
      ?> <script>window.history.replaceState(null, null, window.location.pathname);</script> <?php
      $msg = 'Produk berhasil dihapus.';
      $msg_type = 'success';
@@ -279,8 +338,15 @@ $val_kel_nama  = !empty($pedagang->kelurahan_nama) ? $pedagang->kelurahan_nama :
 $val_alamat    = !empty($pedagang->alamat_lengkap) ? $pedagang->alamat_lengkap : get_user_meta($current_user_id, 'billing_address_1', true);
 $val_kodepos   = !empty($pedagang->kode_pos) ? $pedagang->kode_pos : get_user_meta($current_user_id, 'billing_postcode', true);
 
-// --- Fetch Lists ---
+// --- Fetch Produk (Termasuk Variasi) ---
 $produk_list = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_produk WHERE id_pedagang = %d ORDER BY created_at DESC", $pedagang->id));
+if ($produk_list) {
+    foreach ($produk_list as $p) {
+        $p->variasi = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_variasi WHERE id_produk = %d ORDER BY id ASC", $p->id));
+    }
+}
+
+// --- Fetch Order, Paket, Histori ---
 $order_query = "
     SELECT sub.*, t.nama_penerima, t.no_hp, t.alamat_lengkap AS alamat_kirim
     FROM $table_transaksi_sub sub
@@ -318,7 +384,7 @@ get_header();
 ?>
 
 <!-- ==========================================
-     UI SECTION
+      UI SECTION
 ========================================== -->
 <!-- CDN Tailwind & Icons -->
 <script src="https://cdn.tailwindcss.com"></script>
@@ -477,6 +543,13 @@ get_header();
                              <p class="text-primary font-extrabold text-lg">Rp <?php echo number_format($p->harga,0,',','.'); ?></p>
                              <div class="text-[10px] text-gray-400 font-medium bg-gray-50 px-2 py-1 rounded-full"><?php echo $p->stok; ?> Unit</div>
                          </div>
+                         <!-- Indikator Variasi -->
+                         <?php if(!empty($p->variasi)): ?>
+                             <div class="text-xs text-gray-500 mb-2 italic flex items-center gap-1">
+                                 <i class="fas fa-layer-group text-primary"></i> <?php echo count($p->variasi); ?> Variasi
+                             </div>
+                         <?php endif; ?>
+
                          <div class="mt-auto pt-3 border-t border-dashed border-gray-100 flex gap-2">
                             <button onclick='editProduk(<?php echo htmlspecialchars(json_encode($p), ENT_QUOTES, 'UTF-8'); ?>)' class="flex-1 bg-white border border-gray-200 text-gray-600 py-2 rounded-lg text-xs font-bold hover:bg-gray-50 hover:border-gray-300 transition flex items-center justify-center gap-1"><i class="fas fa-pen"></i> Edit</button>
                             <a href="?act=del_prod&id=<?php echo $p->id; ?>" onclick="return confirm('Hapus produk ini?')" class="w-10 bg-red-50 text-red-500 rounded-lg flex items-center justify-center hover:bg-red-100 transition"><i class="fas fa-trash"></i></a>
@@ -666,14 +739,165 @@ get_header();
                     </div>
                 </div>
             </form>
+
+            <!-- GENERATOR QR CODE MEJA (BARU) -->
+            <div class="mt-10 border-t border-gray-200 pt-8">
+                <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <i class="fas fa-qrcode text-primary"></i> Generator QR Code Meja
+                </h3>
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                    <p class="text-sm text-gray-500 mb-4">
+                        Gunakan fitur ini untuk membuat QR Code unik untuk setiap meja. 
+                        Tempelkan QR Code ini di meja agar pelanggan bisa melakukan pemesanan "Makan di Tempat" (Dine In).
+                    </p>
+                    
+                    <div class="flex flex-wrap items-end gap-4 mb-6">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Dari Nomor</label>
+                            <input type="number" id="qr-start" value="1" class="w-24 border border-gray-300 rounded-lg p-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Sampai Nomor</label>
+                            <input type="number" id="qr-end" value="10" class="w-24 border border-gray-300 rounded-lg p-2 text-sm">
+                        </div>
+                        <button onclick="generateQRLinks()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg font-bold text-sm transition shadow-md h-10">
+                            <i class="fas fa-magic mr-1"></i> Generate
+                        </button>
+                        <button onclick="printQRList()" class="bg-gray-800 hover:bg-gray-900 text-white px-5 py-2 rounded-lg font-bold text-sm transition shadow-md hidden h-10" id="btn-print-qr">
+                            <i class="fas fa-print mr-1"></i> Cetak Semua
+                        </button>
+                    </div>
+
+                    <div id="qr-result-container" class="hidden">
+                        <div class="overflow-x-auto border border-gray-200 rounded-xl">
+                            <table class="w-full text-sm text-left">
+                                <thead class="bg-gray-50 text-gray-600 border-b border-gray-200">
+                                    <tr>
+                                        <th class="p-3">Meja</th>
+                                        <th class="p-3">Link Pemesanan</th>
+                                        <th class="p-3 text-center">QR Preview</th>
+                                        <th class="p-3 text-right">Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="qr-table-body" class="divide-y divide-gray-100">
+                                    <!-- Rows generated via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </main>
 </div>
 
 <!-- ==========================================
-     MODALS
+     MODAL PRODUK (UPDATED WITH GALLERY & VARIATIONS)
 ========================================== -->
-<div id="modal-produk" class="fixed inset-0 z-50 hidden"><div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" onclick="closeProductModal()"></div><div class="absolute right-0 top-0 bottom-0 w-full max-w-lg bg-white shadow-2xl overflow-y-auto transform transition-transform duration-300 translate-x-full flex flex-col" id="modal-produk-panel"><div class="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50"><h2 class="text-xl font-bold text-gray-800" id="modal-title">Tambah Produk</h2><button onclick="closeProductModal()" class="text-gray-400 hover:text-gray-600 transition"><i class="fas fa-times text-xl"></i></button></div><div class="p-6 flex-1 overflow-y-auto"><form method="POST" enctype="multipart/form-data" id="form-product" onsubmit="showLoading(this)"><?php wp_nonce_field('dw_save_product', 'dw_product_nonce'); ?><input type="hidden" name="dw_action" value="save_product"><input type="hidden" name="produk_id" id="prod_id"><div class="space-y-5"><div class="flex justify-center"><div class="w-full"><label class="block text-sm font-bold text-gray-700 mb-2">Foto Utama</label><label class="flex flex-col items-center justify-center w-full h-48 border-2 border-gray-300 border-dashed rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100 transition relative overflow-hidden group"><div class="flex flex-col items-center justify-center pt-5 pb-6 text-gray-500 group-hover:text-primary" id="upload-placeholder"><i class="fas fa-cloud-upload-alt text-3xl mb-2"></i><p class="text-xs">Klik untuk upload foto</p></div><img id="prod-prev-img" class="absolute inset-0 w-full h-full object-cover hidden"><input type="file" name="foto_produk" class="hidden" onchange="previewImage(this, 'prod-prev-img'); $('#upload-placeholder').addClass('hidden'); $('#prod-prev-img').removeClass('hidden');"></label></div></div><div><label class="block text-sm font-bold text-gray-700 mb-1">Nama Produk</label><input type="text" name="nama_produk" id="prod_nama" required class="w-full border-gray-300 rounded-lg p-2.5"></div><div class="grid grid-cols-2 gap-4"><div><label class="block text-sm font-bold text-gray-700 mb-1">Harga</label><input type="number" name="harga" id="prod_harga" required class="w-full border-gray-300 rounded-lg p-2.5"></div><div><label class="block text-sm font-bold text-gray-700 mb-1">Stok</label><input type="number" name="stok" id="prod_stok" required class="w-full border-gray-300 rounded-lg p-2.5"></div></div><div class="grid grid-cols-2 gap-4"><div><label class="block text-sm font-bold text-gray-700 mb-1">Berat (Gr)</label><input type="number" name="berat_gram" id="prod_berat" required class="w-full border-gray-300 rounded-lg p-2.5"></div><div><label class="block text-sm font-bold text-gray-700 mb-1">Kondisi</label><select name="kondisi" id="prod_kondisi" class="w-full border-gray-300 rounded-lg p-2.5 bg-white"><option value="baru">Baru</option><option value="bekas">Bekas</option></select></div></div><div><label class="block text-sm font-bold text-gray-700 mb-1">Kategori</label><select name="kategori" id="prod_kategori" class="w-full border-gray-300 rounded-lg p-2.5 bg-white"><?php foreach($kategori_list as $cat) echo "<option value='$cat'>$cat</option>"; ?><option value="Lainnya">Lainnya</option></select></div><div><label class="block text-sm font-bold text-gray-700 mb-1">Deskripsi</label><textarea name="deskripsi_produk" id="prod_deskripsi" rows="4" class="w-full border-gray-300 rounded-lg p-2.5"></textarea></div></div><div class="mt-8 pt-4 border-t border-gray-100"><button type="submit" class="w-full bg-primary text-white font-bold py-3.5 rounded-xl shadow-lg hover:bg-green-700 transition">Simpan Produk</button></div></form></div></div></div>
+<div id="modal-produk" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity" onclick="closeProductModal()"></div>
+    <div class="absolute right-0 top-0 bottom-0 w-full max-w-lg bg-white shadow-2xl overflow-y-auto transform transition-transform duration-300 translate-x-full flex flex-col" id="modal-produk-panel">
+        
+        <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50 sticky top-0 z-10">
+            <h2 class="text-xl font-bold text-gray-800" id="modal-title">Tambah Produk</h2>
+            <button onclick="closeProductModal()" class="text-gray-400 hover:text-gray-600 transition"><i class="fas fa-times text-xl"></i></button>
+        </div>
+        
+        <div class="p-6 flex-1 overflow-y-auto">
+            <form method="POST" enctype="multipart/form-data" id="form-product" onsubmit="showLoading(this)">
+                <?php wp_nonce_field('dw_save_product', 'dw_product_nonce'); ?>
+                <input type="hidden" name="dw_action" value="save_product">
+                <input type="hidden" name="produk_id" id="prod_id">
+                
+                <div class="space-y-6">
+                    <!-- FOTO UTAMA -->
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">Foto Utama</label>
+                        <label class="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100 transition relative overflow-hidden group">
+                            <div class="flex flex-col items-center justify-center pt-5 pb-6 text-gray-500 group-hover:text-primary" id="upload-placeholder">
+                                <i class="fas fa-cloud-upload-alt text-3xl mb-2"></i>
+                                <p class="text-xs">Klik untuk upload foto utama</p>
+                            </div>
+                            <img id="prod-prev-img" class="absolute inset-0 w-full h-full object-cover hidden">
+                            <input type="file" name="foto_produk" class="hidden" onchange="previewImage(this, 'prod-prev-img'); $('#upload-placeholder').addClass('hidden'); $('#prod-prev-img').removeClass('hidden');">
+                        </label>
+                    </div>
+
+                    <!-- GALERI PRODUK (BARU) -->
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Galeri Foto (Opsional)</label>
+                        <p class="text-xs text-gray-400 mb-2">Pilih banyak foto sekaligus untuk detail produk.</p>
+                        <input type="file" name="galeri_produk[]" multiple class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition">
+                    </div>
+
+                    <!-- INFORMASI DASAR -->
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Nama Produk</label>
+                        <input type="text" name="nama_produk" id="prod_nama" required class="w-full border-gray-300 rounded-lg p-2.5 text-sm">
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Harga Dasar (Rp)</label>
+                            <input type="number" name="harga" id="prod_harga" required class="w-full border-gray-300 rounded-lg p-2.5 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Stok Total</label>
+                            <input type="number" name="stok" id="prod_stok" required class="w-full border-gray-300 rounded-lg p-2.5 text-sm">
+                        </div>
+                    </div>
+
+                    <!-- SECTION VARIASI (BARU) -->
+                    <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                        <div class="flex justify-between items-center mb-3">
+                            <label class="block text-sm font-bold text-gray-800">Variasi Produk</label>
+                            <button type="button" onclick="addVariasiRow()" class="text-xs bg-white border border-gray-300 px-3 py-1 rounded shadow-sm hover:bg-gray-100 transition"><i class="fas fa-plus"></i> Tambah</button>
+                        </div>
+                        <p class="text-xs text-gray-500 mb-3">Isi jika produk memiliki pilihan warna/ukuran dengan harga berbeda.</p>
+                        
+                        <div id="variasi-container" class="space-y-2">
+                            <!-- Rows added via JS -->
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Berat (Gr)</label>
+                            <input type="number" name="berat_gram" id="prod_berat" required class="w-full border-gray-300 rounded-lg p-2.5 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Kondisi</label>
+                            <select name="kondisi" id="prod_kondisi" class="w-full border-gray-300 rounded-lg p-2.5 bg-white text-sm">
+                                <option value="baru">Baru</option>
+                                <option value="bekas">Bekas</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Kategori</label>
+                        <select name="kategori" id="prod_kategori" class="w-full border-gray-300 rounded-lg p-2.5 bg-white text-sm">
+                            <?php foreach($kategori_list as $cat) echo "<option value='$cat'>$cat</option>"; ?>
+                            <option value="Lainnya">Lainnya</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Deskripsi Lengkap</label>
+                        <textarea name="deskripsi_produk" id="prod_deskripsi" rows="4" class="w-full border-gray-300 rounded-lg p-2.5 text-sm"></textarea>
+                    </div>
+                </div>
+
+                <div class="mt-8 pt-4 border-t border-gray-100">
+                    <button type="submit" class="w-full bg-primary text-white font-bold py-3.5 rounded-xl shadow-lg hover:bg-green-700 transition transform active:scale-95">Simpan Produk</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL BUY & ORDER DETAIL (Standard) -->
 <div id="modal-buy" class="fixed inset-0 z-50 hidden"><div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onclick="closeBuyModal()"></div><div class="absolute inset-0 flex items-center justify-center p-4"><div class="bg-white rounded-3xl p-8 w-full max-w-sm relative shadow-2xl transform transition-all scale-100"><button onclick="closeBuyModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button><div class="text-center mb-6"><div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fas fa-receipt"></i></div><h3 class="font-bold text-xl text-gray-800">Konfirmasi Pembelian</h3><p class="text-sm text-gray-500 mt-1">Paket: <span id="modal-paket-name" class="font-bold text-gray-800"></span></p><p class="text-2xl font-bold text-primary mt-2" id="modal-paket-price"></p></div><form method="post" enctype="multipart/form-data" onsubmit="showLoading(this)"><?php wp_nonce_field('beli_paket_action', 'paket_nonce'); ?><input type="hidden" name="beli_paket" value="1"><input type="hidden" name="id_paket" id="modal-id-paket"><div class="mb-6 bg-gray-50 p-4 rounded-xl border border-dashed border-gray-300"><label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 text-center">Upload Bukti Transfer</label><input type="file" name="bukti_bayar" required class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"></div><button type="submit" class="w-full bg-gray-900 text-white font-bold py-3.5 rounded-xl hover:bg-black transition shadow-lg">Kirim Bukti</button></form></div></div></div>
 <div id="modal-order-detail" class="fixed inset-0 z-50 hidden"><div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onclick="closeOrderDetailModal()"></div><div class="absolute right-0 top-0 bottom-0 w-full max-w-2xl bg-white shadow-2xl overflow-y-auto transform transition-transform duration-300 translate-x-full flex flex-col" id="modal-order-panel"><div class="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50 sticky top-0 z-10"><div><h2 class="text-xl font-bold text-gray-800">Detail Pesanan</h2><p class="text-sm text-gray-500" id="det-order-id">#</p></div><button onclick="closeOrderDetailModal()" class="text-gray-400 hover:text-gray-600 transition"><i class="fas fa-times text-xl"></i></button></div><div class="p-6 flex-1 overflow-y-auto space-y-6"><div class="bg-blue-50 p-4 rounded-xl border border-blue-100"><h3 class="font-bold text-blue-900 mb-2 flex items-center gap-2"><i class="fas fa-user"></i> Data Pembeli</h3><div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm"><div><p class="text-gray-500 text-xs uppercase">Nama Penerima</p><p class="font-bold text-gray-800" id="det-penerima">-</p></div><div><p class="text-gray-500 text-xs uppercase">No HP</p><p class="font-bold text-gray-800" id="det-hp">-</p></div><div class="col-span-full"><p class="text-gray-500 text-xs uppercase">Alamat Pengiriman</p><p class="text-gray-800 leading-relaxed" id="det-alamat">-</p></div></div></div><div><h3 class="font-bold text-gray-800 mb-3 flex items-center gap-2"><i class="fas fa-shopping-basket"></i> Item Dipesan</h3><div class="border border-gray-200 rounded-xl overflow-hidden"><table class="w-full text-sm text-left"><thead class="bg-gray-50 text-gray-600 border-b"><tr><th class="p-3">Produk</th><th class="p-3 text-center">Qty</th><th class="p-3 text-right">Total</th></tr></thead><tbody id="det-items-body" class="divide-y divide-gray-100"></tbody><tfoot class="bg-gray-50"><tr><td colspan="2" class="p-3 text-right font-bold">Subtotal</td><td class="p-3 text-right font-bold" id="det-subtotal">Rp 0</td></tr><tr><td colspan="2" class="p-3 text-right font-bold text-gray-600">Ongkir</td><td class="p-3 text-right font-bold text-gray-600" id="det-ongkir">Rp 0</td></tr><tr><td colspan="2" class="p-3 text-right font-bold text-primary text-lg">Total Akhir</td><td class="p-3 text-right font-bold text-primary text-lg" id="det-total">Rp 0</td></tr></tfoot></table></div></div><div class="border-t pt-6"><h3 class="font-bold text-gray-800 mb-4">Update Status Pesanan</h3><form method="POST" id="form-update-order" onsubmit="showLoading(this)"><?php wp_nonce_field('dw_update_order', 'dw_order_nonce'); ?><input type="hidden" name="dw_action" value="update_order_status"><input type="hidden" name="order_id" id="update-order-id"><div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4"><div><label class="block text-xs font-bold text-gray-600 mb-1">Status Pesanan</label><select name="status_pesanan" id="update-status" class="w-full border-gray-300 rounded-lg p-2 text-sm bg-white"><option value="menunggu_konfirmasi">Menunggu Konfirmasi</option><option value="diproses">Diproses</option><option value="dikirim_ekspedisi">Dikirim Ekspedisi</option><option value="diantar_ojek">Diantar Ojek</option><option value="siap_diambil">Siap Diambil</option><option value="selesai">Selesai</option><option value="dibatalkan">Dibatalkan</option></select></div><div><label class="block text-xs font-bold text-gray-600 mb-1">Nomor Resi</label><input type="text" name="no_resi" id="update-resi" class="w-full border-gray-300 rounded-lg p-2 text-sm"></div></div><button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition shadow-lg">Simpan Status</button></form></div></div></div></div>
 
@@ -725,14 +949,57 @@ get_header();
     function showLoading(f) { $(f).find('button[type="submit"]').prop('disabled',true).html('<i class="fas fa-spinner fa-spin"></i> Menyimpan...'); }
 
     // =========================================
-    // MODALS
+    // MODALS & VARIATIONS
     // =========================================
-    function openProductModal() { $('#form-product')[0].reset(); $('#prod_id').val(''); $('#modal-title').text('Tambah Produk'); $('#prod-prev-img').addClass('hidden'); $('#upload-placeholder').removeClass('hidden'); $('#modal-produk').removeClass('hidden'); setTimeout(()=>$('#modal-produk-panel').removeClass('translate-x-full'),10); }
-    function closeProductModal() { $('#modal-produk-panel').addClass('translate-x-full'); setTimeout(()=>$('#modal-produk').addClass('hidden'),300); }
-    function editProduk(p) { openProductModal(); $('#modal-title').text('Edit Produk'); $('#prod_id').val(p.id); $('#prod_nama').val(p.nama_produk); $('#prod_harga').val(p.harga); $('#prod_stok').val(p.stok); $('#prod_berat').val(p.berat_gram); $('#prod_deskripsi').val(p.deskripsi); $('#prod_kategori').val(p.kategori); $('#prod_kondisi').val(p.kondisi); if(p.foto_utama){ $('#prod-prev-img').attr('src', p.foto_utama).removeClass('hidden'); $('#upload-placeholder').addClass('hidden'); } }
-    function openBuyModal(id,n,p) { $('#modal-id-paket').val(id); $('#modal-paket-name').text(n); $('#modal-paket-price').text('Rp '+new Intl.NumberFormat('id-ID').format(p)); $('#modal-buy').removeClass('hidden'); }
-    function closeBuyModal() { $('#modal-buy').addClass('hidden'); }
-    function openOrderDetail(o) { $('#det-order-id').text('#'+o.id); $('#det-penerima').text(o.nama_penerima||'-'); $('#det-hp').text(o.no_hp||'-'); $('#det-alamat').text(o.alamat_kirim||o.alamat_lengkap||'-'); $('#update-order-id').val(o.id); $('#update-status').val(o.status_pesanan); $('#update-resi').val(o.no_resi||''); let h=''; if(o.items){o.items.forEach(i=>{ h+=`<tr><td class="p-3"><div class="font-bold text-gray-800">${i.nama_produk}</div><div class="text-xs text-gray-500">@ Rp ${new Intl.NumberFormat('id-ID').format(i.harga_satuan)}</div></td><td class="p-3 text-center text-gray-600">x${i.jumlah}</td><td class="p-3 text-right font-bold text-gray-800">Rp ${new Intl.NumberFormat('id-ID').format(i.total_harga)}</td></tr>`; });} else { h='<tr><td colspan="3" class="p-4 text-center">No Items</td></tr>'; } $('#det-items-body').html(h); $('#det-subtotal').text('Rp '+new Intl.NumberFormat('id-ID').format(o.sub_total)); $('#det-ongkir').text('Rp '+new Intl.NumberFormat('id-ID').format(o.ongkir)); $('#det-total').text('Rp '+new Intl.NumberFormat('id-ID').format(o.total_pesanan_toko)); $('#modal-order-detail').removeClass('hidden'); setTimeout(()=>$('#modal-order-panel').removeClass('translate-x-full'),10); }
+    function openProductModal() { 
+        $('#form-product')[0].reset(); 
+        $('#prod_id').val(''); 
+        $('#modal-title').text('Tambah Produk'); 
+        $('#prod-prev-img').addClass('hidden'); 
+        $('#upload-placeholder').removeClass('hidden'); 
+        $('#variasi-container').empty(); 
+        $('#modal-produk').removeClass('hidden'); 
+        setTimeout(()=>$('#modal-produk-panel').removeClass('translate-x-full'),10); 
+    }
+    
+    function closeProductModal() { 
+        $('#modal-produk-panel').addClass('translate-x-full'); 
+        setTimeout(()=>$('#modal-produk').addClass('hidden'),300); 
+    }
+
+    function addVariasiRow(n='',h='',s=''){
+        const id=Date.now();
+        $('#variasi-container').append(`<div class="flex gap-2 items-start animate-fade-in" id="row-${id}"><input type="text" name="var_nama[]" value="${n}" placeholder="Warna/Ukuran" class="w-1/2 text-xs border-gray-300 rounded-lg p-2"><input type="number" name="var_harga[]" value="${h}" placeholder="Harga" class="w-1/4 text-xs border-gray-300 rounded-lg p-2"><input type="number" name="var_stok[]" value="${s}" placeholder="Stok" class="w-1/4 text-xs border-gray-300 rounded-lg p-2"><button type="button" onclick="$('#row-${id}').remove()" class="text-red-500 p-2 hover:bg-red-50 rounded-lg transition"><i class="fas fa-times"></i></button></div>`);
+    }
+
+    function editProduk(p){
+        openProductModal(); 
+        $('#modal-title').text('Edit Produk'); 
+        $('#prod_id').val(p.id); 
+        $('#prod_nama').val(p.nama_produk); 
+        $('#prod_harga').val(p.harga); 
+        $('#prod_stok').val(p.stok); 
+        $('#prod_berat').val(p.berat_gram); 
+        $('#prod_deskripsi').val(p.deskripsi); 
+        $('#prod_kategori').val(p.kategori); 
+        $('#prod_kondisi').val(p.kondisi); 
+        
+        if(p.foto_utama){ 
+            $('#prod-prev-img').attr('src', p.foto_utama).removeClass('hidden'); 
+            $('#upload-placeholder').addClass('hidden'); 
+        }
+        
+        if(p.variasi && p.variasi.length > 0) {
+            p.variasi.forEach(v => {
+                addVariasiRow(v.deskripsi_variasi, v.harga_variasi, v.stok_variasi);
+            });
+        }
+    }
+
+    function openBuyModal(id,n,p){ $('#modal-id-paket').val(id); $('#modal-paket-name').text(n); $('#modal-paket-price').text('Rp '+new Intl.NumberFormat('id-ID').format(p)); $('#modal-buy').removeClass('hidden'); }
+    function closeBuyModal(){ $('#modal-buy').addClass('hidden'); }
+    
+    function openOrderDetail(o){ $('#det-order-id').text('#'+o.id); $('#det-penerima').text(o.nama_penerima||'-'); $('#det-hp').text(o.no_hp||'-'); $('#det-alamat').text(o.alamat_kirim||o.alamat_lengkap||'-'); $('#update-order-id').val(o.id); $('#update-status').val(o.status_pesanan); $('#update-resi').val(o.no_resi||''); let h=''; if(o.items){o.items.forEach(i=>{ h+=`<tr><td class="p-3"><div class="font-bold text-gray-800">${i.nama_produk}</div><div class="text-xs text-gray-500">@ Rp ${new Intl.NumberFormat('id-ID').format(i.harga_satuan)}</div></td><td class="p-3 text-center text-gray-600">x${i.jumlah}</td><td class="p-3 text-right font-bold text-gray-800">Rp ${new Intl.NumberFormat('id-ID').format(i.total_harga)}</td></tr>`; });} else { h='<tr><td colspan="3" class="p-4 text-center">No Items</td></tr>'; } $('#det-items-body').html(h); $('#det-subtotal').text('Rp '+new Intl.NumberFormat('id-ID').format(o.sub_total)); $('#det-ongkir').text('Rp '+new Intl.NumberFormat('id-ID').format(o.ongkir)); $('#det-total').text('Rp '+new Intl.NumberFormat('id-ID').format(o.total_pesanan_toko)); $('#modal-order-detail').removeClass('hidden'); setTimeout(()=>$('#modal-order-panel').removeClass('translate-x-full'),10); }
     function closeOrderDetailModal() { $('#modal-order-panel').addClass('translate-x-full'); setTimeout(()=>$('#modal-order-detail').addClass('hidden'),300); }
 
     // =========================================
@@ -867,12 +1134,12 @@ get_header();
         $('#sel-kec-dekat, #sel-kec-jauh').on('change', function() { syncExclusion('#sel-kec-dekat', '#sel-kec-jauh'); syncExclusion('#sel-kec-jauh', '#sel-kec-dekat'); });
     });
 
-    // [BARU] Fungsi Copy to Clipboard
+    // Fungsi Copy to Clipboard
     function copyToClipboard(text) {
         if (!text) return;
         if (navigator.clipboard && window.isSecureContext) {
             navigator.clipboard.writeText(text).then(() => {
-                alert('Link Pendaftaran berhasil disalin!\n\n' + text);
+                alert('Link disalin: ' + text);
             }).catch(err => {
                 fallbackCopy(text);
             });
@@ -891,11 +1158,68 @@ get_header();
         textArea.select();
         try {
             document.execCommand('copy');
-            alert('Link Pendaftaran berhasil disalin!\n\n' + text);
+            alert('Link disalin: ' + text);
         } catch (err) {
             alert('Gagal menyalin kode. Silakan salin manual.');
         }
         document.body.removeChild(textArea);
+    }
+
+    // =========================================
+    // QR CODE GENERATOR LOGIC
+    // =========================================
+    const shopBaseUrl = "<?php echo home_url('/toko/' . $pedagang->slug_toko); ?>";
+
+    function generateQRLinks() {
+        const start = parseInt($('#qr-start').val()) || 1;
+        const end = parseInt($('#qr-end').val()) || 10;
+        const tbody = $('#qr-table-body');
+        tbody.empty();
+
+        if(end < start) { alert('Nomor akhir harus lebih besar dari awal.'); return; }
+        if((end - start) > 100) { alert('Maksimal 100 meja sekali generate.'); return; }
+
+        for(let i=start; i<=end; i++) {
+            const url = `${shopBaseUrl}?meja=${i}`;
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(url)}`;
+            
+            const row = `
+                <tr class="hover:bg-gray-50">
+                    <td class="p-3 font-bold text-gray-800 w-24">Meja ${i}</td>
+                    <td class="p-3">
+                        <div class="flex items-center gap-2">
+                            <input type="text" value="${url}" readonly class="w-full text-xs border border-gray-200 bg-gray-50 rounded px-2 py-1.5 text-gray-500 font-mono">
+                            <button onclick="copyToClipboard('${url}')" class="text-blue-600 hover:text-blue-800 bg-blue-50 p-1.5 rounded"><i class="far fa-copy"></i></button>
+                        </div>
+                    </td>
+                    <td class="p-3 text-center">
+                        <img src="${qrUrl}" class="w-16 h-16 mx-auto border p-1 rounded bg-white shadow-sm">
+                    </td>
+                    <td class="p-3 text-right">
+                        <a href="${qrUrl}" download="QR-Meja-${i}.png" target="_blank" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded text-xs font-bold transition flex items-center justify-end gap-1 ml-auto w-fit">
+                            <i class="fas fa-download"></i> Simpan
+                        </a>
+                    </td>
+                </tr>
+            `;
+            tbody.append(row);
+        }
+        
+        $('#qr-result-container').removeClass('hidden');
+        $('#btn-print-qr').removeClass('hidden');
+    }
+
+    function printQRList() {
+        const content = $('#qr-result-container').html();
+        const win = window.open('', '', 'height=700,width=900');
+        win.document.write('<html><head><title>Cetak QR Meja</title>');
+        win.document.write('<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">');
+        win.document.write('</head><body class="p-8">');
+        win.document.write('<div class="mb-4 text-center"><h1 class="text-2xl font-bold">QR Code Meja</h1><p><?php echo esc_js($pedagang->nama_toko); ?></p></div>');
+        win.document.write(content);
+        win.document.write('</body></html>');
+        win.document.close();
+        setTimeout(function(){ win.print(); }, 500);
     }
 </script>
 
