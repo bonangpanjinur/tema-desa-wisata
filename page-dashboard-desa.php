@@ -1,8 +1,8 @@
 <?php
 /**
  * Template Name: Dashboard Desa
- * Description: Panel Frontend Desa Lengkap (CRUD Stabil + Fitur Lengkap + ID Generator).
- * Status: FINAL FIX (Layout Responsif - Sidebar Terpisah).
+ * Description: Panel Frontend Desa Lengkap (Profil, Verifikasi, Wisata, dan Manajemen Keuangan/Komisi).
+ * Status: FINAL COMPLETE (PHP 7.x Compatible Fix)
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -21,6 +21,7 @@ global $wpdb;
 $table_desa     = $wpdb->prefix . 'dw_desa'; 
 $table_pedagang = $wpdb->prefix . 'dw_pedagang';
 $table_wisata   = $wpdb->prefix . 'dw_wisata';
+$table_payout   = $wpdb->prefix . 'dw_payout_ledger'; // Tabel Payout (History Penarikan)
 
 // 2. Ambil Data Desa
 $desa_data = $wpdb->get_row( $wpdb->prepare("SELECT * FROM $table_desa WHERE id_user_desa = %d", $current_user_id) );
@@ -51,7 +52,10 @@ $status_verifikasi = $desa_data->status_akses_verifikasi;
 $msg = '';
 $msg_type = '';
 
-// --- LOGIC PHP UTAMA (CRUD & Handler) ---
+// ==========================================
+// FORM HANDLERS
+// ==========================================
+
 // 1. Simpan Profil & Generate ID
 if ( isset($_POST['save_profil_desa']) && check_admin_referer('save_profil_desa_action', 'profil_desa_nonce') ) {
     require_once( ABSPATH . 'wp-admin/includes/file.php' ); require_once( ABSPATH . 'wp-admin/includes/image.php' ); require_once( ABSPATH . 'wp-admin/includes/media.php' );
@@ -83,7 +87,7 @@ if ( isset($_POST['save_profil_desa']) && check_admin_referer('save_profil_desa_
     $wpdb->update($table_desa, $update_desa, ['id'=>$id_desa]); $msg="Profil diperbarui."; $msg_type="success"; $desa_data=$wpdb->get_row($wpdb->prepare("SELECT * FROM $table_desa WHERE id=%d",$id_desa));
 }
 
-// 2. Upload Bukti
+// 2. Upload Bukti Verifikasi
 if ( isset($_POST['action_upload_bukti']) && check_admin_referer('upload_bukti_action', 'upload_bukti_nonce') ) {
     if(!function_exists('wp_handle_upload')) require_once(ABSPATH.'wp-admin/includes/file.php');
     $u=$_FILES['bukti_bayar']; if(!empty($u['name'])){ $m=wp_handle_upload($u,['test_form'=>false]); if($m&&!isset($m['error'])){ $wpdb->update($table_desa,['bukti_bayar_akses'=>$m['url'],'status_akses_verifikasi'=>'pending','updated_at'=>current_time('mysql')],['id'=>$id_desa]); $msg="Bukti terkirim."; $msg_type="success"; $status_verifikasi='pending'; } }
@@ -116,7 +120,43 @@ if ( isset($_GET['action']) && $_GET['action'] == 'hapus_wisata' && isset($_GET[
     $wpdb->delete($table_wisata, ['id' => intval($_GET['id']), 'id_desa' => $id_desa]); wp_redirect( home_url('/dashboard-desa/?tab=wisata') ); exit;
 }
 
-// Data Fetching
+// 6. REQUEST WITHDRAW (Pencairan Komisi) - FITUR BARU
+if ( isset($_POST['action_withdraw']) && check_admin_referer('withdraw_action', 'withdraw_nonce') ) {
+    $amount = floatval(str_replace('.', '', $_POST['nominal_withdraw'])); // Hapus format ribuan
+    
+    // Validasi
+    if ( $amount <= 0 ) {
+        $msg = "Nominal penarikan tidak valid."; $msg_type = "error";
+    } elseif ( $amount > $desa_data->saldo_komisi ) {
+        $msg = "Saldo tidak mencukupi untuk penarikan tersebut."; $msg_type = "error";
+    } elseif ( empty($desa_data->no_rekening_desa) || empty($desa_data->nama_bank_desa) ) {
+        $msg = "Harap lengkapi Data Rekening Desa di menu Profil terlebih dahulu."; $msg_type = "error";
+    } else {
+        // Proses Pengurangan Saldo
+        $wpdb->query($wpdb->prepare("UPDATE $table_desa SET saldo_komisi = saldo_komisi - %f WHERE id = %d", $amount, $id_desa));
+        
+        // Catat di Ledger Payout
+        // Schema: order_id (bisa dipakai utk kode unik), payable_to_type, payable_to_id, amount, status
+        $wpdb->insert($table_payout, [
+            'order_id' => 0, // 0 menandakan manual request
+            'payable_to_type' => 'desa',
+            'payable_to_id' => $id_desa,
+            'amount' => $amount,
+            'status' => 'pending',
+            'created_at' => current_time('mysql')
+        ]);
+
+        $msg = "Permintaan pencairan Rp " . number_format($amount, 0, ',', '.') . " berhasil dikirim.";
+        $msg_type = "success";
+        
+        // Refresh Data
+        $desa_data = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_desa WHERE id=%d",$id_desa));
+    }
+}
+
+// ==========================================
+// DATA QUERY
+// ==========================================
 $wisata_list = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_wisata WHERE id_desa = %d AND status = 'aktif' ORDER BY created_at DESC", $id_desa));
 $total_umkm = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table_pedagang WHERE id_desa = %d AND status_akun = 'aktif'", $id_desa));
 $total_wisata_count = count($wisata_list);
@@ -127,6 +167,9 @@ $sys_bank_name = get_option('dw_bank_name', '-');
 $sys_bank_account = get_option('dw_bank_account', '-'); 
 $sys_bank_holder = get_option('dw_bank_holder', '-'); 
 
+// Fetch History Payouts (Keuangan)
+$payout_history = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_payout WHERE payable_to_type = 'desa' AND payable_to_id = %d ORDER BY created_at DESC", $id_desa));
+
 get_header(); // Memuat Header Website
 ?>
 
@@ -134,12 +177,10 @@ get_header(); // Memuat Header Website
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-<!-- WRAPPER UTAMA (Responsive Positioning) -->
-<!-- pt-16 (Mobile) & md:pt-20 (Desktop) memberi ruang untuk Header Utama (Navbar) agar tidak tertutup -->
+<!-- WRAPPER UTAMA -->
 <div class="bg-gray-50 min-h-screen font-sans flex flex-col md:flex-row pt-16 md:pt-20 relative">
 
-    <!-- MOBILE MENU TOGGLE (Khusus Mobile) -->
-    <!-- Muncul tepat di bawah header utama (top-16) -->
+    <!-- MOBILE MENU TOGGLE -->
     <div class="md:hidden bg-white border-b border-gray-200 px-4 py-3 flex justify-between items-center sticky top-16 z-30 shadow-sm">
         <span class="font-bold text-gray-700 flex items-center gap-2">
             <i class="fas fa-columns text-blue-600"></i> Menu Dashboard
@@ -156,7 +197,6 @@ get_header(); // Memuat Header Website
     ]); ?>
 
     <!-- MAIN CONTENT -->
-    <!-- md:ml-64 memberi margin kiri selebar sidebar pada desktop -->
     <main class="flex-1 md:ml-64 p-4 md:p-8 transition-all duration-300 min-h-[80vh]">
         
         <!-- Notifikasi -->
@@ -170,16 +210,21 @@ get_header(); // Memuat Header Website
         <div id="view-ringkasan" class="tab-content animate-fade-in">
             <header class="mb-8"><h1 class="text-2xl font-bold text-gray-800">Ringkasan Desa</h1><p class="text-gray-500 text-sm">Statistik perkembangan.</p></header>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Saldo Komisi -->
+                <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 hover:shadow-md transition cursor-pointer" onclick="switchTab('keuangan')">
+                    <div class="w-12 h-12 bg-green-100 text-green-600 rounded-xl flex items-center justify-center text-xl"><i class="fas fa-wallet"></i></div>
+                    <div>
+                        <p class="text-sm text-gray-500 font-medium">Saldo Komisi</p>
+                        <h3 class="text-2xl font-bold text-gray-800">Rp <?php echo number_format($desa_data->saldo_komisi, 0, ',', '.'); ?></h3>
+                    </div>
+                </div>
+                
                 <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 hover:shadow-md transition">
-                    <div class="w-12 h-12 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center text-xl"><i class="fas fa-store"></i></div>
+                    <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center text-xl"><i class="fas fa-store"></i></div>
                     <div><p class="text-sm text-gray-500 font-medium">Total UMKM</p><h3 class="text-2xl font-bold text-gray-800"><?php echo number_format($total_umkm); ?></h3></div>
                 </div>
                 <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 hover:shadow-md transition">
-                    <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center text-xl"><i class="fas fa-map-marked-alt"></i></div>
-                    <div><p class="text-sm text-gray-500 font-medium">Objek Wisata</p><h3 class="text-2xl font-bold text-gray-800"><?php echo number_format($total_wisata_count); ?></h3></div>
-                </div>
-                <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4 hover:shadow-md transition">
-                    <div class="w-12 h-12 <?php echo $akses_premium ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500'; ?> rounded-xl flex items-center justify-center text-xl"><i class="fas <?php echo $akses_premium ? 'fa-crown' : 'fa-lock'; ?>"></i></div>
+                    <div class="w-12 h-12 <?php echo $akses_premium ? 'bg-indigo-100 text-indigo-600' : 'bg-gray-100 text-gray-500'; ?> rounded-xl flex items-center justify-center text-xl"><i class="fas <?php echo $akses_premium ? 'fa-crown' : 'fa-lock'; ?>"></i></div>
                     <div><p class="text-sm text-gray-500 font-medium">Status Membership</p><h3 class="text-lg font-bold text-gray-800"><?php echo $akses_premium ? 'PREMIUM' : 'FREE PLAN'; ?></h3></div>
                 </div>
             </div>
@@ -293,6 +338,87 @@ get_header(); // Memuat Header Website
             </div>
         </div>
 
+        <!-- VIEW: KEUANGAN / KOMISI (FITUR BARU) -->
+        <div id="view-keuangan" class="tab-content hidden animate-fade-in">
+            <header class="mb-8"><h1 class="text-2xl font-bold text-gray-800">Manajemen Keuangan</h1><p class="text-gray-500 text-sm">Kelola komisi dan pencairan dana desa.</p></header>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                <!-- Saldo Card -->
+                <div class="bg-gradient-to-br from-green-500 to-green-700 text-white rounded-3xl p-8 shadow-xl relative overflow-hidden">
+                    <div class="relative z-10">
+                        <p class="text-green-100 uppercase tracking-widest text-xs font-bold mb-2">Saldo Komisi Tersedia</p>
+                        <h2 class="text-4xl font-extrabold mb-6">Rp <?php echo number_format($desa_data->saldo_komisi, 0, ',', '.'); ?></h2>
+                        <div class="flex gap-3">
+                            <button onclick="document.getElementById('modal-withdraw').classList.remove('hidden')" class="bg-white text-green-700 px-6 py-3 rounded-xl font-bold hover:bg-green-50 transition shadow-lg flex items-center gap-2"><i class="fas fa-money-bill-wave"></i> Cairkan Dana</button>
+                            <div class="text-xs text-green-100 flex items-center max-w-[150px] leading-tight">Minimal penarikan Rp 50.000</div>
+                        </div>
+                    </div>
+                    <div class="absolute right-0 bottom-0 opacity-10 transform translate-x-10 translate-y-10"><i class="fas fa-wallet text-9xl"></i></div>
+                </div>
+                
+                <!-- Info Bank -->
+                <div class="bg-white rounded-3xl border border-gray-200 p-8 shadow-sm">
+                    <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2"><i class="fas fa-university text-gray-400"></i> Rekening Penerimaan</h3>
+                    <div class="space-y-4">
+                        <?php if($desa_data->nama_bank_desa && $desa_data->no_rekening_desa): ?>
+                            <div><label class="text-xs text-gray-400 uppercase font-bold">Bank</label><p class="font-bold text-gray-800 text-lg"><?php echo esc_html($desa_data->nama_bank_desa); ?></p></div>
+                            <div><label class="text-xs text-gray-400 uppercase font-bold">Nomor Rekening</label><p class="font-mono text-gray-800 text-lg tracking-wider"><?php echo esc_html($desa_data->no_rekening_desa); ?></p></div>
+                            <div><label class="text-xs text-gray-400 uppercase font-bold">Atas Nama</label><p class="text-gray-800"><?php echo esc_html($desa_data->atas_nama_rekening_desa); ?></p></div>
+                            <div class="mt-4 pt-4 border-t border-gray-100"><button onclick="switchTab('profil')" class="text-blue-600 text-sm font-bold hover:underline">Ubah Rekening</button></div>
+                        <?php else: ?>
+                            <div class="text-center py-6">
+                                <p class="text-gray-500 text-sm mb-4">Rekening bank belum diatur.</p>
+                                <button onclick="switchTab('profil')" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-200">Atur Rekening</button>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabel Riwayat -->
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100 bg-gray-50/50"><h3 class="font-bold text-gray-700">Riwayat Penarikan</h3></div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-gray-50 text-gray-500 font-bold border-b border-gray-100 uppercase text-xs">
+                            <tr>
+                                <th class="p-4 pl-6">Tanggal Request</th>
+                                <th class="p-4">Nominal</th>
+                                <th class="p-4">Status</th>
+                                <th class="p-4 text-right pr-6">Tanggal Cair</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            <?php if($payout_history): foreach($payout_history as $pay): 
+                                $status_badge = 'bg-gray-100 text-gray-600';
+                                $label = $pay->status;
+
+                                if ($pay->status === 'pending') {
+                                    $status_badge = 'bg-yellow-100 text-yellow-700';
+                                    $label = 'Menunggu';
+                                } elseif ($pay->status === 'paid') {
+                                    $status_badge = 'bg-green-100 text-green-700';
+                                    $label = 'Dicairkan';
+                                } elseif ($pay->status === 'rejected') {
+                                    $status_badge = 'bg-red-100 text-red-700';
+                                    $label = 'Ditolak';
+                                }
+                            ?>
+                            <tr class="hover:bg-gray-50 transition">
+                                <td class="p-4 pl-6 text-gray-600"><?php echo date('d M Y, H:i', strtotime($pay->created_at)); ?></td>
+                                <td class="p-4 font-bold text-gray-800">Rp <?php echo number_format($pay->amount, 0, ',', '.'); ?></td>
+                                <td class="p-4"><span class="px-3 py-1 rounded-full text-xs font-bold uppercase <?php echo $status_badge; ?>"><?php echo $label; ?></span></td>
+                                <td class="p-4 pr-6 text-right text-gray-500"><?php echo $pay->paid_at ? date('d M Y', strtotime($pay->paid_at)) : '-'; ?></td>
+                            </tr>
+                            <?php endforeach; else: ?>
+                            <tr><td colspan="4" class="p-8 text-center text-gray-400">Belum ada riwayat penarikan.</td></tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <!-- VIEW: PROFIL DESA -->
         <div id="view-profil" class="tab-content hidden animate-fade-in">
             <!-- View Mode -->
@@ -317,9 +443,6 @@ get_header(); // Memuat Header Website
                                     <div class="text-sm text-red-500 italic">Belum dibuat. Silakan lengkapi wilayah.</div>
                                 <?php endif; ?>
                             </div>
-                            <?php if($desa_data->qris_image_url_desa): ?>
-                                <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 text-center"><p class="text-xs font-bold text-gray-500 uppercase mb-2">QRIS Desa</p><img src="<?php echo esc_url($desa_data->qris_image_url_desa); ?>" class="w-32 h-32 object-contain mx-auto mix-blend-multiply"></div>
-                            <?php endif; ?>
                         </div>
                         <div class="w-full md:w-2/3 space-y-6">
                             <div class="bg-gray-50 p-6 rounded-xl border border-gray-100"><label class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Deskripsi Desa</label><p class="text-gray-700 leading-relaxed text-sm"><?php echo nl2br(esc_html($desa_data->deskripsi ?: 'Belum ada deskripsi.')); ?></p></div>
@@ -393,6 +516,35 @@ get_header(); // Memuat Header Website
     </div>
 </div>
 
+<!-- Modal Withdraw -->
+<div id="modal-withdraw" class="fixed inset-0 z-[60] hidden">
+    <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="document.getElementById('modal-withdraw').classList.add('hidden')"></div>
+    <div class="absolute inset-0 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl w-full max-w-sm p-8 shadow-2xl transform scale-100 transition-all text-center">
+            <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fas fa-money-bill-wave"></i></div>
+            <h3 class="text-xl font-bold text-gray-800 mb-2">Tarik Dana Desa</h3>
+            <p class="text-gray-500 text-sm mb-6">Saldo tersedia: <strong>Rp <?php echo number_format($desa_data->saldo_komisi, 0, ',', '.'); ?></strong></p>
+            
+            <form method="POST">
+                <?php wp_nonce_field('withdraw_action', 'withdraw_nonce'); ?>
+                <input type="hidden" name="action_withdraw" value="1">
+                <div class="mb-6 text-left">
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Nominal Penarikan</label>
+                    <div class="relative">
+                        <span class="absolute left-3 top-3 text-gray-400 font-bold">Rp</span>
+                        <input type="text" name="nominal_withdraw" class="w-full border border-gray-300 rounded-xl pl-10 pr-3 py-3 font-bold text-lg focus:ring-2 focus:ring-green-500 outline-none" placeholder="0" onkeyup="let v=this.value.replace(/[^0-9]/g,''); this.value=new Intl.NumberFormat('id-ID').format(v);">
+                    </div>
+                    <p class="text-[10px] text-gray-400 mt-2 italic">*Dana akan ditransfer ke rekening desa yang terdaftar.</p>
+                </div>
+                <div class="flex gap-3">
+                    <button type="button" onclick="document.getElementById('modal-withdraw').classList.add('hidden')" class="flex-1 py-3 text-gray-600 font-bold bg-gray-100 rounded-xl hover:bg-gray-200 transition">Batal</button>
+                    <button type="submit" class="flex-1 py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition shadow-lg">Cairkan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <style>
     .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -403,7 +555,7 @@ get_header(); // Memuat Header Website
     var wisataData = <?php echo json_encode($wisata_list); ?>;
     var ajaxurl = "<?php echo admin_url('admin-ajax.php'); ?>";
 
-    // Toggle Sidebar Function - Required for the Mobile Header Button and Backdrop
+    // Toggle Sidebar Function
     function toggleSidebar() {
         const sidebar = document.getElementById('dashboard-sidebar');
         const backdrop = document.getElementById('sidebar-backdrop');
@@ -427,7 +579,8 @@ get_header(); // Memuat Header Website
         const nav = document.getElementById('nav-' + tabName);
         if(target) target.classList.remove('hidden');
         if(nav) nav.classList.add('active-tab');
-        if(window.innerWidth < 768) { // Auto close sidebar on mobile
+        
+        if(window.innerWidth < 768) {
              const sidebar = document.getElementById('dashboard-sidebar');
              if (sidebar && !sidebar.classList.contains('-translate-x-full')) {
                  toggleSidebar();
@@ -498,7 +651,7 @@ get_header(); // Memuat Header Website
             loadR('dw_fetch_provinces', null, els.prov, data.prov, function(){
                 loadR('dw_fetch_regencies', data.prov, els.kota, data.kota, function(){
                     if(data.kota) loadR('dw_fetch_districts', data.kota, els.kec, data.kec, function(){
-                        if(data.kec) loadR('dw_fetch_villages', data.kec, els.desa, data.desa);
+                        if(data.kec) loadR('dw_fetch_villages', data.kec, els.kel, data.kel);
                     });
                 });
             });

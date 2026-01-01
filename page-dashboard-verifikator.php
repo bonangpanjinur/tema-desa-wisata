@@ -2,7 +2,7 @@
 /**
  * Template Name: Dashboard Verifikator UMKM
  * Description: Panel Verifikator Lengkap (Profil, Verifikasi, Data Binaan, & Keuangan).
- * Status: FINAL COMPLETE FIXED (Query Binaan & Layout Sempurna)
+ * Status: FINAL COMPLETE FIXED (UI/UX Refined)
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -136,11 +136,9 @@ if ( isset($_POST['action_withdraw']) && check_admin_referer('withdraw_action', 
 
 // A. Antrean (Menunggu)
 // Mengambil semua pedagang 'menunggu' atau 'menunggu_desa'.
-// Bisa ditambahkan logika: WHERE api_kabupaten_id = ... jika ingin filter per wilayah verifikator
 $pending_list = $wpdb->get_results("SELECT * FROM $table_pedagang WHERE status_pendaftaran IN ('menunggu', 'menunggu_desa') ORDER BY created_at ASC");
 
 // B. UMKM Binaan Saya (Relasi id_verifikator)
-// Ini query yang harus menampilkan data '2' tersebut.
 $binaan_list = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_pedagang WHERE id_verifikator = %d ORDER BY created_at DESC", $verifikator_id));
 
 // C. Riwayat Kerja (Audit Log berdasarkan User ID)
@@ -206,22 +204,25 @@ get_header();
                 </div>
 
                 <!-- Saldo -->
-                <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between hover:shadow-md transition cursor-pointer" onclick="openWithdrawModal()">
+                <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between hover:shadow-md transition cursor-pointer group" onclick="openWithdrawModal()">
                     <div class="flex items-center justify-between mb-3">
                         <div class="flex items-center gap-4">
                             <div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center text-lg"><i class="fas fa-coins"></i></div>
-                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Saldo Cair</p>
+                            <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Saldo Tersedia</p>
                         </div>
-                        <span class="text-[10px] text-blue-600 bg-blue-50 px-2 py-1 rounded hover:bg-blue-100">Tarik <i class="fas fa-arrow-right"></i></span>
+                        <span class="text-[10px] text-blue-600 bg-blue-50 px-2 py-1 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition flex items-center gap-1 font-bold">
+                            Tarik Dana <i class="fas fa-arrow-right"></i>
+                        </span>
                     </div>
                     <h3 class="text-2xl font-bold text-gray-800">Rp <?php echo number_format($stats_saldo, 0, ',', '.'); ?></h3>
+                    <p class="text-[10px] text-gray-400 mt-2">Saldo yang bisa dicairkan ke rekening bank.</p>
                 </div>
 
                 <!-- Antrean -->
                 <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between hover:shadow-md transition cursor-pointer" onclick="switchTab('antrean')">
                     <div class="flex items-center gap-4 mb-3">
                         <div class="w-10 h-10 bg-yellow-100 text-yellow-600 rounded-xl flex items-center justify-center text-lg"><i class="fas fa-clock"></i></div>
-                        <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Antrean</p>
+                        <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Antrean Verifikasi</p>
                     </div>
                     <h3 class="text-2xl font-bold text-gray-800"><?php echo number_format($stats_pending); ?></h3>
                 </div>
