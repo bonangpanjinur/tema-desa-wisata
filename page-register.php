@@ -1,7 +1,8 @@
 <?php
 /**
  * Template Name: Halaman Register Custom
- * Description: Pendaftaran khusus Wisatawan & Pedagang (Ojek & Verifikator via Admin).
+ * Description: Pendaftaran khusus Wisatawan & Pedagang. 
+ * Fitur: Desain Alpine.js + Logika Referral Locking & Database Sync.
  */
 
 if ( is_user_logged_in() ) {
@@ -11,80 +12,125 @@ if ( is_user_logged_in() ) {
 
 $success_message = '';
 $error_message = '';
+global $wpdb;
+
+// --- 1. LOGIKA ANALISIS KODE REFERRAL (LOCKING) ---
+$ref_code_url = isset($_GET['ref']) ? sanitize_text_field($_GET['ref']) : '';
+$locked_role = ''; // 'pedagang' atau 'buyer' atau kosong (bebas)
+$lock_reason = '';
+
+if ( !empty($ref_code_url) ) {
+    // Cek pemilik kode (Desa/Verif -> Lock Pedagang, Pedagang -> Lock Buyer)
+    $is_desa = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}dw_desa WHERE kode_referral = %s", $ref_code_url));
+    $is_verif = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}dw_verifikator WHERE kode_referral = %s", $ref_code_url));
+    $is_pedagang = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}dw_pedagang WHERE kode_referral_saya = %s", $ref_code_url));
+
+    if ( $is_desa || $is_verif ) {
+        $locked_role = 'pedagang';
+        $lock_reason = 'Kode undangan khusus Mitra Pedagang.';
+    } elseif ( $is_pedagang ) {
+        $locked_role = 'buyer';
+        $lock_reason = 'Kode undangan khusus Wisatawan.';
+    }
+}
+// --------------------------------------------------
 
 if ( $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['dw_register_nonce']) && wp_verify_nonce($_POST['dw_register_nonce'], 'dw_register_action') ) {
     
-    global $wpdb;
-    $username   = sanitize_user($_POST['username']);
-    $email      = sanitize_email($_POST['email']);
-    $password   = $_POST['password'];
-    $role_input = sanitize_text_field($_POST['role_type']); // 'buyer' atau 'pedagang'
+    $username     = sanitize_user($_POST['username']);
+    $email        = sanitize_email($_POST['email']);
+    $password     = $_POST['password'];
+    $role_input   = sanitize_text_field($_POST['role_type']); 
     $nama_lengkap = sanitize_text_field($_POST['nama_lengkap']);
+    $no_hp        = sanitize_text_field($_POST['no_hp']);
     
-    // Validasi Role (Hanya izinkan buyer atau pedagang)
-    $allowed_roles = ['buyer', 'pedagang'];
-    if (!in_array($role_input, $allowed_roles)) {
-        $role_input = 'buyer'; // Fallback ke buyer jika di-tamper
+    // Ambil Kode Referral
+    $referral_code_used = isset($_POST['kode_referral']) ? strtoupper(sanitize_text_field($_POST['kode_referral'])) : '';
+
+    // Security: Paksa role jika terkunci
+    if ( !empty($locked_role) ) {
+        $role_input = $locked_role;
     }
 
     // Validasi Dasar
     if ( username_exists($username) || email_exists($email) ) {
-        $error_message = 'Username atau Email sudah terdaftar. Silakan login atau gunakan email lain.';
+        $error_message = 'Username atau Email sudah terdaftar. Silakan login.';
+    } elseif ( empty($username) || empty($email) || empty($password) || empty($nama_lengkap) ) {
+        $error_message = 'Mohon lengkapi semua kolom wajib.';
     } else {
-        // Tentukan Role WordPress
-        $wp_role = 'subscriber'; // Default pembeli/wisatawan
-        if ($role_input === 'pedagang') {
-            $wp_role = 'pedagang';
-        }
-
+        
         // Buat User WP
-        $userdata = array(
-            'user_login' => $username,
-            'user_email' => $email,
-            'user_pass'  => $password,
-            'first_name' => $nama_lengkap,
-            'role'       => $wp_role,
-        );
-    
-        $user_id = wp_insert_user( $userdata );
-    
-        if ( ! is_wp_error( $user_id ) ) {
-            // --- LOGIKA KHUSUS ROLE ---
-            
-            // 1. Logika Pedagang
-            if ( $role_input === 'pedagang' ) {
-                $nama_toko = sanitize_text_field($_POST['nama_toko']);
-                $no_wa     = sanitize_text_field($_POST['no_wa']);
-                
-                update_user_meta( $user_id, 'nama_toko', $nama_toko );
-                update_user_meta( $user_id, 'no_wa', $no_wa );
-                // Status verifikasi default pending, menunggu verifikasi Admin/Verifikator
-                update_user_meta( $user_id, 'status_verifikasi', 'pending' ); 
-            } 
-            
-            // Auto Login setelah daftar
-            $creds = array(
-                'user_login'    => $username,
-                'user_password' => $password,
-                'remember'      => true
-            );
-            $signon = wp_signon( $creds, false );
-            
-            // Redirect sesuai Role
-            if ( $role_input === 'pedagang' ) {
-                wp_redirect( home_url('/dashboard-toko') ); // atau /dashboard sesuai router
-            } else {
-                wp_redirect( home_url('/akun-saya') );
-            }
-            exit;
-
-        } else {
+        $user_id = wp_create_user( $username, $password, $email );
+        
+        if ( is_wp_error( $user_id ) ) {
             $error_message = $user_id->get_error_message();
+        } else {
+            // Update Data User
+            wp_update_user([
+                'ID' => $user_id,
+                'display_name' => $nama_lengkap,
+                'first_name'   => $nama_lengkap,
+                'role'         => ($role_input == 'pedagang') ? 'pedagang' : 'subscriber' 
+            ]);
+            
+            update_user_meta( $user_id, 'billing_phone', $no_hp );
+            if ( !empty($referral_code_used) ) {
+                update_user_meta( $user_id, 'dw_referral_used', $referral_code_used );
+            }
+
+            // Insert Tabel Custom
+            if ( $role_input == 'pedagang' ) {
+                $table_pedagang = $wpdb->prefix . 'dw_pedagang';
+                $wpdb->insert($table_pedagang, [
+                    'id_user' => $user_id,
+                    'nama_pemilik' => $nama_lengkap,
+                    'nama_toko' => $username . ' Store',
+                    'slug_toko' => sanitize_title($username . '-' . time()),
+                    'nomor_wa' => $no_hp,
+                    'terdaftar_melalui_kode' => $referral_code_used, 
+                    'status_pendaftaran' => 'menunggu_desa', 
+                    'status_akun' => 'nonaktif',
+                    'created_at' => current_time('mysql')
+                ]);
+            } else {
+                $table_pembeli = $wpdb->prefix . 'dw_pembeli';
+                $referrer_id = 0; $referrer_type = NULL;
+                
+                if ( !empty($referral_code_used) ) {
+                    $table_pedagang_ref = $wpdb->prefix . 'dw_pedagang';
+                    $pedagang_referrer = $wpdb->get_row( $wpdb->prepare("SELECT id FROM $table_pedagang_ref WHERE kode_referral_saya = %s", $referral_code_used) );
+                    if ( $pedagang_referrer ) {
+                        $referrer_id = $pedagang_referrer->id;
+                        $referrer_type = 'pedagang';
+                        $wpdb->query( $wpdb->prepare("UPDATE $table_pedagang_ref SET total_referral_pembeli = total_referral_pembeli + 1 WHERE id = %d", $referrer_id) );
+                    }
+                }
+                $wpdb->insert($table_pembeli, [
+                    'id_user' => $user_id,
+                    'nama_lengkap' => $nama_lengkap,
+                    'no_hp' => $no_hp,
+                    'terdaftar_melalui_kode' => $referral_code_used,
+                    'referrer_id' => $referrer_id, 
+                    'referrer_type' => $referrer_type,
+                    'created_at' => current_time('mysql')
+                ]);
+            }
+
+            // Auto Login & Redirect
+            wp_set_current_user($user_id);
+            wp_set_auth_cookie($user_id);
+            
+            if ( $role_input == 'pedagang' ) wp_redirect( home_url('/dashboard-toko') );
+            else wp_redirect( home_url('/akun-saya') );
+            exit;
         }
     }
 }
 
 get_header(); 
+
+// Set Default Role untuk Alpine JS
+$default_role_js = $locked_role ? $locked_role : 'buyer';
 ?>
 
 <!-- Alpine.js -->
@@ -124,17 +170,28 @@ get_header();
                 </div>
             <?php endif; ?>
 
-            <form class="space-y-6" action="" method="POST" x-data="{ role: 'buyer' }">
+            <?php if($lock_reason): ?>
+                <div class="mb-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg flex items-start gap-3">
+                    <i class="fas fa-info-circle text-blue-500 mt-0.5"></i>
+                    <div>
+                        <h3 class="text-sm font-bold text-blue-800">Mode Pendaftaran Terkunci</h3>
+                        <p class="text-sm text-blue-700 mt-1"><?php echo $lock_reason; ?></p>
+                    </div>
+                </div>
+            <?php endif; ?>
+
+            <form class="space-y-6" action="" method="POST" x-data="{ role: '<?php echo $default_role_js; ?>' }">
                 <?php wp_nonce_field('dw_register_action', 'dw_register_nonce'); ?>
                 
-                <!-- Pilihan Role: 2 Grid (Wisatawan & Pedagang) -->
+                <!-- Pilihan Role (Locked Aware) -->
                 <div>
                     <label class="block text-sm font-bold text-gray-700 mb-3 text-center uppercase tracking-wider text-xs text-gray-400">Pilih Tipe Akun</label>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        
                         <!-- Wisatawan -->
-                        <div @click="role = 'buyer'" 
+                        <div @click="<?php echo ($locked_role === 'pedagang') ? '' : "role = 'buyer'"; ?>" 
                              :class="{ 'ring-2 ring-blue-500 bg-blue-50': role === 'buyer', 'border-gray-200 hover:border-blue-300 hover:bg-gray-50': role !== 'buyer' }"
-                             class="cursor-pointer border rounded-xl p-4 text-center transition-all duration-200 relative group overflow-hidden">
+                             class="cursor-pointer border rounded-xl p-4 text-center transition-all duration-200 relative group overflow-hidden <?php echo ($locked_role === 'pedagang') ? 'opacity-40 cursor-not-allowed grayscale' : ''; ?>">
                             <div class="mb-2">
                                 <div class="w-12 h-12 mx-auto rounded-full flex items-center justify-center transition-colors" :class="role === 'buyer' ? 'bg-blue-200 text-blue-700' : 'bg-gray-100 text-gray-500 group-hover:bg-blue-100 group-hover:text-blue-600'">
                                     <i class="fas fa-user text-xl"></i>
@@ -146,9 +203,9 @@ get_header();
                         </div>
                         
                         <!-- Pedagang -->
-                        <div @click="role = 'pedagang'" 
+                        <div @click="<?php echo ($locked_role === 'buyer') ? '' : "role = 'pedagang'"; ?>" 
                              :class="{ 'ring-2 ring-orange-500 bg-orange-50': role === 'pedagang', 'border-gray-200 hover:border-orange-300 hover:bg-gray-50': role !== 'pedagang' }"
-                             class="cursor-pointer border rounded-xl p-4 text-center transition-all duration-200 relative group overflow-hidden">
+                             class="cursor-pointer border rounded-xl p-4 text-center transition-all duration-200 relative group overflow-hidden <?php echo ($locked_role === 'buyer') ? 'opacity-40 cursor-not-allowed grayscale' : ''; ?>">
                             <div class="mb-2">
                                 <div class="w-12 h-12 mx-auto rounded-full flex items-center justify-center transition-colors" :class="role === 'pedagang' ? 'bg-orange-200 text-orange-700' : 'bg-gray-100 text-gray-500 group-hover:bg-orange-100 group-hover:text-orange-600'">
                                     <i class="fas fa-store text-xl"></i>
@@ -159,12 +216,12 @@ get_header();
                             <div x-show="role === 'pedagang'" class="absolute top-2 right-2 text-orange-500"><i class="fas fa-check-circle"></i></div>
                         </div>
                     </div>
-                    <input type="hidden" name="role_type" :value="role" id="role_input">
+                    <input type="hidden" name="role_type" :value="role">
                 </div>
 
                 <div class="border-t border-gray-100 pt-4"></div>
 
-                <!-- Field Umum (Semua Role) -->
+                <!-- Form Fields -->
                 <div class="grid grid-cols-1 gap-5">
                     <div>
                         <label for="nama_lengkap" class="block text-sm font-medium text-gray-700 mb-1">Nama Lengkap</label>
@@ -181,11 +238,18 @@ get_header();
                                    placeholder="Tanpa spasi">
                         </div>
                         <div>
-                            <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Alamat Email</label>
-                            <input type="email" name="email" id="email" required 
+                            <label for="no_hp" class="block text-sm font-medium text-gray-700 mb-1">WhatsApp</label>
+                            <input type="text" name="no_hp" id="no_hp" required 
                                    class="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-xl placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 sm:text-sm transition-all bg-gray-50 focus:bg-white"
-                                   placeholder="email@contoh.com">
+                                   placeholder="0812...">
                         </div>
+                    </div>
+
+                    <div>
+                        <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Alamat Email</label>
+                        <input type="email" name="email" id="email" required 
+                               class="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-xl placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 sm:text-sm transition-all bg-gray-50 focus:bg-white"
+                               placeholder="email@contoh.com">
                     </div>
 
                     <div>
@@ -194,44 +258,31 @@ get_header();
                                class="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-xl placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 sm:text-sm transition-all bg-gray-50 focus:bg-white"
                                placeholder="Minimal 8 karakter">
                     </div>
-                </div>
 
-                <!-- Field Khusus Pedagang -->
-                <div x-show="role === 'pedagang'" 
-                     x-transition:enter="transition ease-out duration-200"
-                     x-transition:enter-start="opacity-0 transform -translate-y-2"
-                     x-transition:enter-end="opacity-100 transform translate-y-0"
-                     class="bg-orange-50 p-5 rounded-2xl border border-orange-100 space-y-4 shadow-sm mt-4">
-                    <div class="flex items-center gap-2 mb-2 border-b border-orange-200 pb-2">
-                        <i class="fas fa-store text-orange-500"></i>
-                        <h4 class="text-sm font-bold text-orange-800">Detail Usaha</h4>
-                    </div>
-                    
+                    <!-- Kode Referral Field -->
                     <div>
-                        <label for="nama_toko" class="block text-sm font-medium text-gray-700 mb-1">Nama Toko / Usaha</label>
-                        <input type="text" name="nama_toko" id="input_nama_toko" 
-                               :required="role === 'pedagang'"
-                               class="block w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-orange-500 focus:border-orange-500 sm:text-sm bg-white"
-                               placeholder="Contoh: Keripik Pisang Bu Ani">
-                    </div>
-
-                    <div>
-                        <label for="no_wa" class="block text-sm font-medium text-gray-700 mb-1">Nomor WhatsApp</label>
-                        <div class="mt-1 flex rounded-xl shadow-sm">
-                            <span class="inline-flex items-center px-4 rounded-l-xl border border-r-0 border-gray-300 bg-gray-100 text-gray-500 font-bold text-sm">
-                                +62
-                            </span>
-                            <input type="text" name="no_wa" id="input_no_wa" 
-                                   :required="role === 'pedagang'"
-                                   class="flex-1 min-w-0 block w-full px-4 py-3 rounded-none rounded-r-xl border border-gray-300 focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
-                                   placeholder="81234567890">
+                        <label class="block text-sm font-medium text-gray-700 mb-1" x-text="role === 'pedagang' ? 'Kode Referral (Dari Desa/Verifikator)' : 'Kode Referral (Dari Toko/Teman)'"></label>
+                        <div class="relative">
+                            <input type="text" name="kode_referral" 
+                                   value="<?php echo esc_attr($ref_code_url); ?>" 
+                                   <?php echo !empty($ref_code_url) ? 'readonly' : ''; ?>
+                                   class="appearance-none block w-full px-4 py-3 border border-gray-300 rounded-xl placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 sm:text-sm transition-all bg-gray-50 focus:bg-white <?php echo !empty($ref_code_url) ? 'bg-yellow-50 text-yellow-700 font-bold cursor-not-allowed' : ''; ?>"
+                                   :placeholder="role === 'pedagang' ? 'Contoh: DESA-XXX' : 'Contoh: TOKO-XXX'">
+                            
+                            <?php if(!empty($ref_code_url)): ?>
+                                <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                    <span class="text-xs text-green-600 font-bold bg-green-100 px-2 py-0.5 rounded-full">Terpasang</span>
+                                </div>
+                            <?php endif; ?>
                         </div>
-                        <p class="text-xs text-gray-500 mt-1">Nomor aktif untuk notifikasi pesanan.</p>
+                        <p class="text-xs text-gray-400 mt-1 italic">
+                            <?php echo !empty($ref_code_url) ? 'Kode otomatis terpasang dari link undangan.' : 'Opsional. Masukkan jika ada.'; ?>
+                        </p>
                     </div>
                 </div>
 
                 <div>
-                    <button type="submit" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-lg text-sm font-bold text-white bg-gray-900 hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-all duration-300 transform hover:-translate-y-0.5">
+                    <button type="submit" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-lg text-sm font-bold text-white bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-all duration-300 transform hover:-translate-y-0.5">
                         <i class="fas fa-paper-plane mr-2 mt-0.5"></i> Daftar Sekarang
                     </button>
                 </div>
@@ -253,16 +304,15 @@ get_header();
                     </a>
                 </div>
                 
-                <div class="mt-6 text-center">
+                <div class="mt-6 text-center" x-show="role === 'pedagang'">
                     <div class="bg-blue-50 p-3 rounded-lg text-xs text-blue-700 border border-blue-100">
                         <i class="fas fa-info-circle mr-1"></i> 
-                        <br>Untuk mendaftar <strong>Desa Wisata</strong>, silakan hubungi Admin.
+                        <br>Pendaftaran <strong>Desa Wisata</strong> dilakukan oleh Admin.
                     </div>
                 </div>
             </div>
         </div>
         
-        <!-- Footer Kecil -->
         <p class="mt-8 text-center text-xs text-gray-400">
             &copy; <?php echo date('Y'); ?> <?php bloginfo('name'); ?>. Hak Cipta Dilindungi.
         </p>

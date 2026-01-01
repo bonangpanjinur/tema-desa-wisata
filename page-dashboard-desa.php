@@ -1,8 +1,8 @@
 <?php
 /**
  * Template Name: Dashboard Desa
- * Description: Panel Frontend Desa Lengkap (Profil, Verifikasi, Wisata, dan Manajemen Keuangan/Komisi).
- * Status: FINAL COMPLETE (PHP 7.x Compatible Fix)
+ * Description: Panel Frontend Desa Lengkap (Profil, Verifikasi, Wisata, Keuangan, & Referral).
+ * Status: FINAL COMPLETE (Referral Card Added)
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -31,10 +31,15 @@ if ( ! $desa_data ) {
     $nama_default = 'Desa ' . $current_user->display_name;
     $slug_default = sanitize_title($nama_default) . '-' . $current_user_id;
     
+    // Generate Kode Referral Awal
+    $rand = rand(1000, 9999);
+    $ref_code = 'DESA-' . strtoupper(substr($current_user->display_name, 0, 3)) . '-' . $rand;
+
     $wpdb->insert($table_desa, [
         'id_user_desa'            => $current_user_id,
         'nama_desa'               => $nama_default,
         'slug_desa'               => $slug_default,
+        'kode_referral'           => $ref_code,
         'status'                  => 'pending',
         'status_akses_verifikasi' => 'locked', 
         'created_at'              => current_time('mysql'),
@@ -56,23 +61,29 @@ $msg_type = '';
 // FORM HANDLERS
 // ==========================================
 
-// 1. Simpan Profil & Generate ID
+// 1. Simpan Profil & Update Referral (Jika kosong)
 if ( isset($_POST['save_profil_desa']) && check_admin_referer('save_profil_desa_action', 'profil_desa_nonce') ) {
     require_once( ABSPATH . 'wp-admin/includes/file.php' ); require_once( ABSPATH . 'wp-admin/includes/image.php' ); require_once( ABSPATH . 'wp-admin/includes/media.php' );
     $prov_txt = sanitize_text_field($_POST['provinsi_nama']); $kab_txt  = sanitize_text_field($_POST['kabupaten_nama']); $kec_txt  = sanitize_text_field($_POST['kecamatan_nama']); $kel_txt  = sanitize_text_field($_POST['kelurahan_nama']);
 
-    // Generator ID Wilayah
+    // Generator ID Wilayah (Jika belum punya)
     $kode_referral_save = $desa_data->kode_referral;
-    if ( empty($kode_referral_save) && !empty($prov_txt) && !empty($kab_txt) && !empty($kel_txt) ) {
-        $get_code = function($text){ 
-            $c=trim(strtolower($text)); $c=preg_replace('/^(provinsi|kabupaten|kota|desa|kelurahan)\s+/','',$c);
-            if($c=='jawa barat')return 'JAB'; if($c=='jawa tengah')return 'JTG'; if($c=='jawa timur')return 'JTM'; if(strpos($c,'jakarta')!==false)return 'DKI'; if(strpos($c,'yogyakarta')!==false)return 'DIY';
-            return strtoupper(substr(str_replace(' ','',$c),0,3));
-        };
-        $c_prov=$get_code($prov_txt); $c_kab=$get_code($kab_txt); $c_des=$get_code($kel_txt); $rand=rand(1000,9999); 
-        $calon_kode = "$c_prov-$c_kab-$c_des-$rand";
-        while($wpdb->get_var($wpdb->prepare("SELECT id FROM $table_desa WHERE kode_referral=%s AND id!=%d",$calon_kode,$id_desa))){ $rand=rand(1000,9999); $calon_kode="$c_prov-$c_kab-$c_des-$rand"; }
-        $kode_referral_save = $calon_kode;
+    if ( empty($kode_referral_save) ) {
+        if(!empty($prov_txt) && !empty($kab_txt) && !empty($kel_txt)) {
+            $get_code = function($text){ 
+                $c=trim(strtolower($text)); $c=preg_replace('/^(provinsi|kabupaten|kota|desa|kelurahan)\s+/','',$c);
+                if($c=='jawa barat')return 'JAB'; if($c=='jawa tengah')return 'JTG'; if($c=='jawa timur')return 'JTM'; if(strpos($c,'jakarta')!==false)return 'DKI'; if(strpos($c,'yogyakarta')!==false)return 'DIY';
+                return strtoupper(substr(str_replace(' ','',$c),0,3));
+            };
+            $c_prov=$get_code($prov_txt); $c_kab=$get_code($kab_txt); $c_des=$get_code($kel_txt); $rand=rand(1000,9999); 
+            $calon_kode = "$c_prov-$c_kab-$c_des-$rand";
+            // Cek Unik
+            while($wpdb->get_var($wpdb->prepare("SELECT id FROM $table_desa WHERE kode_referral=%s AND id!=%d",$calon_kode,$id_desa))){ $rand=rand(1000,9999); $calon_kode="$c_prov-$c_kab-$c_des-$rand"; }
+            $kode_referral_save = $calon_kode;
+        } else {
+            // Fallback random simple
+            $kode_referral_save = 'DESA-' . rand(10000, 99999);
+        }
     }
 
     $update_desa = [
@@ -120,7 +131,7 @@ if ( isset($_GET['action']) && $_GET['action'] == 'hapus_wisata' && isset($_GET[
     $wpdb->delete($table_wisata, ['id' => intval($_GET['id']), 'id_desa' => $id_desa]); wp_redirect( home_url('/dashboard-desa/?tab=wisata') ); exit;
 }
 
-// 6. REQUEST WITHDRAW (Pencairan Komisi) - FITUR BARU
+// 6. REQUEST WITHDRAW (Pencairan Komisi)
 if ( isset($_POST['action_withdraw']) && check_admin_referer('withdraw_action', 'withdraw_nonce') ) {
     $amount = floatval(str_replace('.', '', $_POST['nominal_withdraw'])); // Hapus format ribuan
     
@@ -136,7 +147,6 @@ if ( isset($_POST['action_withdraw']) && check_admin_referer('withdraw_action', 
         $wpdb->query($wpdb->prepare("UPDATE $table_desa SET saldo_komisi = saldo_komisi - %f WHERE id = %d", $amount, $id_desa));
         
         // Catat di Ledger Payout
-        // Schema: order_id (bisa dipakai utk kode unik), payable_to_type, payable_to_id, amount, status
         $wpdb->insert($table_payout, [
             'order_id' => 0, // 0 menandakan manual request
             'payable_to_type' => 'desa',
@@ -159,6 +169,7 @@ if ( isset($_POST['action_withdraw']) && check_admin_referer('withdraw_action', 
 // ==========================================
 $wisata_list = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_wisata WHERE id_desa = %d AND status = 'aktif' ORDER BY created_at DESC", $id_desa));
 $total_umkm = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table_pedagang WHERE id_desa = %d AND status_akun = 'aktif'", $id_desa));
+$umkm_active = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_pedagang WHERE id_desa = %d AND status_akun = 'aktif' ORDER BY created_at DESC LIMIT 10", $id_desa));
 $total_wisata_count = count($wisata_list);
 $kategori_wisata = ['Wisata Alam', 'Wisata Bahari', 'Wisata Budaya', 'Wisata Sejarah', 'Spot Foto', 'Camping Ground', 'Edukasi'];
 $settings = get_option('dw_settings', []); 
@@ -167,7 +178,7 @@ $sys_bank_name = get_option('dw_bank_name', '-');
 $sys_bank_account = get_option('dw_bank_account', '-'); 
 $sys_bank_holder = get_option('dw_bank_holder', '-'); 
 
-// Fetch History Payouts (Keuangan)
+// Fetch History Payouts
 $payout_history = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_payout WHERE payable_to_type = 'desa' AND payable_to_id = %d ORDER BY created_at DESC", $id_desa));
 
 get_header(); // Memuat Header Website
@@ -205,6 +216,29 @@ get_header(); // Memuat Header Website
                 <i class="fas <?php echo ($msg_type=='error')?'fa-exclamation-circle':'fa-check-circle'; ?>"></i> <?php echo $msg; ?>
             </div>
         <?php endif; ?>
+
+        <!-- [BARU] KARTU KODE REFERRAL DESA -->
+        <div class="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-5 mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm relative overflow-hidden group">
+            <div class="relative z-10">
+                <p class="text-xs font-bold text-green-600 uppercase tracking-wider mb-1 flex items-center gap-2">
+                    <i class="fas fa-tag"></i> Link Referral Desa
+                </p>
+                <h2 class="text-2xl font-mono font-bold text-gray-800 tracking-wide">
+                    <?php echo esc_html($desa_data->kode_referral); ?>
+                </h2>
+                <p class="text-xs text-gray-500 mt-1">Bagikan link ini kepada UMKM/Pedagang agar otomatis terdaftar di desa ini.</p>
+            </div>
+            <div class="relative z-10">
+                <?php 
+                    // GENERATE LINK REGISTER
+                    $ref_link_desa = home_url('/register?ref=' . $desa_data->kode_referral);
+                ?>
+                <button onclick="copyToClipboard('<?php echo esc_js($ref_link_desa); ?>')" class="bg-white hover:bg-green-600 hover:text-white text-green-700 border border-green-200 font-bold py-2.5 px-5 rounded-xl shadow-sm transition-all active:scale-95 flex items-center gap-2">
+                    <i class="fas fa-link"></i> <span>Salin Link Daftar</span>
+                </button>
+            </div>
+            <div class="absolute right-0 top-0 h-full w-32 bg-green-100/30 -skew-x-12 translate-x-10 group-hover:translate-x-5 transition-transform duration-500"></div>
+        </div>
 
         <!-- VIEW: RINGKASAN -->
         <div id="view-ringkasan" class="tab-content animate-fade-in">
@@ -276,7 +310,7 @@ get_header(); // Memuat Header Website
         <div id="view-data-umkm" class="tab-content hidden animate-fade-in">
             <header class="mb-8 flex justify-between items-center">
                 <div><h1 class="text-2xl font-bold text-gray-800">Data UMKM</h1><p class="text-gray-500 text-sm">Daftar pedagang aktif.</p></div>
-                <div class="text-sm bg-blue-50 text-blue-700 px-4 py-2 rounded-lg border border-blue-100">Total: <strong><?php echo count($umkm_active ?? []); ?></strong> Mitra</div>
+                <div class="text-sm bg-blue-50 text-blue-700 px-4 py-2 rounded-lg border border-blue-100">Total: <strong><?php echo number_format($total_umkm); ?></strong> Mitra</div>
             </header>
             <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                 <?php if($umkm_active): ?>
@@ -663,6 +697,36 @@ get_header(); // Memuat Header Website
     });
 
     document.addEventListener('DOMContentLoaded', () => { const p = new URLSearchParams(window.location.search); const tab = p.get('tab') || 'ringkasan'; switchTab(tab); });
+
+    // [BARU] Fungsi Copy to Clipboard
+    function copyToClipboard(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Kode berhasil disalin: ' + text);
+            }).catch(err => {
+                fallbackCopy(text);
+            });
+        } else {
+            fallbackCopy(text);
+        }
+    }
+
+    function fallbackCopy(text) {
+        let textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-9999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            alert('Kode berhasil disalin: ' + text);
+        } catch (err) {
+            alert('Gagal menyalin kode. Silakan salin manual.');
+        }
+        document.body.removeChild(textArea);
+    }
 </script>
 
 <?php get_footer(); ?>

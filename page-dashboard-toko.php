@@ -2,7 +2,7 @@
 /**
  * Template Name: Dashboard Toko (Merchant)
  * Description: Dashboard lengkap pedagang. Fitur Ongkir Ojek Lokal (Fixed Zones), Detail Pesanan, Manajemen Paket, dan Referral.
- * Status: FINAL COMPLETE (UI/UX + Full Logic + Data Fallback Fix)
+ * Status: FINAL COMPLETE (UI/UX + Full Logic + Referral Card)
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -232,7 +232,7 @@ if (isset($_POST['beli_paket']) && isset($_POST['paket_nonce']) && wp_verify_non
                 'nama_paket_snapshot' => $paket->nama_paket,
                 'harga_paket' => $paket->harga,
                 'jumlah_transaksi' => $paket->jumlah_transaksi,
-                'persentase_komisi_desa' => $paket->persentase_komisi_desa,
+                'persentase_komisi_referrer' => 5, // Default percentage or fetch from settings
                 'url_bukti_bayar' => $upload['url'],
                 'status' => 'pending',
                 'created_at' => current_time('mysql')
@@ -266,7 +266,6 @@ if (isset($_POST['dw_action']) && $_POST['dw_action'] == 'update_order_status') 
 // ==========================================
 
 // --- Prepare Address Data with Fallback to User Meta ---
-// Ini penting agar data alamat muncul meskipun di tabel pedagang kosong (mengambil dari user meta WooCommerce)
 $val_prov_id = !empty($pedagang->api_provinsi_id) ? $pedagang->api_provinsi_id : get_user_meta($current_user_id, 'api_provinsi_id', true);
 $val_kota_id = !empty($pedagang->api_kabupaten_id) ? $pedagang->api_kabupaten_id : get_user_meta($current_user_id, 'api_kabupaten_id', true);
 $val_kec_id  = !empty($pedagang->api_kecamatan_id) ? $pedagang->api_kecamatan_id : get_user_meta($current_user_id, 'api_kecamatan_id', true);
@@ -380,6 +379,35 @@ get_header();
         <!-- VIEW 1: RINGKASAN -->
         <div id="view-ringkasan" class="tab-content active">
             <h1 class="text-2xl font-bold text-gray-800 mb-6">Ringkasan</h1>
+
+            <!-- KARTU KODE REFERRAL TOKO -->
+            <div class="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-2xl p-5 mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm relative overflow-hidden group">
+                <div class="relative z-10">
+                    <p class="text-xs font-bold text-purple-600 uppercase tracking-wider mb-1 flex items-center gap-2">
+                        <i class="fas fa-gift"></i> Link Referral Toko Saya
+                    </p>
+                    <h2 class="text-2xl font-mono font-bold text-gray-800 tracking-wide">
+                        <?php echo !empty($pedagang->kode_referral_saya) ? esc_html($pedagang->kode_referral_saya) : '-'; ?>
+                    </h2>
+                    <p class="text-xs text-gray-500 mt-1">Bagikan link ini. Pembeli yang mendaftar akan otomatis terhubung dengan Anda.</p>
+                </div>
+                <div class="relative z-10">
+                    <?php 
+                        // GENERATE LINK REGISTER OTOMATIS
+                        $ref_link = home_url('/register?ref=' . $pedagang->kode_referral_saya);
+                    ?>
+                    <?php if(!empty($pedagang->kode_referral_saya)): ?>
+                    <button onclick="copyToClipboard('<?php echo esc_js($ref_link); ?>')" class="bg-white hover:bg-purple-600 hover:text-white text-purple-700 border border-purple-200 font-bold py-2.5 px-5 rounded-xl shadow-sm transition-all active:scale-95 flex items-center gap-2">
+                        <i class="fas fa-link"></i> <span>Salin Link Daftar</span>
+                    </button>
+                    <?php else: ?>
+                    <span class="text-xs text-red-500 italic bg-red-50 px-3 py-1 rounded-lg">Kode belum digenerate</span>
+                    <?php endif; ?>
+                </div>
+                <!-- Decoration -->
+                <div class="absolute right-0 top-0 h-full w-32 bg-purple-100/30 -skew-x-12 translate-x-10 group-hover:translate-x-5 transition-transform duration-500"></div>
+            </div>
+
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <!-- Pendapatan -->
                 <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition flex items-center gap-5 relative overflow-hidden group">
@@ -838,6 +866,37 @@ get_header();
         $('#sel-desa-dekat, #sel-desa-jauh').on('change', function() { syncExclusion('#sel-desa-dekat', '#sel-desa-jauh'); syncExclusion('#sel-desa-jauh', '#sel-desa-dekat'); });
         $('#sel-kec-dekat, #sel-kec-jauh').on('change', function() { syncExclusion('#sel-kec-dekat', '#sel-kec-jauh'); syncExclusion('#sel-kec-jauh', '#sel-kec-dekat'); });
     });
+
+    // [BARU] Fungsi Copy to Clipboard
+    function copyToClipboard(text) {
+        if (!text) return;
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Link Pendaftaran berhasil disalin!\n\n' + text);
+            }).catch(err => {
+                fallbackCopy(text);
+            });
+        } else {
+            fallbackCopy(text);
+        }
+    }
+
+    function fallbackCopy(text) {
+        let textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-9999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            document.execCommand('copy');
+            alert('Link Pendaftaran berhasil disalin!\n\n' + text);
+        } catch (err) {
+            alert('Gagal menyalin kode. Silakan salin manual.');
+        }
+        document.body.removeChild(textArea);
+    }
 </script>
 
 <?php get_footer(); ?>
