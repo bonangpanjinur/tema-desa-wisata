@@ -1,7 +1,7 @@
 <?php
 /**
  * Template Name: Checkout Marketplace (Complete Logic)
- * Description: Checkout dengan perbaikan penangkapan Kurir & Logika Redirect Tunai/COD + UI/UX Premium.
+ * Description: Checkout dengan perbaikan penangkapan Kurir & Logika Redirect Tunai/COD + UI/UX Premium + Auto Save Address.
  */
 
 if (!session_id()) session_start();
@@ -34,16 +34,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dw_place_order'])) {
         wp_die('Tidak ada produk yang dipilih untuk checkout.');
     }
 
-    // Ambil data formulir
+    // Ambil data formulir teks
     $nama_penerima = sanitize_text_field($_POST['nama_penerima']);
     $no_hp         = sanitize_text_field($_POST['no_hp']);
     $alamat_lengkap = sanitize_textarea_field($_POST['alamat_lengkap']);
+    $kode_pos      = sanitize_text_field($_POST['kode_pos']);
+    $metode_bayar  = sanitize_text_field($_POST['payment_method']);
+
+    // Ambil Nama Wilayah (untuk disimpan di tabel transaksi sebagai teks snapshot)
     $provinsi      = sanitize_text_field($_POST['provinsi_nama']);
     $kabupaten     = sanitize_text_field($_POST['kabupaten_nama']);
     $kecamatan     = sanitize_text_field($_POST['kecamatan_nama']);
     $kelurahan     = sanitize_text_field($_POST['kelurahan_nama']);
-    $kode_pos      = sanitize_text_field($_POST['kode_pos']);
-    $metode_bayar  = sanitize_text_field($_POST['payment_method']);
+
+    // Ambil ID Wilayah (untuk disimpan kembali ke profil user / Auto-Update)
+    $prov_id       = sanitize_text_field($_POST['provinsi_id']);
+    $kota_id       = sanitize_text_field($_POST['kota_id']);
+    $kec_id        = sanitize_text_field($_POST['kecamatan_id']);
+    $kel_id        = sanitize_text_field($_POST['kelurahan_id']);
 
     // Tangkap data kurir (Array: [toko_id => value])
     $post_kurir  = isset($_POST['kurir']) ? $_POST['kurir'] : []; 
@@ -64,6 +72,84 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dw_place_order'])) {
     $selected_items = $wpdb->get_results($cart_sql);
 
     if ($selected_items) {
+        
+        // --- FITUR AUTO-SAVE ADDRESS KE PROFIL PENGGUNA ---
+        // Logika: Jika alamat di profil masih kosong atau user ingin update, data checkout ini akan menimpa data profil.
+        // Ini memastikan checkout berikutnya otomatis terisi.
+        
+        $table_user = '';
+        $where_user = [];
+        $data_update_user = [];
+
+        if (in_array('pedagang', $roles)) {
+            // Role Pedagang
+            $table_user = "{$wpdb->prefix}dw_pedagang";
+            $where_user = ['id_user' => $user_id];
+            $data_update_user = [
+                'alamat_lengkap'   => $alamat_lengkap,
+                'provinsi_nama'    => $provinsi,
+                'kabupaten_nama'   => $kabupaten,
+                'kecamatan_nama'   => $kecamatan,
+                'kelurahan_nama'   => $kelurahan,
+                'api_provinsi_id'  => $prov_id,
+                'api_kabupaten_id' => $kota_id,
+                'api_kecamatan_id' => $kec_id,
+                'api_kelurahan_id' => $kel_id,
+                'kode_pos'         => $kode_pos,
+                'nomor_wa'         => $no_hp
+            ];
+        } elseif (in_array('admin_desa', $roles) || in_array('editor_desa', $roles)) {
+            // Role Desa
+            $table_user = "{$wpdb->prefix}dw_desa";
+            $where_user = ['id_user_desa' => $user_id];
+            $data_update_user = [
+                'alamat_lengkap'   => $alamat_lengkap,
+                'provinsi'         => $provinsi,
+                'kabupaten'        => $kabupaten,
+                'kecamatan'        => $kecamatan,
+                'kelurahan'        => $kelurahan,
+                'api_provinsi_id'  => $prov_id,
+                'api_kabupaten_id' => $kota_id,
+                'api_kecamatan_id' => $kec_id,
+                'api_kelurahan_id' => $kel_id,
+                'kode_pos'         => $kode_pos
+            ];
+            // No HP desa biasanya disimpan di user meta karena tabel desa tidak selalu punya kolom no_hp personal
+            update_user_meta($user_id, 'billing_phone', $no_hp);
+
+        } else {
+            // Role Pembeli (Default)
+            $table_user = "{$wpdb->prefix}dw_pembeli";
+            $where_user = ['id_user' => $user_id];
+            
+            // Cek dulu apakah kolom 'nomor_wa' atau 'no_hp' yang ada di tabel pembeli
+            // Kita asumsikan update keduanya atau salah satu yang umum
+            $data_update_user = [
+                'alamat_lengkap'   => $alamat_lengkap,
+                'provinsi'         => $provinsi,
+                'kabupaten'        => $kabupaten,
+                'kecamatan'        => $kecamatan,
+                'kelurahan'        => $kelurahan,
+                'api_provinsi_id'  => $prov_id,
+                'api_kabupaten_id' => $kota_id,
+                'api_kecamatan_id' => $kec_id,
+                'api_kelurahan_id' => $kel_id,
+                'kode_pos'         => $kode_pos,
+                'no_hp'            => $no_hp // Mengupdate no_hp agar tersimpan
+            ];
+        }
+
+        // Eksekusi Update Profil
+        if ($table_user && !empty($data_update_user)) {
+            // Cek apakah user ada di tabel tersebut
+            $check_user = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table_user WHERE " . key($where_user) . " = %d", current($where_user)));
+            if ($check_user) {
+                $wpdb->update($table_user, $data_update_user, $where_user);
+            }
+        }
+        
+        // --- LANJUT PROSES TRANSAKSI SEPERTI BIASA ---
+
         $total_produk = 0;
         $total_ongkir = 0;
         $biaya_layanan = 1000;
@@ -115,8 +201,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dw_place_order'])) {
 
             $ongkir_toko = floatval($post_ongkir[$toko_id] ?? 0);
             
-            // PERBAIKAN: Pastikan ID Toko sesuai untuk menangkap metode_pengiriman
-            $metode_kirim_toko = isset($post_kurir[$toko_id]) ? sanitize_text_field($post_kurir[$toko_id]) : 'pickup';
+            // PERBAIKAN: Tangkap kode pengiriman dan ubah ke label yang user-friendly untuk database
+            $kode_kirim_raw = isset($post_kurir[$toko_id]) ? sanitize_text_field($post_kurir[$toko_id]) : 'pickup';
+            $metode_kirim_db = 'Ambil Sendiri'; // Default
+
+            switch ($kode_kirim_raw) {
+                case 'ojek':
+                    $metode_kirim_db = 'Ojek Lokal';
+                    break;
+                case 'ekspedisi':
+                    $metode_kirim_db = 'Ekspedisi';
+                    break;
+                case 'pickup':
+                default:
+                    $metode_kirim_db = 'Ambil Sendiri';
+                    break;
+            }
             
             $nama_toko = $wpdb->get_var($wpdb->prepare("SELECT nama_toko FROM {$wpdb->prefix}dw_pedagang WHERE id = %d", $toko_id));
 
@@ -127,7 +227,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dw_place_order'])) {
                 'sub_total'          => $sub_total_toko,
                 'ongkir'             => $ongkir_toko,
                 'total_pesanan_toko' => $sub_total_toko + $ongkir_toko,
-                'metode_pengiriman'  => $metode_kirim_toko, // Data sudah tertangkap disini
+                'metode_pengiriman'  => $metode_kirim_db, // Simpan teks yang sudah diformat (Ambil Sendiri/Ojek Lokal/Ekspedisi)
                 'status_pesanan'     => 'menunggu_konfirmasi',
                 'created_at'         => current_time('mysql')
             ]);
