@@ -1,8 +1,8 @@
 <?php
 /**
  * Header Template
- * * Menampilkan bagian atas situs: Logo, Menu Navigasi, dan User Dropdown.
- * FIXED: Kembali ke desain lama + Menampilkan Foto Profil (Avatar).
+ * Menampilkan bagian atas situs: Logo, Menu Navigasi, dan User Dropdown.
+ * FIXED: Menghapus duplikasi blok IF PWA yang menyebabkan error syntax.
  */
 ?>
 <!DOCTYPE html>
@@ -11,28 +11,25 @@
     <meta charset="<?php bloginfo( 'charset' ); ?>">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="profile" href="https://gmpg.org/xfn/11">
+
     <?php if ( get_theme_mod('dw_pwa_enabled', '1') ) : ?>
-    <meta name="theme-color" content="<?php echo get_theme_mod('dw_pwa_theme_color', '#0d6efd'); ?>">
-    <link rel="manifest" href="<?php echo home_url('/?dw-manifest=1'); ?>">
-    <link rel="apple-touch-icon" href="<?php echo get_site_icon_url(180); ?>">
-<?php if ( get_theme_mod('dw_pwa_enabled', '1') ) : ?>
-    <meta name="theme-color" content="<?php echo get_theme_mod('dw_pwa_theme_color', '#0d6efd'); ?>">
-    <link rel="manifest" href="<?php echo home_url('/?dw-manifest=1'); ?>">
-    <link rel="apple-touch-icon" href="<?php echo get_site_icon_url(180); ?>">
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', function() {
-                // Menambahkan { scope: '/' } sangat penting jika menggunakan URL dinamis
-                navigator.serviceWorker.register('<?php echo home_url('/?dw-sw=1'); ?>', { scope: '/' })
-                .then(function(registration) {
-                    console.log('PWA: ServiceWorker terdaftar dengan scope: ', registration.scope);
-                }, function(err) {
-                    console.log('PWA: Registrasi gagal: ', err);
+        <meta name="theme-color" content="<?php echo get_theme_mod('dw_pwa_theme_color', '#16a34a'); ?>">
+        <link rel="manifest" href="<?php echo home_url('/?dw-manifest=1'); ?>">
+        <link rel="apple-touch-icon" href="<?php echo get_site_icon_url(180); ?>">
+        <script>
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                    // Menambahkan { scope: '/' } sangat penting jika menggunakan URL dinamis
+                    navigator.serviceWorker.register('<?php echo home_url('/?dw-sw=1'); ?>', { scope: '/' })
+                    .then(function(registration) {
+                        console.log('PWA: ServiceWorker terdaftar dengan scope: ', registration.scope);
+                    }, function(err) {
+                        console.log('PWA: Registrasi gagal: ', err);
+                    });
                 });
-            });
-        }
-    </script>
-<?php endif; ?>
+            }
+        </script>
+    <?php endif; ?>
 
     <?php wp_head(); ?>
 </head>
@@ -73,7 +70,6 @@
                 );
 
                 foreach ($menu_items as $name => $link) :
-                    // Cek aktif
                     $is_active = (is_front_page() && $name == 'Beranda') || (is_post_type_archive('dw_wisata') && $name == 'Wisata') || (is_post_type_archive('dw_produk') && $name == 'Produk');
                     $active_class = $is_active ? 'text-primary font-bold bg-green-50' : 'text-gray-600 hover:text-primary hover:bg-gray-50';
                 ?>
@@ -86,11 +82,10 @@
             <!-- 3. Actions Area -->
             <div class="flex items-center gap-3 md:gap-5">
                 
-                <!-- Keranjang (Visible on Mobile & Desktop) -->
+                <!-- Keranjang -->
                 <?php 
                 global $wpdb;
                 $cart_count = 0;
-                // Logic hitung cart sederhana jika tabel ada
                 $table_cart = $wpdb->prefix . 'dw_cart';
                 if($wpdb->get_var("SHOW TABLES LIKE '$table_cart'") == $table_cart) {
                     $user_id = get_current_user_id();
@@ -112,15 +107,14 @@
                     <?php endif; ?>
                 </a>
 
-                <!-- Akun / Login (HIDDEN ON MOBILE as requested) -->
+                <!-- Akun / Login (Desktop) -->
                 <div class="hidden md:flex items-center gap-3 pl-3 border-l border-gray-200">
                     <?php if (is_user_logged_in()): ?>
                         <?php 
                             $current_user = wp_get_current_user(); 
                             $roles = (array) $current_user->roles;
                             
-                            // Determine Dashboard URL dynamically based on roles
-                            $dashboard_url = home_url('/akun-saya'); // Default fallback
+                            $dashboard_url = home_url('/akun-saya'); 
                             
                             if (in_array('administrator', $roles)) {
                                 $dashboard_url = admin_url();
@@ -134,7 +128,6 @@
                         ?>
                         <div class="relative group dropdown-container">
                             <button class="flex items-center gap-2 focus:outline-none">
-                                <!-- [UPDATED] Foto Profil Logic: Menggunakan get_avatar_url() -->
                                 <div class="w-9 h-9 rounded-full bg-primary/10 overflow-hidden border border-primary/20 flex-shrink-0">
                                     <img src="<?php echo get_avatar_url($current_user->ID, ['size' => 100]); ?>" 
                                          alt="<?php echo esc_attr($current_user->display_name); ?>" 
@@ -148,7 +141,6 @@
                                 <i class="fas fa-chevron-down text-xs text-gray-400 ml-1"></i>
                             </button>
                             
-                            <!-- Dropdown Menu -->
                             <div class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top-right z-50">
                                 <a href="<?php echo $dashboard_url; ?>" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary"><i class="fas fa-columns w-5"></i> Dashboard</a>
                                 <a href="<?php echo home_url('/akun-saya'); ?>" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary"><i class="fas fa-user-cog w-5"></i> Akun Saya</a>
