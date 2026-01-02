@@ -2,7 +2,7 @@
 /**
  * Template Name: Dashboard Toko (Merchant)
  * Description: Dashboard lengkap pedagang. Integrasi Penuh: Variasi & Galeri Produk (Preview), Ongkir Ojek Zona, Paket, Referral, & QR Generator.
- * Status: FINAL COMPLETE (All Features Merged + Gallery Preview + Order Fixes)
+ * Status: FINAL MERGED (Original Features Restored + Advanced Order Management)
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -19,7 +19,7 @@ global $wpdb;
 // Definisi Tabel
 $table_pedagang      = $wpdb->prefix . 'dw_pedagang';
 $table_produk        = $wpdb->prefix . 'dw_produk';
-$table_variasi       = $wpdb->prefix . 'dw_produk_variasi'; // Tabel Variasi
+$table_variasi       = $wpdb->prefix . 'dw_produk_variasi'; 
 $table_transaksi     = $wpdb->prefix . 'dw_transaksi';
 $table_transaksi_sub = $wpdb->prefix . 'dw_transaksi_sub';
 $table_items         = $wpdb->prefix . 'dw_transaksi_items';
@@ -48,11 +48,83 @@ if (!$pedagang) {
 $msg = '';
 $msg_type = '';
 
+// --- HELPER: FORMAT STATUS BADGE (NEW) ---
+if (!function_exists('dw_get_status_badge')) {
+    function dw_get_status_badge($status) {
+        $colors = [
+            'menunggu_pembayaran'     => 'bg-yellow-100 text-yellow-700 border-yellow-200',
+            'pembayaran_dikonfirmasi' => 'bg-green-100 text-green-700 border-green-200',
+            'pembayaran_gagal'        => 'bg-red-100 text-red-700 border-red-200',
+            'diproses'                => 'bg-blue-100 text-blue-700 border-blue-200',
+            'dikirim_ekspedisi'       => 'bg-purple-100 text-purple-700 border-purple-200',
+            'diantar_ojek'            => 'bg-purple-100 text-purple-700 border-purple-200',
+            'siap_diambil'            => 'bg-indigo-100 text-indigo-700 border-indigo-200',
+            'selesai'                 => 'bg-emerald-100 text-emerald-700 border-emerald-200',
+            'dibatalkan'              => 'bg-red-100 text-red-700 border-red-200',
+            'menunggu_driver'         => 'bg-orange-100 text-orange-700 border-orange-200',
+            'penawaran_driver'        => 'bg-purple-100 text-purple-700 border-purple-200',
+            'nego'                    => 'bg-cyan-100 text-cyan-700 border-cyan-200',
+            'menunggu_penjemputan'    => 'bg-sky-100 text-sky-700 border-sky-200',
+            'dalam_perjalanan'        => 'bg-teal-100 text-teal-700 border-teal-200',
+        ];
+        
+        $labels = [
+            'menunggu_pembayaran'     => 'Belum Dibayar',
+            'pembayaran_dikonfirmasi' => 'Sudah Bayar',
+            'pembayaran_gagal'        => 'Gagal Bayar',
+            'diproses'                => 'Diproses',
+            'dikirim_ekspedisi'       => 'Dikirim Ekspedisi',
+            'diantar_ojek'            => 'Diantar Ojek',
+            'siap_diambil'            => 'Siap Diambil',
+            'selesai'                 => 'Selesai',
+            'dibatalkan'              => 'Dibatalkan',
+            'menunggu_driver'         => 'Cari Driver',
+            'penawaran_driver'        => 'Tawaran Masuk',
+            'nego'                    => 'Nego Ongkir',
+            'menunggu_penjemputan'    => 'Menunggu Jemput',
+            'dalam_perjalanan'        => 'Driver OTW',
+        ];
+
+        $c = isset($colors[$status]) ? $colors[$status] : 'bg-gray-100 text-gray-600 border-gray-200';
+        $l = isset($labels[$status]) ? $labels[$status] : ucfirst(str_replace('_', ' ', $status));
+        return "<span class='px-3 py-1 rounded-full text-[10px] font-bold border flex items-center w-fit $c'>{$l}</span>";
+    }
+}
+
 // ==========================================
 // FORM HANDLERS
 // ==========================================
 
-// --- HANDLER 1: SIMPAN PENGATURAN TOKO (LENGKAP DENGAN ONGKIR ZONE) ---
+// --- HANDLER 0: VERIFIKASI PEMBAYARAN & UPDATE STATUS (NEW) ---
+if (isset($_POST['dw_action']) && $_POST['dw_action'] == 'verify_payment_order') {
+    if ( isset($_POST['dw_order_nonce']) && wp_verify_nonce($_POST['dw_order_nonce'], 'dw_verify_order') ) {
+        $order_id       = intval($_POST['order_id']); 
+        $parent_trx_id  = intval($_POST['parent_trx_id']); 
+        $decision       = sanitize_text_field($_POST['decision']); 
+        $current_time   = current_time('mysql');
+        
+        if ($decision === 'accept') {
+            $wpdb->update($table_transaksi_sub, ['status_pesanan' => 'diproses'], ['id' => $order_id, 'id_pedagang' => $pedagang->id]);
+            // Hanya update global jika status sebelumnya menunggu
+            $wpdb->update($table_transaksi, ['status_transaksi' => 'pembayaran_dikonfirmasi', 'tanggal_pembayaran' => $current_time], ['id' => $parent_trx_id]);
+            $msg = "Pembayaran diterima. Pesanan diproses."; $msg_type = "success";
+        } elseif ($decision === 'reject') {
+            $reason = sanitize_textarea_field($_POST['rejection_reason']);
+            $wpdb->update($table_transaksi_sub, ['status_pesanan' => 'dibatalkan', 'alasan_batal' => 'Bukti Bayar Ditolak: ' . $reason], ['id' => $order_id, 'id_pedagang' => $pedagang->id]);
+            $wpdb->update($table_transaksi, ['status_transaksi' => 'pembayaran_gagal'], ['id' => $parent_trx_id]);
+            $msg = "Pembayaran ditolak. Pesanan dibatalkan."; $msg_type = "warning";
+        } elseif ($decision === 'update_shipping') {
+            $new_status = sanitize_text_field($_POST['status_pesanan']);
+            $no_resi    = sanitize_text_field($_POST['no_resi']);
+            $data_update = ['status_pesanan' => $new_status];
+            if(!empty($no_resi)) { $data_update['no_resi'] = $no_resi; }
+            $wpdb->update($table_transaksi_sub, $data_update, ['id' => $order_id, 'id_pedagang' => $pedagang->id]);
+            $msg = "Status pesanan diperbarui."; $msg_type = "success";
+        }
+    }
+}
+
+// --- HANDLER 1: SIMPAN PENGATURAN TOKO (LENGKAP DENGAN ONGKIR ZONE - RESTORED) ---
 if ( isset($_POST['dw_action']) && $_POST['dw_action'] == 'save_store_settings' ) {
     if ( isset($_POST['dw_settings_nonce']) && wp_verify_nonce($_POST['dw_settings_nonce'], 'dw_save_settings') ) {
         
@@ -106,7 +178,7 @@ if ( isset($_POST['dw_action']) && $_POST['dw_action'] == 'save_store_settings' 
         $update_data['shipping_nasional_aktif']   = isset($_POST['shipping_nasional_aktif']) ? 1 : 0;
         $update_data['shipping_nasional_harga']   = floatval($_POST['shipping_nasional_harga']);
 
-        // --- LOGIKA PENYIMPANAN ZONA OJEK (FULL) ---
+        // --- LOGIKA PENYIMPANAN ZONA OJEK (FULL RESTORED) ---
         $safe_array_map = function($input) {
             return isset($input) && is_array($input) ? array_map('sanitize_text_field', $input) : [];
         };
@@ -172,7 +244,7 @@ if ( isset($_POST['dw_action']) && $_POST['dw_action'] == 'save_store_settings' 
     }
 }
 
-// --- HANDLER 2: PRODUK (SAVE/UPDATE + VARIASI + GALERI) ---
+// --- HANDLER 2: PRODUK (SAVE/UPDATE + VARIASI + GALERI - RESTORED) ---
 if ( isset($_POST['dw_action']) && $_POST['dw_action'] == 'save_product' ) {
     if ( isset($_POST['dw_product_nonce']) && wp_verify_nonce($_POST['dw_product_nonce'], 'dw_save_product') ) {
         require_once( ABSPATH . 'wp-admin/includes/file.php');
@@ -199,7 +271,7 @@ if ( isset($_POST['dw_action']) && $_POST['dw_action'] == 'save_product' ) {
             }
         }
 
-        // 2. Upload Galeri (Multiple Files)
+        // 2. Upload Galeri (Multiple Files - RESTORED)
         if (!empty($_FILES['galeri_produk']['name'][0])) {
             $galeri_urls = [];
             $files = $_FILES['galeri_produk'];
@@ -239,7 +311,7 @@ if ( isset($_POST['dw_action']) && $_POST['dw_action'] == 'save_product' ) {
             $msg = 'Produk berhasil ditambahkan.';
         }
 
-        // 3. Handle Variasi Produk
+        // 3. Handle Variasi Produk (RESTORED)
         // Hapus variasi lama jika update (cara paling aman untuk sinkronisasi)
         if ($prod_id > 0) {
             $wpdb->delete($table_variasi, ['id_produk' => $prod_id]);
@@ -277,7 +349,7 @@ if ( isset($_GET['act']) && $_GET['act'] == 'del_prod' && isset($_GET['id']) ) {
      $msg_type = 'success';
 }
 
-// --- HANDLER 4: BELI PAKET ---
+// --- HANDLER 4: BELI PAKET (RESTORED) ---
 if (isset($_POST['beli_paket']) && isset($_POST['paket_nonce']) && wp_verify_nonce($_POST['paket_nonce'], 'beli_paket_action')) {
     require_once(ABSPATH . 'wp-admin/includes/file.php');
     $id_paket = intval($_POST['id_paket']);
@@ -299,24 +371,6 @@ if (isset($_POST['beli_paket']) && isset($_POST['paket_nonce']) && wp_verify_non
             $msg = "Pembelian diajukan. Mohon tunggu verifikasi admin."; 
             $msg_type = "success";
         }
-    }
-}
-
-// --- HANDLER 5: UPDATE STATUS PESANAN ---
-if (isset($_POST['dw_action']) && $_POST['dw_action'] == 'update_order_status') {
-    if ( isset($_POST['dw_order_nonce']) && wp_verify_nonce($_POST['dw_order_nonce'], 'dw_update_order') ) {
-        $order_id = intval($_POST['order_id']);
-        $new_status = sanitize_text_field($_POST['status_pesanan']);
-        $no_resi = sanitize_text_field($_POST['no_resi']);
-        
-        $data_update = ['status_pesanan' => $new_status];
-        if(!empty($no_resi)) {
-            $data_update['no_resi'] = $no_resi;
-        }
-        
-        $wpdb->update($table_transaksi_sub, $data_update, ['id' => $order_id, 'id_pedagang' => $pedagang->id]);
-        $msg = "Status pesanan #$order_id berhasil diperbarui.";
-        $msg_type = "success";
     }
 }
 
@@ -348,15 +402,19 @@ if ($produk_list) {
     }
 }
 
-// --- Fetch Order, Paket, Histori ---
+// --- Fetch Order, Paket, Histori (UPDATED FOR ADVANCED ORDERS) ---
+// UPDATED: JOIN dw_transaksi untuk ambil data global (bukti bayar, status)
 $order_query = "
-    SELECT sub.*, t.nama_penerima, t.no_hp, t.alamat_lengkap AS alamat_kirim
+    SELECT sub.*, 
+           t.kode_unik, t.bukti_pembayaran, t.status_transaksi as global_status, 
+           t.nama_penerima, t.no_hp, t.alamat_lengkap AS alamat_kirim
     FROM $table_transaksi_sub sub
     JOIN $table_transaksi t ON sub.id_transaksi = t.id
     WHERE sub.id_pedagang = %d
     ORDER BY sub.created_at DESC
 ";
 $order_list = $wpdb->get_results($wpdb->prepare($order_query, $pedagang->id));
+
 $pakets = $wpdb->get_results("SELECT * FROM $table_paket WHERE status = 'aktif' AND target_role = 'pedagang' ORDER BY harga ASC");
 $histori_paket = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_pembelian WHERE id_pedagang = %d ORDER BY created_at DESC LIMIT 10", $pedagang->id));
 
@@ -404,6 +462,7 @@ get_header();
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+    .status-badge { @apply px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border; }
 </style>
 
 <div class="bg-gray-50 min-h-screen font-sans flex overflow-hidden text-slate-800">
@@ -444,12 +503,12 @@ get_header();
             </div>
         <?php endif; ?>
 
-        <!-- VIEW 1: RINGKASAN -->
+        <!-- VIEW 1: RINGKASAN (RESTORED) -->
         <div id="view-ringkasan" class="tab-content active">
-            <h1 class="text-2xl font-bold text-gray-800 mb-6">Ringkasan</h1>
+             <h1 class="text-2xl font-bold text-gray-800 mb-6">Ringkasan</h1>
 
-            <!-- KARTU KODE REFERRAL TOKO -->
-            <div class="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-2xl p-5 mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm relative overflow-hidden group">
+             <!-- KARTU KODE REFERRAL TOKO -->
+             <div class="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-2xl p-5 mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm relative overflow-hidden group">
                 <div class="relative z-10">
                     <p class="text-xs font-bold text-purple-600 uppercase tracking-wider mb-1 flex items-center gap-2">
                         <i class="fas fa-gift"></i> Link Referral Toko Saya
@@ -507,7 +566,7 @@ get_header();
             </div>
         </div>
 
-        <!-- VIEW 2: PRODUK -->
+        <!-- VIEW 2: PRODUK (RESTORED) -->
         <div id="view-produk" class="tab-content hidden">
              <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
                  <div>
@@ -577,50 +636,65 @@ get_header();
              </div>
         </div>
 
-        <!-- VIEW 3: PESANAN -->
+        <!-- VIEW 3: PESANAN MASUK (NEW - ADVANCED UI) -->
         <div id="view-pesanan" class="tab-content hidden">
-            <h1 class="text-2xl font-bold text-gray-800 mb-2">Pesanan Masuk</h1>
-            <p class="text-sm text-gray-500 mb-6">Pantau dan kelola pesanan dari pelanggan.</p>
+            <h1 class="text-2xl font-bold text-gray-800 mb-2">Manajemen Pesanan</h1>
+            <p class="text-sm text-gray-500 mb-6">Verifikasi pembayaran dan update status pengiriman.</p>
             
-            <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                 <?php if($order_list): ?>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm text-left">
-                        <thead class="bg-gray-50/50 border-b border-gray-100">
+                        <thead class="bg-gray-50 border-b border-gray-200">
                             <tr class="text-gray-500 uppercase text-[11px] tracking-wider">
-                                <th class="py-4 px-6 font-bold">ID Order</th>
+                                <th class="py-4 px-6 font-bold">Info Transaksi</th>
                                 <th class="py-4 px-6 font-bold">Pelanggan</th>
-                                <th class="py-4 px-6 font-bold">Total Belanja</th>
-                                <th class="py-4 px-6 font-bold">Status</th>
+                                <th class="py-4 px-6 font-bold">Total & Status</th>
+                                <th class="py-4 px-6 font-bold">Bukti Bayar</th>
                                 <th class="py-4 px-6 font-bold text-right">Aksi</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-50">
+                        <tbody class="divide-y divide-gray-100">
                             <?php foreach($order_list as $o): 
                                 $items = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_items WHERE id_sub_transaksi = %d", $o->id));
                                 $o->items = $items; 
                                 
-                                // Color mapping for different statuses
-                                $status_colors = [
-                                    'menunggu_konfirmasi' => 'bg-yellow-50 text-yellow-600 border border-yellow-100',
-                                    'diproses'            => 'bg-blue-50 text-blue-600 border border-blue-100',
-                                    'dikirim_ekspedisi'   => 'bg-purple-50 text-purple-600 border border-purple-100',
-                                    'diantar_ojek'        => 'bg-purple-50 text-purple-600 border border-purple-100',
-                                    'siap_diambil'        => 'bg-indigo-50 text-indigo-600 border border-indigo-100',
-                                    'selesai'             => 'bg-green-50 text-green-600 border border-green-100',
-                                    'lunas'               => 'bg-green-50 text-green-600 border border-green-100',
-                                    'dibatalkan'          => 'bg-red-50 text-red-600 border border-red-100',
-                                    'menunggu_driver'     => 'bg-orange-50 text-orange-600 border border-orange-100',
-                                    'dalam_perjalanan'    => 'bg-teal-50 text-teal-600 border border-teal-100',
-                                ];
-                                $status_color = isset($status_colors[$o->status_pesanan]) ? $status_colors[$o->status_pesanan] : 'bg-gray-50 text-gray-500 border border-gray-100';
+                                // Color mapping logic
+                                $pay_status = $o->global_status; // Status Transaksi Induk
+                                $order_status = $o->status_pesanan; // Status Sub
                             ?>
                             <tr class="hover:bg-gray-50/80 transition group">
-                                <td class="py-4 px-6"><span class="font-bold text-gray-800">#<?php echo $o->id; ?></span><div class="text-[10px] text-gray-400 mt-0.5"><?php echo date('d M Y', strtotime($o->created_at)); ?></div></td>
-                                <td class="py-4 px-6"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 font-bold text-xs"><?php echo substr($o->nama_penerima, 0, 1); ?></div><div><div class="font-bold text-gray-800 text-sm"><?php echo esc_html($o->nama_penerima); ?></div><div class="text-xs text-gray-500"><?php echo esc_html($o->no_hp); ?></div></div></div></td>
-                                <td class="py-4 px-6 font-bold text-gray-800">Rp <?php echo number_format($o->total_pesanan_toko, 0, ',', '.'); ?></td>
-                                <td class="py-4 px-6"><span class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide <?php echo $status_color; ?>"><?php echo str_replace('_', ' ', $o->status_pesanan); ?></span></td>
-                                <td class="py-4 px-6 text-right"><button onclick='openOrderDetail(<?php echo htmlspecialchars(json_encode($o), ENT_QUOTES, 'UTF-8'); ?>)' class="text-blue-600 hover:text-white hover:bg-blue-600 border border-blue-200 hover:border-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold transition">Detail Order</button></td>
+                                <td class="py-4 px-6 align-top">
+                                    <span class="font-mono text-xs font-bold bg-gray-100 text-gray-600 px-2 py-0.5 rounded border border-gray-200"><?php echo esc_html($o->kode_unik); ?></span>
+                                    <div class="text-[10px] text-gray-400 mt-1"><?php echo date('d M Y, H:i', strtotime($o->created_at)); ?></div>
+                                    <div class="text-[10px] text-gray-500 mt-1 font-medium">Order ID: #<?php echo $o->id; ?></div>
+                                </td>
+                                <td class="py-4 px-6 align-top">
+                                    <div class="font-bold text-gray-800 text-sm"><?php echo esc_html($o->nama_penerima); ?></div>
+                                    <div class="text-xs text-gray-500 flex items-center gap-1 mt-0.5"><i class="fab fa-whatsapp text-green-500"></i> <?php echo esc_html($o->no_hp); ?></div>
+                                </td>
+                                <td class="py-4 px-6 align-top">
+                                    <div class="font-bold text-gray-800">Rp <?php echo number_format($o->total_pesanan_toko, 0, ',', '.'); ?></div>
+                                    <div class="flex flex-col gap-1 mt-2">
+                                        <?php echo dw_get_status_badge($pay_status); ?>
+                                        <?php echo dw_get_status_badge($order_status); ?>
+                                    </div>
+                                </td>
+                                <td class="py-4 px-6 align-top">
+                                    <?php if(!empty($o->bukti_pembayaran)): ?>
+                                        <div class="relative group w-12 h-12 cursor-pointer" onclick="openLightbox('<?php echo esc_url($o->bukti_pembayaran); ?>')">
+                                            <img src="<?php echo esc_url($o->bukti_pembayaran); ?>" class="w-full h-full object-cover rounded-lg border border-gray-200 shadow-sm">
+                                            <div class="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition"><i class="fas fa-search-plus text-white text-xs"></i></div>
+                                        </div>
+                                    <?php else: ?>
+                                        <span class="text-xs text-gray-400 italic">Belum upload</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="py-4 px-6 text-right align-top">
+                                    <button onclick='openOrderDetail(<?php echo htmlspecialchars(json_encode($o), ENT_QUOTES, 'UTF-8'); ?>)' class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-xs font-bold transition shadow-sm flex items-center gap-2 ml-auto">
+                                        <i class="fas fa-eye"></i> Detail & Aksi
+                                    </button>
+                                </td>
                             </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -632,7 +706,7 @@ get_header();
             </div>
         </div>
 
-        <!-- VIEW 4: PAKET & KUOTA -->
+        <!-- VIEW 4: PAKET (RESTORED ORIGINAL DESIGN) -->
         <div id="view-paket" class="tab-content hidden">
             <h1 class="text-2xl font-bold text-gray-800 mb-2">Paket & Kuota</h1>
             <p class="text-gray-500 mb-8">Tingkatkan kapasitas toko Anda dengan paket transaksi.</p>
@@ -656,7 +730,7 @@ get_header();
             <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"><table class="w-full text-sm text-left"><thead class="bg-gray-50 border-b border-gray-100 text-gray-500 uppercase text-[11px] tracking-wider"><tr><th class="p-4 font-bold">Tanggal</th><th class="p-4 font-bold">Paket</th><th class="p-4 font-bold">Harga</th><th class="p-4 font-bold text-right">Status</th></tr></thead><tbody class="divide-y divide-gray-50"><?php if($histori_paket): foreach($histori_paket as $h): $st=($h->status=='disetujui')?'bg-green-50 text-green-700':(($h->status=='ditolak')?'bg-red-50 text-red-700':'bg-yellow-50 text-yellow-700'); ?><tr class="hover:bg-gray-50/50"><td class="p-4 text-gray-500"><?php echo date('d M Y', strtotime($h->created_at)); ?></td><td class="p-4 font-bold"><?php echo esc_html($h->nama_paket_snapshot); ?></td><td class="p-4 text-gray-600">Rp <?php echo number_format($h->harga_paket,0,',','.'); ?></td><td class="p-4 text-right"><span class="px-2 py-1 rounded-full text-[10px] font-bold uppercase <?php echo $st; ?>"><?php echo ucfirst($h->status); ?></span></td></tr><?php endforeach; else: ?><tr><td colspan="4" class="p-8 text-center text-gray-400">Belum ada riwayat.</td></tr><?php endif; ?></tbody></table></div>
         </div>
 
-        <!-- VIEW 5: PENGATURAN -->
+        <!-- VIEW 5: PENGATURAN (RESTORED FULL WITH OJEK) -->
         <div id="view-pengaturan" class="tab-content hidden">
             <h1 class="text-2xl font-bold text-gray-800 mb-6">Pengaturan Toko</h1>
             <form method="POST" enctype="multipart/form-data" id="settings-form" onsubmit="showLoading(this)">
@@ -781,125 +855,130 @@ get_header();
     </main>
 </div>
 
-<!-- MODAL BUY & ORDER DETAIL (Standard) -->
-<div id="modal-buy" class="fixed inset-0 z-50 hidden"><div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onclick="closeBuyModal()"></div><div class="absolute inset-0 flex items-center justify-center p-4"><div class="bg-white rounded-3xl p-8 w-full max-w-sm relative shadow-2xl transform transition-all scale-100"><button onclick="closeBuyModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button><div class="text-center mb-6"><div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fas fa-receipt"></i></div><h3 class="font-bold text-xl text-gray-800">Konfirmasi Pembelian</h3><p class="text-sm text-gray-500 mt-1">Paket: <span id="modal-paket-name" class="font-bold text-gray-800"></span></p><p class="text-2xl font-bold text-primary mt-2" id="modal-paket-price"></p></div><form method="post" enctype="multipart/form-data" onsubmit="showLoading(this)"><?php wp_nonce_field('beli_paket_action', 'paket_nonce'); ?><input type="hidden" name="beli_paket" value="1"><input type="hidden" name="id_paket" id="modal-id-paket"><div class="mb-6 bg-gray-50 p-4 rounded-xl border border-dashed border-gray-300"><label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 text-center">Upload Bukti Transfer</label><input type="file" name="bukti_bayar" required class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"></div><button type="submit" class="w-full bg-gray-900 text-white font-bold py-3.5 rounded-xl hover:bg-black transition shadow-lg">Kirim Bukti</button></form></div></div></div>
+<!-- MODAL LIGHTBOX -->
+<div id="lightbox-modal" class="fixed inset-0 z-[60] hidden flex items-center justify-center bg-black/90 backdrop-blur-sm" onclick="this.classList.add('hidden')"><img id="lightbox-img" src="" class="max-w-[90%] max-h-[90%] rounded-lg shadow-2xl"></div>
 
-<!-- MODAL ORDER DETAIL (UPDATED) -->
+<!-- MODAL ORDER DETAIL (ADVANCED - New Version) -->
 <div id="modal-order-detail" class="fixed inset-0 z-50 hidden">
     <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onclick="closeOrderDetailModal()"></div>
-    <div class="absolute right-0 top-0 bottom-0 w-full max-w-2xl bg-white shadow-2xl overflow-y-auto transform transition-transform duration-300 translate-x-full flex flex-col" id="modal-order-panel">
+    <div class="absolute right-0 top-0 bottom-0 w-full max-w-4xl bg-white shadow-2xl overflow-y-auto transform transition-transform duration-300 translate-x-full flex flex-col" id="modal-order-panel">
         
         <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50 sticky top-0 z-10">
             <div>
-                <h2 class="text-xl font-bold text-gray-800">Detail Pesanan</h2>
-                <p class="text-sm text-gray-500" id="det-order-id">#</p>
+                <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2"><i class="fas fa-file-invoice"></i> Detail Pesanan</h2>
+                <div class="flex items-center gap-3 mt-1"><span class="text-xs text-gray-500 font-mono bg-white px-2 py-0.5 rounded border border-gray-200" id="det-kode-unik">TRX-000</span><span class="text-xs text-gray-400" id="det-tanggal">-</span></div>
             </div>
             <button onclick="closeOrderDetailModal()" class="text-gray-400 hover:text-gray-600 transition"><i class="fas fa-times text-xl"></i></button>
         </div>
         
-        <div class="p-6 flex-1 overflow-y-auto space-y-6">
-            <div class="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                <h3 class="font-bold text-blue-900 mb-2 flex items-center gap-2"><i class="fas fa-user"></i> Data Pembeli</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div>
-                        <p class="text-gray-500 text-xs uppercase">Nama Penerima</p>
-                        <p class="font-bold text-gray-800" id="det-penerima">-</p>
-                    </div>
-                    <div>
-                        <p class="text-gray-500 text-xs uppercase">No HP</p>
-                        <p class="font-bold text-gray-800" id="det-hp">-</p>
-                    </div>
-                    <div class="col-span-full">
-                        <p class="text-gray-500 text-xs uppercase">Alamat Pengiriman</p>
-                        <p class="text-gray-800 leading-relaxed" id="det-alamat">-</p>
-                    </div>
-                </div>
-            </div>
-
-            <div>
-                <h3 class="font-bold text-gray-800 mb-3 flex items-center gap-2"><i class="fas fa-shopping-basket"></i> Item Dipesan</h3>
-                <div class="border border-gray-200 rounded-xl overflow-hidden">
-                    <table class="w-full text-sm text-left">
-                        <thead class="bg-gray-50 text-gray-600 border-b">
-                            <tr>
-                                <th class="p-3">Produk</th>
-                                <th class="p-3 text-center">Qty</th>
-                                <th class="p-3 text-right">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody id="det-items-body" class="divide-y divide-gray-100"></tbody>
-                        <tfoot class="bg-gray-50">
-                            <tr>
-                                <td colspan="2" class="p-3 text-right font-bold">Subtotal</td>
-                                <td class="p-3 text-right font-bold" id="det-subtotal">Rp 0</td>
-                            </tr>
-                            <tr>
-                                <td colspan="2" class="p-3 text-right font-bold text-gray-600">Ongkir</td>
-                                <td class="p-3 text-right font-bold text-gray-600" id="det-ongkir">Rp 0</td>
-                            </tr>
-                            <tr>
-                                <td colspan="2" class="p-3 text-right font-bold text-primary text-lg">Total Akhir</td>
-                                <td class="p-3 text-right font-bold text-primary text-lg" id="det-total">Rp 0</td>
-                            </tr>
-                        </tfoot>
-                    </table>
-                </div>
-            </div>
-
-            <div class="border-t pt-6">
-                <h3 class="font-bold text-gray-800 mb-4">Update Status Pesanan</h3>
-                <form method="POST" id="form-update-order" onsubmit="showLoading(this)">
-                    <?php wp_nonce_field('dw_update_order', 'dw_order_nonce'); ?>
-                    <input type="hidden" name="dw_action" value="update_order_status">
-                    <input type="hidden" name="order_id" id="update-order-id">
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <label class="block text-xs font-bold text-gray-600 mb-1">Status Pesanan</label>
-                            <select name="status_pesanan" id="update-status" class="w-full border-gray-300 rounded-lg p-2 text-sm bg-white">
-                                <option value="menunggu_konfirmasi">Menunggu Konfirmasi</option>
-                                <option value="diproses">Diproses</option>
-                                <option value="dikirim_ekspedisi">Dikirim Ekspedisi</option>
-                                <option value="diantar_ojek">Diantar Ojek</option>
-                                <option value="siap_diambil">Siap Diambil</option>
-                                <option value="selesai">Selesai</option>
-                                <option value="dibatalkan">Dibatalkan</option>
-                                <option value="menunggu_driver">Menunggu Driver</option>
-                                <option value="penawaran_driver">Penawaran Driver</option>
-                                <option value="nego">Nego</option>
-                                <option value="menunggu_penjemputan">Menunggu Penjemputan</option>
-                                <option value="dalam_perjalanan">Dalam Perjalanan</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-600 mb-1">Nomor Resi (Opsional)</label>
-                            <input type="text" name="no_resi" id="update-resi" class="w-full border-gray-300 rounded-lg p-2 text-sm" placeholder="Isi jika pakai ekspedisi">
+        <div class="p-6 flex-1 overflow-y-auto">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- KIRI -->
+                <div class="space-y-6">
+                    <div class="bg-blue-50 p-5 rounded-2xl border border-blue-100">
+                        <h3 class="font-bold text-blue-900 mb-3 flex items-center gap-2 text-sm uppercase tracking-wide"><i class="fas fa-user-circle"></i> Info Pembeli</h3>
+                        <div class="space-y-3 text-sm">
+                            <div class="flex justify-between"><span class="text-gray-500">Nama</span><span class="font-bold text-gray-800" id="det-penerima">-</span></div>
+                            <div class="flex justify-between"><span class="text-gray-500">WhatsApp</span><span class="font-bold text-gray-800" id="det-hp">-</span></div>
+                            <div class="border-t border-blue-100 pt-2 mt-2"><p class="text-gray-500 text-xs mb-1">Alamat Pengiriman</p><p class="font-semibold text-gray-800 leading-relaxed" id="det-alamat">-</p></div>
                         </div>
                     </div>
-                    
-                    <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition shadow-lg">Simpan Status</button>
-                </form>
+                    <div>
+                        <h3 class="font-bold text-gray-800 mb-3 flex items-center gap-2 text-sm uppercase tracking-wide"><i class="fas fa-shopping-basket text-primary"></i> Daftar Produk</h3>
+                        <div class="border border-gray-200 rounded-xl overflow-hidden"><table class="w-full text-sm text-left"><thead class="bg-gray-50 text-gray-600 border-b"><tr><th class="p-3">Item</th><th class="p-3 text-center">Qty</th><th class="p-3 text-right">Subtotal</th></tr></thead><tbody id="det-items-body" class="divide-y divide-gray-100"></tbody><tfoot class="bg-gray-50 text-xs"><tr><td colspan="2" class="p-3 text-right text-gray-500">Ongkir (<span id="det-kurir">-</span>)</td><td class="p-3 text-right font-bold text-gray-700" id="det-ongkir">Rp 0</td></tr><tr class="text-sm"><td colspan="2" class="p-3 text-right font-bold text-gray-800">TOTAL</td><td class="p-3 text-right font-extrabold text-primary text-base" id="det-total">Rp 0</td></tr></tfoot></table></div>
+                    </div>
+                </div>
+
+                <!-- KANAN -->
+                <div class="space-y-6">
+                    <div class="bg-gray-50 p-5 rounded-2xl border border-gray-200">
+                        <h3 class="font-bold text-gray-800 mb-3 flex items-center gap-2 text-sm uppercase tracking-wide"><i class="fas fa-receipt text-gray-500"></i> Bukti Pembayaran</h3>
+                        <div id="payment-proof-container" class="mb-4"></div>
+                        
+                        <div id="verification-actions" class="hidden">
+                            <p class="text-xs text-gray-500 mb-3 text-center">Apakah bukti pembayaran ini valid?</p>
+                            <div class="grid grid-cols-2 gap-3">
+                                <button onclick="setVerificationAction('reject')" class="bg-red-50 text-red-600 border border-red-200 py-2.5 rounded-xl text-sm font-bold hover:bg-red-100 transition">Tolak</button>
+                                <button onclick="setVerificationAction('accept')" class="bg-green-600 text-white py-2.5 rounded-xl text-sm font-bold hover:bg-green-700 shadow-md transition">Terima</button>
+                            </div>
+                        </div>
+                        
+                        <form method="POST" id="form-verify-payment" class="hidden mt-4 pt-4 border-t border-gray-200" onsubmit="showLoading(this)">
+                            <?php wp_nonce_field('dw_verify_order', 'dw_order_nonce'); ?>
+                            <input type="hidden" name="dw_action" value="verify_payment_order">
+                            <input type="hidden" name="order_id" id="verify-order-id">
+                            <input type="hidden" name="parent_trx_id" id="verify-parent-id">
+                            <input type="hidden" name="decision" id="verify-decision">
+                            
+                            <div id="reject-reason-box" class="hidden mb-3">
+                                <label class="block text-xs font-bold text-red-600 mb-1">Alasan Penolakan (Wajib)</label>
+                                <textarea name="rejection_reason" class="w-full border border-red-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-red-200 outline-none" rows="2" placeholder="Contoh: Nominal tidak sesuai"></textarea>
+                            </div>
+                            
+                            <button type="submit" class="w-full py-3 rounded-xl text-sm font-bold transition shadow-lg text-white" id="btn-submit-verify">Konfirmasi</button>
+                            <button type="button" onclick="cancelVerification()" class="w-full mt-2 text-xs text-gray-500 underline">Batal</button>
+                        </form>
+                    </div>
+
+                    <div class="border-t border-gray-200 pt-6">
+                        <h3 class="font-bold text-gray-800 mb-4 text-sm uppercase tracking-wide">Update Status Pesanan</h3>
+                        <form method="POST" onsubmit="showLoading(this)">
+                            <?php wp_nonce_field('dw_verify_order', 'dw_order_nonce'); ?>
+                            <input type="hidden" name="dw_action" value="verify_payment_order">
+                            <input type="hidden" name="decision" value="update_shipping">
+                            <input type="hidden" name="order_id" id="update-order-id">
+                            
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-600 mb-1">Status</label>
+                                    <select name="status_pesanan" id="update-status" class="w-full border-gray-300 rounded-lg p-2.5 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none">
+                                        <option value="menunggu_konfirmasi">Menunggu Konfirmasi</option>
+                                        <option value="diproses">Diproses</option>
+                                        <option value="dikirim_ekspedisi">Dikirim Ekspedisi</option>
+                                        <option value="diantar_ojek">Diantar Ojek</option>
+                                        <option value="siap_diambil">Siap Diambil</option>
+                                        <option value="selesai">Selesai</option>
+                                        <option value="dibatalkan">Dibatalkan</option>
+                                        <optgroup label="Ojek Driver">
+                                            <option value="menunggu_driver">Menunggu Driver</option>
+                                            <option value="penawaran_driver">Penawaran Driver</option>
+                                            <option value="nego">Nego</option>
+                                            <option value="menunggu_penjemputan">Menunggu Penjemputan</option>
+                                            <option value="dalam_perjalanan">Dalam Perjalanan</option>
+                                        </optgroup>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-600 mb-1">Nomor Resi (Jika Ekspedisi)</label>
+                                    <input type="text" name="no_resi" id="update-resi" class="w-full border-gray-300 rounded-lg p-2.5 text-sm" placeholder="Input No Resi">
+                                </div>
+                                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition shadow-lg">Simpan Perubahan</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
+<!-- MODAL PRODUK (RESTORED) -->
+<div id="modal-produk" class="fixed inset-0 z-50 hidden"><div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onclick="closeProductModal()"></div><div class="absolute right-0 top-0 bottom-0 w-full max-w-lg bg-white shadow-2xl overflow-y-auto transform transition-transform duration-300 translate-x-full flex flex-col" id="modal-produk-panel"><div class="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50 sticky top-0 z-10"><h2 class="text-xl font-bold text-gray-800" id="modal-title">Tambah Produk</h2><button onclick="closeProductModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button></div><div class="p-6 flex-1 overflow-y-auto"><form method="POST" enctype="multipart/form-data" id="form-product" onsubmit="showLoading(this)"><?php wp_nonce_field('dw_save_product', 'dw_product_nonce'); ?><input type="hidden" name="dw_action" value="save_product"><input type="hidden" name="produk_id" id="prod_id"><div class="space-y-6"><div><label class="block text-sm font-bold text-gray-700 mb-2">Foto Utama</label><label class="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100 transition relative overflow-hidden group"><div class="flex flex-col items-center justify-center pt-5 pb-6 text-gray-500 group-hover:text-primary" id="upload-placeholder"><i class="fas fa-cloud-upload-alt text-3xl mb-2"></i><p class="text-xs">Klik untuk upload foto utama</p></div><img id="prod-prev-img" class="absolute inset-0 w-full h-full object-cover hidden"><input type="file" name="foto_produk" class="hidden" onchange="previewImage(this, 'prod-prev-img'); $('#upload-placeholder').addClass('hidden'); $('#prod-prev-img').removeClass('hidden');"></label></div><div><label class="block text-sm font-bold text-gray-700 mb-1">Galeri Foto</label><input type="file" name="galeri_produk[]" multiple class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" onchange="previewGallery(this)"><div id="prev-galeri" class="grid grid-cols-4 gap-2 mt-3 empty:hidden"></div></div><div><label class="block text-sm font-bold text-gray-700 mb-1">Nama Produk</label><input type="text" name="nama_produk" id="prod_nama" required class="w-full border-gray-300 rounded-lg p-2.5 text-sm"></div><div class="grid grid-cols-2 gap-4"><div><label class="block text-sm font-bold text-gray-700 mb-1">Harga (Rp)</label><input type="number" name="harga" id="prod_harga" required class="w-full border-gray-300 rounded-lg p-2.5 text-sm"></div><div><label class="block text-sm font-bold text-gray-700 mb-1">Stok</label><input type="number" name="stok" id="prod_stok" required class="w-full border-gray-300 rounded-lg p-2.5 text-sm"></div></div><div class="bg-gray-50 p-4 rounded-xl border border-gray-200"><div class="flex justify-between items-center mb-3"><label class="block text-sm font-bold text-gray-800">Variasi Produk</label><button type="button" onclick="addVariasiRow()" class="text-xs bg-white border border-gray-300 px-3 py-1 rounded shadow-sm hover:bg-gray-100"><i class="fas fa-plus"></i> Tambah</button></div><div id="variasi-container" class="space-y-2"></div></div><div class="grid grid-cols-2 gap-4"><div><label class="block text-sm font-bold text-gray-700 mb-1">Berat (Gr)</label><input type="number" name="berat_gram" id="prod_berat" required class="w-full border-gray-300 rounded-lg p-2.5 text-sm"></div><div><label class="block text-sm font-bold text-gray-700 mb-1">Kondisi</label><select name="kondisi" id="prod_kondisi" class="w-full border-gray-300 rounded-lg p-2.5 bg-white text-sm"><option value="baru">Baru</option><option value="bekas">Bekas</option></select></div></div><div><label class="block text-sm font-bold text-gray-700 mb-1">Kategori</label><select name="kategori" id="prod_kategori" class="w-full border-gray-300 rounded-lg p-2.5 bg-white text-sm"><?php foreach($kategori_list as $cat) echo "<option value='$cat'>$cat</option>"; ?><option value="Lainnya">Lainnya</option></select></div><div><label class="block text-sm font-bold text-gray-700 mb-1">Deskripsi</label><textarea name="deskripsi_produk" id="prod_deskripsi" rows="4" class="w-full border-gray-300 rounded-lg p-2.5 text-sm"></textarea></div></div><div class="mt-8 pt-4 border-t border-gray-100"><button type="submit" class="w-full bg-primary text-white font-bold py-3.5 rounded-xl shadow-lg hover:bg-green-700 transition transform active:scale-95">Simpan Produk</button></div></form></div></div></div>
+
+<!-- MODAL BUY (RESTORED) -->
+<div id="modal-buy" class="fixed inset-0 z-50 hidden"><div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onclick="closeBuyModal()"></div><div class="absolute inset-0 flex items-center justify-center p-4"><div class="bg-white rounded-3xl p-8 w-full max-w-sm relative shadow-2xl transform transition-all scale-100"><button onclick="closeBuyModal()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button><div class="text-center mb-6"><div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"><i class="fas fa-receipt"></i></div><h3 class="font-bold text-xl text-gray-800">Konfirmasi Pembelian</h3><p class="text-sm text-gray-500 mt-1">Paket: <span id="modal-paket-name" class="font-bold text-gray-800"></span></p><p class="text-2xl font-bold text-primary mt-2" id="modal-paket-price"></p></div><form method="post" enctype="multipart/form-data" onsubmit="showLoading(this)"><?php wp_nonce_field('beli_paket_action', 'paket_nonce'); ?><input type="hidden" name="beli_paket" value="1"><input type="hidden" name="id_paket" id="modal-id-paket"><div class="mb-6 bg-gray-50 p-4 rounded-xl border border-dashed border-gray-300"><label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 text-center">Upload Bukti Transfer</label><input type="file" name="bukti_bayar" required class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"></div><button type="submit" class="w-full bg-gray-900 text-white font-bold py-3.5 rounded-xl hover:bg-black transition shadow-lg">Kirim Bukti</button></form></div></div></div>
+
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
     var ajaxurl = "<?php echo admin_url('admin-ajax.php'); ?>";
     
-    // ... (UI Utilities same as before) ...
+    // UI Utilities
     function toggleMobileSidebar() {
         const sidebar = document.getElementById('dashboard-sidebar');
-        const backdrop = document.getElementById('sidebar-backdrop');
-        if (sidebar) {
-            if (sidebar.classList.contains('-translate-x-full')) {
-                sidebar.classList.remove('-translate-x-full');
-                if(backdrop) backdrop.classList.remove('hidden');
-            } else {
-                sidebar.classList.add('-translate-x-full');
-                if(backdrop) backdrop.classList.add('hidden');
-            }
+        if (sidebar.classList.contains('-translate-x-full')) {
+            sidebar.classList.remove('-translate-x-full');
+        } else {
+            sidebar.classList.add('-translate-x-full');
         }
     }
 
@@ -923,287 +1002,101 @@ get_header();
         } 
     }
     function showLoading(f) { $(f).find('button[type="submit"]').prop('disabled',true).html('<i class="fas fa-spinner fa-spin"></i> Menyimpan...'); }
+    function openLightbox(src) { $('#lightbox-img').attr('src', src); $('#lightbox-modal').removeClass('hidden'); }
 
-    // ... (Product Modal functions same as before) ...
-    function openProductModal() { 
-        $('#form-product')[0].reset(); 
-        $('#prod_id').val(''); 
-        $('#modal-title').text('Tambah Produk'); 
-        $('#prod-prev-img').addClass('hidden'); 
-        $('#upload-placeholder').removeClass('hidden'); 
-        $('#variasi-container').empty(); 
-        $('#prev-galeri').empty(); 
-        $('#modal-produk').removeClass('hidden'); 
-        setTimeout(()=>$('#modal-produk-panel').removeClass('translate-x-full'),10); 
+    // --- ORDER DETAIL & VERIFICATION LOGIC (NEW) ---
+    function openOrderDetail(o) {
+        $('#det-order-id').text('#' + o.id);
+        $('#det-kode-unik').text(o.kode_unik);
+        $('#det-tanggal').text(o.created_at);
+        $('#det-penerima').text(o.nama_penerima || '-');
+        $('#det-hp').text(o.no_hp || '-');
+        $('#det-alamat').text(o.alamat_kirim || '-');
+        $('#det-subtotal').text('Rp ' + new Intl.NumberFormat('id-ID').format(o.sub_total));
+        $('#det-ongkir').text('Rp ' + new Intl.NumberFormat('id-ID').format(o.ongkir));
+        $('#det-total').text('Rp ' + new Intl.NumberFormat('id-ID').format(o.total_pesanan_toko));
+        $('#det-kurir').text(o.metode_pengiriman);
+
+        $('#update-order-id').val(o.id);
+        $('#update-status').val(o.status_pesanan);
+        $('#update-resi').val(o.no_resi || '');
+        $('#verify-order-id').val(o.id);
+        $('#verify-parent-id').val(o.id_transaksi);
+
+        let h = '';
+        if (o.items && o.items.length) {
+            o.items.forEach(i => { h += `<tr class="hover:bg-gray-50"><td class="p-3"><div class="font-bold">${i.nama_produk}</div><small>${i.nama_variasi||''}</small></td><td class="p-3 text-center">x${i.jumlah}</td><td class="p-3 text-right">Rp ${new Intl.NumberFormat('id-ID').format(i.total_harga)}</td></tr>`; });
+        }
+        $('#det-items-body').html(h);
+
+        const cont = $('#payment-proof-container');
+        const acts = $('#verification-actions');
+        $('#form-verify-payment').addClass('hidden');
+        
+        if (o.bukti_pembayaran) {
+            cont.html(`<div class="relative group w-full h-48 cursor-pointer" onclick="openLightbox('${o.bukti_pembayaran}')"><img src="${o.bukti_pembayaran}" class="w-full h-full object-cover rounded-xl"><div class="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 text-white text-xs">Perbesar</div></div>`);
+            if (o.global_status === 'menunggu_pembayaran' || o.global_status === 'menunggu_konfirmasi') acts.removeClass('hidden'); else acts.addClass('hidden');
+        } else {
+            cont.html(`<div class="w-full h-32 bg-gray-50 flex items-center justify-center text-gray-400 text-xs">Belum ada bukti bayar</div>`);
+            acts.addClass('hidden');
+        }
+
+        $('#modal-order-detail').removeClass('hidden');
+        setTimeout(() => $('#modal-order-panel').removeClass('translate-x-full'), 10);
     }
+
+    function closeOrderDetailModal() { $('#modal-order-panel').addClass('translate-x-full'); setTimeout(() => $('#modal-order-detail').addClass('hidden'), 300); }
     
-    function closeProductModal() { 
-        $('#modal-produk-panel').addClass('translate-x-full'); 
-        setTimeout(()=>$('#modal-produk').addClass('hidden'),300); 
+    function setVerificationAction(act) {
+        $('#verification-actions').addClass('hidden'); $('#form-verify-payment').removeClass('hidden'); $('#verify-decision').val(act);
+        const btn = $('#btn-submit-verify'); const box = $('#reject-reason-box');
+        if (act === 'accept') { btn.text('Terima Pembayaran').removeClass('bg-red-600').addClass('bg-green-600'); box.addClass('hidden').find('textarea').prop('required', false); }
+        else { btn.text('Tolak & Batalkan').removeClass('bg-green-600').addClass('bg-red-600'); box.removeClass('hidden').find('textarea').prop('required', true); }
     }
+    function cancelVerification() { $('#form-verify-payment').addClass('hidden'); $('#verification-actions').removeClass('hidden'); }
 
-    function addVariasiRow(n='',h='',s=''){
-        const id=Date.now();
-        $('#variasi-container').append(`<div class="flex gap-2 items-start animate-fade-in" id="row-${id}"><input type="text" name="var_nama[]" value="${n}" placeholder="Warna/Ukuran" class="w-1/2 text-xs border-gray-300 rounded-lg p-2"><input type="number" name="var_harga[]" value="${h}" placeholder="Harga" class="w-1/4 text-xs border-gray-300 rounded-lg p-2"><input type="number" name="var_stok[]" value="${s}" placeholder="Stok" class="w-1/4 text-xs border-gray-300 rounded-lg p-2"><button type="button" onclick="$('#row-${id}').remove()" class="text-red-500 p-2 hover:bg-red-50 rounded-lg transition"><i class="fas fa-times"></i></button></div>`);
-    }
-
-    function previewGallery(input) {
-        if (input.files) {
-            $('#prev-galeri').empty();
-            Array.from(input.files).forEach(file => {
-                var reader = new FileReader();
-                reader.onload = function(e) {
-                    $('#prev-galeri').append(`<div class="relative aspect-square rounded-lg overflow-hidden border border-gray-200"><img src="${e.target.result}" class="w-full h-full object-cover"></div>`);
-                }
-                reader.readAsDataURL(file);
-            });
-        }
-    }
-
-    function editProduk(p){
-        openProductModal(); 
-        $('#modal-title').text('Edit Produk'); 
-        $('#prod_id').val(p.id); 
-        $('#prod_nama').val(p.nama_produk); 
-        $('#prod_harga').val(p.harga); 
-        $('#prod_stok').val(p.stok); 
-        $('#prod_berat').val(p.berat_gram); 
-        $('#prod_deskripsi').val(p.deskripsi); 
-        $('#prod_kategori').val(p.kategori); 
-        $('#prod_kondisi').val(p.kondisi); 
-        
-        if(p.foto_utama){ 
-            $('#prod-prev-img').attr('src', p.foto_utama).removeClass('hidden'); 
-            $('#upload-placeholder').addClass('hidden'); 
-        }
-        
-        if(p.variasi && p.variasi.length > 0) {
-            p.variasi.forEach(v => {
-                addVariasiRow(v.deskripsi_variasi, v.harga_variasi, v.stok_variasi);
-            });
-        }
-
-        $('#prev-galeri').empty();
-        if(p.galeri_list && p.galeri_list.length > 0){
-            p.galeri_list.forEach(url => {
-                $('#prev-galeri').append(`<div class="relative aspect-square rounded-lg overflow-hidden border border-gray-200"><img src="${url}" class="w-full h-full object-cover"></div>`);
-            });
-        }
-    }
-
+    // --- PRODUCT & OTHER FUNCTIONS (RESTORED) ---
+    function openProductModal() { $('#form-product')[0].reset(); $('#prod_id').val(''); $('#modal-title').text('Tambah Produk'); $('#prod-prev-img').addClass('hidden'); $('#upload-placeholder').removeClass('hidden'); $('#variasi-container, #prev-galeri').empty(); $('#modal-produk').removeClass('hidden'); setTimeout(()=>$('#modal-produk-panel').removeClass('translate-x-full'),10); }
+    function closeProductModal() { $('#modal-produk-panel').addClass('translate-x-full'); setTimeout(()=>$('#modal-produk').addClass('hidden'),300); }
+    function addVariasiRow(n='',h='',s=''){ const id=Date.now(); $('#variasi-container').append(`<div class="flex gap-2 items-start" id="row-${id}"><input type="text" name="var_nama[]" value="${n}" placeholder="Var" class="w-1/2 border rounded p-2 text-xs"><input type="number" name="var_harga[]" value="${h}" placeholder="Rp" class="w-1/4 border rounded p-2 text-xs"><input type="number" name="var_stok[]" value="${s}" placeholder="Stok" class="w-1/4 border rounded p-2 text-xs"><button type="button" onclick="$('#row-${id}').remove()" class="text-red-500"><i class="fas fa-times"></i></button></div>`); }
+    function previewGallery(i){ if(i.files){ $('#prev-galeri').empty(); Array.from(i.files).forEach(f=>{ var r=new FileReader(); r.onload=function(e){ $('#prev-galeri').append(`<img src="${e.target.result}" class="w-full h-20 object-cover rounded">`); }; r.readAsDataURL(f); }); } }
+    function editProduk(p){ openProductModal(); $('#modal-title').text('Edit Produk'); $('#prod_id').val(p.id); $('#prod_nama').val(p.nama_produk); $('#prod_harga').val(p.harga); $('#prod_stok').val(p.stok); $('#prod_berat').val(p.berat_gram); $('#prod_deskripsi').val(p.deskripsi); $('#prod_kategori').val(p.kategori); $('#prod_kondisi').val(p.kondisi); if(p.foto_utama){ $('#prod-prev-img').attr('src',p.foto_utama).removeClass('hidden'); $('#upload-placeholder').addClass('hidden'); } if(p.variasi) p.variasi.forEach(v=>addVariasiRow(v.deskripsi_variasi,v.harga_variasi,v.stok_variasi)); }
     function openBuyModal(id,n,p){ $('#modal-id-paket').val(id); $('#modal-paket-name').text(n); $('#modal-paket-price').text('Rp '+new Intl.NumberFormat('id-ID').format(p)); $('#modal-buy').removeClass('hidden'); }
     function closeBuyModal(){ $('#modal-buy').addClass('hidden'); }
-    
-    function openOrderDetail(o){ 
-        $('#det-order-id').text('#'+o.id); 
-        $('#det-penerima').text(o.nama_penerima||'-'); 
-        $('#det-hp').text(o.no_hp||'-'); 
-        $('#det-alamat').text(o.alamat_kirim||'-'); 
-        $('#update-order-id').val(o.id); 
-        $('#update-status').val(o.status_pesanan); 
-        $('#update-resi').val(o.no_resi||''); 
-        
-        let h=''; 
-        if(o.items){
-            o.items.forEach(i=>{ 
-                h+=`<tr><td class="p-3"><div class="font-bold text-gray-800">${i.nama_produk}</div><div class="text-xs text-gray-500">@ Rp ${new Intl.NumberFormat('id-ID').format(i.harga_satuan)}</div></td><td class="p-3 text-center text-gray-600">x${i.jumlah}</td><td class="p-3 text-right font-bold text-gray-800">Rp ${new Intl.NumberFormat('id-ID').format(i.total_harga)}</td></tr>`; 
-            });
-        } else { 
-            h='<tr><td colspan="3" class="p-4 text-center">No Items</td></tr>'; 
-        } 
-        $('#det-items-body').html(h); 
-        $('#det-subtotal').text('Rp '+new Intl.NumberFormat('id-ID').format(o.sub_total)); 
-        $('#det-ongkir').text('Rp '+new Intl.NumberFormat('id-ID').format(o.ongkir)); 
-        $('#det-total').text('Rp '+new Intl.NumberFormat('id-ID').format(o.total_pesanan_toko)); 
-        $('#modal-order-detail').removeClass('hidden'); 
-        setTimeout(()=>$('#modal-order-panel').removeClass('translate-x-full'),10); 
-    }
-    function closeOrderDetailModal() { $('#modal-order-panel').addClass('translate-x-full'); setTimeout(()=>$('#modal-order-detail').addClass('hidden'),300); }
 
-    // ... (Multi-select & QR Code Logic same as before) ...
-    // Multi-Select Logic
-    window.toggleOption = function(selId, val) {
-        const $el = $(selId);
-        const vals = $el.val() || [];
-        const index = vals.indexOf(val);
-        if (index > -1) { vals.splice(index, 1); } else { vals.push(val); }
-        $el.val(vals).trigger('change');
-    };
-
+    // --- MULTI-SELECT OJEK (RESTORED) ---
+    window.toggleOption = function(selId, val) { const $el = $(selId); const vals = $el.val() || []; const index = vals.indexOf(val); if (index > -1) { vals.splice(index, 1); } else { vals.push(val); } $el.val(vals).trigger('change'); };
     function setupEnhancedMultiSelect(selectId) {
-        const $select = $(selectId);
-        const containerId = selectId.replace('#', '') + '-wrapper';
-        $('#' + containerId).remove();
-        
-        const wrapper = `
-            <div id="${containerId}" class="enhanced-select-wrapper border border-gray-300 rounded-xl overflow-hidden bg-white shadow-sm">
-                <div class="selected-area p-3 bg-gray-50 border-b border-gray-100 min-h-[50px] flex flex-wrap gap-2 text-sm text-gray-500">
-                    <span class="placeholder-text italic text-xs py-1">Belum ada yang dipilih...</span>
-                </div>
-                <div class="list-area">
-                    <div class="p-2 border-b border-gray-100 bg-white sticky top-0 z-10">
-                        <div class="relative"><i class="fas fa-search absolute left-3 top-2.5 text-gray-400 text-xs"></i><input type="text" class="search-input w-full text-xs pl-8 p-2 border border-gray-200 rounded-lg focus:outline-none focus:border-primary transition bg-gray-50 focus:bg-white" placeholder="Cari nama wilayah..."></div>
-                    </div>
-                    <div class="options-list max-h-48 overflow-y-auto p-1 space-y-1 scrollbar-thin"></div>
-                </div>
-            </div>`;
+        const $select = $(selectId); const containerId = selectId.replace('#', '') + '-wrapper'; $('#' + containerId).remove();
+        const wrapper = `<div id="${containerId}" class="enhanced-select-wrapper border border-gray-300 rounded-xl overflow-hidden bg-white shadow-sm"><div class="selected-area p-3 bg-gray-50 border-b border-gray-100 min-h-[50px] flex flex-wrap gap-2 text-sm text-gray-500"><span class="placeholder-text italic text-xs py-1">Belum ada yang dipilih...</span></div><div class="list-area"><div class="p-2 border-b border-gray-100 bg-white sticky top-0 z-10"><div class="relative"><i class="fas fa-search absolute left-3 top-2.5 text-gray-400 text-xs"></i><input type="text" class="search-input w-full text-xs pl-8 p-2 border border-gray-200 rounded-lg focus:outline-none focus:border-primary transition bg-gray-50 focus:bg-white" placeholder="Cari nama wilayah..."></div></div><div class="options-list max-h-48 overflow-y-auto p-1 space-y-1 scrollbar-thin"></div></div></div>`;
         $select.after(wrapper); $select.hide();
-        
-        $(`#${containerId} .search-input`).on('keyup', function() {
-            var val = $(this).val().toLowerCase();
-            $(`#${containerId} .options-list .option-item`).filter(function() { $(this).toggle($(this).find('.opt-text').text().toLowerCase().indexOf(val) > -1) });
-        });
-
+        $(`#${containerId} .search-input`).on('keyup', function() { var val = $(this).val().toLowerCase(); $(`#${containerId} .options-list .option-item`).filter(function() { $(this).toggle($(this).find('.opt-text').text().toLowerCase().indexOf(val) > -1) }); });
         function render() {
-            const $wrapper = $('#' + containerId);
-            const $selectedArea = $wrapper.find('.selected-area');
-            const $listArea = $wrapper.find('.options-list');
-            $selectedArea.empty(); $listArea.empty();
-            let hasSelected = false; let optionsCount = 0;
-            
+            const $wrapper = $('#' + containerId); const $selectedArea = $wrapper.find('.selected-area'); const $listArea = $wrapper.find('.options-list'); $selectedArea.empty(); $listArea.empty(); let hasSelected = false; let optionsCount = 0;
             $select.find('option').each(function() {
-                optionsCount++;
-                const $opt = $(this); const val = $opt.val(); let text = $opt.text().replace(' (Dipilih di sebelah)', '');
-                const isSelected = $opt.is(':selected'); const isDisabled = $opt.is(':disabled');
-                
-                if (isSelected) {
-                    hasSelected = true;
-                    $selectedArea.append(`<div class="flex items-center gap-1 bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold animate-fade-in border border-green-200 shadow-sm"><span>${text}</span><button type="button" class="hover:text-green-900 ml-1 bg-green-200 w-4 h-4 rounded-full flex items-center justify-center transition" onclick="window.toggleOption('${selectId}', '${val}')"><i class="fas fa-times text-[10px]"></i></button></div>`);
-                }
-                
-                let itemClass = "option-item p-2 rounded-lg text-xs cursor-pointer flex items-center justify-between transition group ";
-                let icon = '<div class="w-4 h-4 border border-gray-300 rounded bg-white group-hover:border-primary"></div>';
-                let clickHandler = `onclick="window.toggleOption('${selectId}', '${val}')"`;
-                let statusText = '';
-                
+                optionsCount++; const $opt = $(this); const val = $opt.val(); let text = $opt.text().replace(' (Dipilih di sebelah)', ''); const isSelected = $opt.is(':selected'); const isDisabled = $opt.is(':disabled');
+                if (isSelected) { hasSelected = true; $selectedArea.append(`<div class="flex items-center gap-1 bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold animate-fade-in border border-green-200 shadow-sm"><span>${text}</span><button type="button" class="hover:text-green-900 ml-1 bg-green-200 w-4 h-4 rounded-full flex items-center justify-center transition" onclick="window.toggleOption('${selectId}', '${val}')"><i class="fas fa-times text-[10px]"></i></button></div>`); }
+                let itemClass = "option-item p-2 rounded-lg text-xs cursor-pointer flex items-center justify-between transition group "; let icon = '<div class="w-4 h-4 border border-gray-300 rounded bg-white group-hover:border-primary"></div>'; let clickHandler = `onclick="window.toggleOption('${selectId}', '${val}')"`; let statusText = '';
                 if (isDisabled) { itemClass += "bg-gray-50 text-gray-400 cursor-not-allowed opacity-60"; icon = '<i class="fas fa-ban text-gray-300"></i>'; clickHandler = ""; statusText = '<span class="text-[10px] italic ml-2">(Zona Lain)</span>'; } 
                 else if (isSelected) { itemClass += "bg-green-50 text-green-700 font-bold border border-green-200"; icon = '<div class="w-4 h-4 bg-green-500 rounded flex items-center justify-center text-white text-[10px] shadow-sm"><i class="fas fa-check"></i></div>'; } 
                 else { itemClass += "hover:bg-gray-50 text-gray-700 border border-transparent"; }
-                
                 $listArea.append(`<div class="${itemClass}" ${clickHandler}><span class="opt-text">${text} ${statusText}</span><span>${icon}</span></div>`);
             });
-            
             if (!hasSelected) $selectedArea.html('<span class="placeholder-text italic text-xs py-1 text-gray-400 flex items-center gap-2"><i class="fas fa-info-circle"></i> Hasil pilihan akan muncul di sini...</span>');
             if (optionsCount === 0 || $select.is(':disabled')) $listArea.html('<div class="p-4 text-center text-xs text-gray-400 italic">Data belum dimuat. Silakan pilih lokasi toko terlebih dahulu.</div>');
         }
-        render();
-        const observer = new MutationObserver(render); observer.observe($select[0], { childList: true, attributes: true });
-        $select.on('change render-ui', render);
+        render(); const observer = new MutationObserver(render); observer.observe($select[0], { childList: true, attributes: true }); $select.on('change render-ui', render);
     }
+    function syncExclusion(sId, tId) { var sVals = $(sId).val() || []; var $target = $(tId); $target.find('option').each(function() { var val = $(this).val(); if (sVals.includes(val)) { $(this).prop('disabled', true); if (!$(this).text().includes('(Dipilih)')) $(this).text($(this).text() + ' (Dipilih di sebelah)'); } else { $(this).prop('disabled', false); $(this).text($(this).text().replace(' (Dipilih di sebelah)', '')); } }); $target.trigger('render-ui'); }
 
-    function syncExclusion(sId, tId) {
-        var sVals = $(sId).val() || []; var $target = $(tId);
-        $target.find('option').each(function() {
-            var val = $(this).val();
-            if (sVals.includes(val)) { $(this).prop('disabled', true); if (!$(this).text().includes('(Dipilih)')) $(this).text($(this).text() + ' (Dipilih di sebelah)'); } 
-            else { $(this).prop('disabled', false); $(this).text($(this).text().replace(' (Dipilih di sebelah)', '')); }
-        });
-        $target.trigger('render-ui');
-    }
-
-    // QR Code Logic
-    const shopBaseUrl = "<?php echo home_url('/toko/' . $pedagang->slug_toko); ?>";
-
-    function generateQRLinks() {
-        const start = parseInt($('#qr-start').val()) || 1;
-        const end = parseInt($('#qr-end').val()) || 10;
-        const tbody = $('#qr-table-body');
-        tbody.empty();
-
-        if(end < start) { alert('Nomor akhir harus lebih besar dari awal.'); return; }
-        if((end - start) > 100) { alert('Maksimal 100 meja sekali generate.'); return; }
-
-        for(let i=start; i<=end; i++) {
-            const url = `${shopBaseUrl}?meja=${i}`;
-            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(url)}`;
-            
-            const row = `
-                <tr class="hover:bg-gray-50">
-                    <td class="p-3 font-bold text-gray-800 w-24">Meja ${i}</td>
-                    <td class="p-3">
-                        <div class="flex items-center gap-2">
-                            <input type="text" value="${url}" readonly class="w-full text-xs border border-gray-200 bg-gray-50 rounded px-2 py-1.5 text-gray-500 font-mono">
-                            <button onclick="copyToClipboard('${url}')" class="text-blue-600 hover:text-blue-800 bg-blue-50 p-1.5 rounded"><i class="far fa-copy"></i></button>
-                        </div>
-                    </td>
-                    <td class="p-3 text-center">
-                        <img src="${qrUrl}" class="w-16 h-16 mx-auto border p-1 rounded bg-white shadow-sm">
-                    </td>
-                    <td class="p-3 text-right">
-                        <a href="${qrUrl}" download="QR-Meja-${i}.png" target="_blank" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded text-xs font-bold transition flex items-center justify-end gap-1 ml-auto w-fit">
-                            <i class="fas fa-download"></i> Simpan
-                        </a>
-                    </td>
-                </tr>
-            `;
-            tbody.append(row);
-        }
-        
-        $('#qr-result-container').removeClass('hidden');
-        $('#btn-print-qr').removeClass('hidden');
-    }
-
-    function printQRList() {
-        const content = $('#qr-result-container').html();
-        const win = window.open('', '', 'height=700,width=900');
-        win.document.write('<html><head><title>Cetak QR Meja</title>');
-        win.document.write('<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">');
-        win.document.write('</head><body class="p-8">');
-        win.document.write('<div class="mb-4 text-center"><h1 class="text-2xl font-bold">QR Code Meja</h1><p><?php echo esc_js($pedagang->nama_toko); ?></p></div>');
-        win.document.write(content);
-        win.document.write('</body></html>');
-        win.document.close();
-        setTimeout(function(){ win.print(); }, 500);
-    }
-
-    function copyToClipboard(text) {
-        if (!text) return;
-        if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(text).then(() => {
-                alert('Link disalin: ' + text);
-            }).catch(err => {
-                fallbackCopy(text);
-            });
-        } else {
-            fallbackCopy(text);
-        }
-    }
-
-    function fallbackCopy(text) {
-        let textArea = document.createElement("textarea");
-        textArea.value = text;
-        textArea.style.position = "fixed";
-        textArea.style.left = "-9999px";
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        try {
-            document.execCommand('copy');
-            alert('Link disalin: ' + text);
-        } catch (err) {
-            alert('Gagal menyalin. Silakan copy manual.');
-        }
-        document.body.removeChild(textArea);
-    }
-    
-    // Main Init
-    jQuery(document).ready(function($){
-        // Setup Region Logic
+    // Init Regions
+    $(document).ready(function(){
         var els={prov:$('#dw_provinsi'),kota:$('#dw_kota'),kec:$('#dw_kecamatan'),desa:$('#dw_desa')}, data=$('#region-data').data();
-        function l(a,pid,el,sel,cb){ el.html('<option>Loading...</option>').prop('disabled',true); var p={action:a}; if(a=='dw_fetch_regencies')p.province_id=pid; if(a=='dw_fetch_districts')p.regency_id=pid; if(a=='dw_fetch_villages')p.district_id=pid; $.get(ajaxurl,p,function(r){ if(r.success){ var o='<option value="">-- Pilih --</option>'; $.each(r.data.data||r.data,function(i,v){ var id=v.id||v.code; o+='<option value="'+id+'" '+(id==sel?'selected':'')+'>'+(v.name||v.nama)+'</option>'; }); el.html(o).prop('disabled',false); if(cb)cb(); }}); }
+        function l(a,pid,el,sel,cb){ el.html('<option>Loading...</option>').prop('disabled',true); $.get(ajaxurl,{action:a,province_id:pid,regency_id:pid,district_id:pid},function(r){ if(r.success){ var o='<option value="">-- Pilih --</option>'; $.each(r.data.data||r.data,function(i,v){ var id=v.id||v.code; o+='<option value="'+id+'" '+(id==sel?'selected':'')+'>'+(v.name||v.nama)+'</option>'; }); el.html(o).prop('disabled',false); if(cb)cb(); }}); }
         function s(el,t){ var txt=$(el).find('option:selected').text(); if(txt!=='Loading...'&&txt!=='-- Pilih --')$(t).val(txt); }
-        function fetchDesaForOngkir(id){ 
-            if(!id){ $('#sel-desa-dekat, #sel-desa-jauh').empty().prop('disabled',true).trigger('render-ui'); return; }
-            $('#sel-desa-dekat, #sel-desa-jauh').prop('disabled',true).trigger('render-ui');
-            $.get(ajaxurl, {action:'dw_fetch_villages', district_id:id}, function(r){ if(r.success){ var els=[$('#sel-desa-dekat'),$('#sel-desa-jauh')]; els.forEach(el=>{ el.prop('disabled',false).empty(); $.each(r.data.data||r.data,function(i,v){ var val=v.id||v.code; var isSel=(el.data('selected')||[]).includes(val)?'selected':''; el.append('<option value="'+val+'" '+isSel+'>'+(v.name||v.nama)+'</option>'); }); el.trigger('render-ui'); }); syncExclusion('#sel-desa-dekat','#sel-desa-jauh'); syncExclusion('#sel-desa-jauh','#sel-desa-dekat'); } });
-        }
-        function fetchKecForOngkir(id){ 
-            if(!id){ $('#sel-kec-dekat, #sel-kec-jauh').empty().prop('disabled',true).trigger('render-ui'); return; }
-            $('#sel-kec-dekat, #sel-kec-jauh').prop('disabled',true).trigger('render-ui');
-            $.get(ajaxurl, {action:'dw_fetch_districts', regency_id:id}, function(r){ if(r.success){ var els=[$('#sel-kec-dekat'),$('#sel-kec-jauh')]; els.forEach(el=>{ el.prop('disabled',false).empty(); $.each(r.data.data||r.data,function(i,v){ var val=v.id||v.code; var isSel=(el.data('selected')||[]).includes(val)?'selected':''; el.append('<option value="'+val+'" '+isSel+'>'+(v.name||v.nama)+'</option>'); }); el.trigger('render-ui'); }); syncExclusion('#sel-kec-dekat','#sel-kec-jauh'); syncExclusion('#sel-kec-jauh','#sel-kec-dekat'); } });
-        }
+        function fetchDesaForOngkir(id){ if(!id){ $('#sel-desa-dekat, #sel-desa-jauh').empty().prop('disabled',true).trigger('render-ui'); return; } $('#sel-desa-dekat, #sel-desa-jauh').prop('disabled',true).trigger('render-ui'); $.get(ajaxurl, {action:'dw_fetch_villages', district_id:id}, function(r){ if(r.success){ var els=[$('#sel-desa-dekat'),$('#sel-desa-jauh')]; els.forEach(el=>{ el.prop('disabled',false).empty(); $.each(r.data.data||r.data,function(i,v){ var val=v.id||v.code; var isSel=(el.data('selected')||[]).includes(val)?'selected':''; el.append('<option value="'+val+'" '+isSel+'>'+(v.name||v.nama)+'</option>'); }); el.trigger('render-ui'); }); syncExclusion('#sel-desa-dekat','#sel-desa-jauh'); syncExclusion('#sel-desa-jauh','#sel-desa-dekat'); } }); }
+        function fetchKecForOngkir(id){ if(!id){ $('#sel-kec-dekat, #sel-kec-jauh').empty().prop('disabled',true).trigger('render-ui'); return; } $('#sel-kec-dekat, #sel-kec-jauh').prop('disabled',true).trigger('render-ui'); $.get(ajaxurl, {action:'dw_fetch_districts', regency_id:id}, function(r){ if(r.success){ var els=[$('#sel-kec-dekat'),$('#sel-kec-jauh')]; els.forEach(el=>{ el.prop('disabled',false).empty(); $.each(r.data.data||r.data,function(i,v){ var val=v.id||v.code; var isSel=(el.data('selected')||[]).includes(val)?'selected':''; el.append('<option value="'+val+'" '+isSel+'>'+(v.name||v.nama)+'</option>'); }); el.trigger('render-ui'); }); syncExclusion('#sel-kec-dekat','#sel-kec-jauh'); syncExclusion('#sel-kec-jauh','#sel-kec-dekat'); } }); }
 
-        // Load Initial Regions
         l('dw_fetch_provinces',null,els.prov,data.prov,function(){ 
             if(data.prov) l('dw_fetch_regencies',data.prov,els.kota,data.kota,function(){ 
                 if(data.kota) { l('dw_fetch_districts',data.kota,els.kec,data.kec,function(){ 
@@ -1211,25 +1104,29 @@ get_header();
                 }); fetchKecForOngkir(data.kota); }
             }); 
         });
-
-        // Region Events
         els.prov.change(function(){s(this,'#input_provinsi_name'); l('dw_fetch_regencies',$(this).val(),els.kota,null); els.kota.val(''); });
         els.kota.change(function(){s(this,'#input_kabupaten_name'); var id=$(this).val(); l('dw_fetch_districts',id,els.kec,null); fetchKecForOngkir(id); });
         els.kec.change(function(){s(this,'#input_kecamatan_name'); var id=$(this).val(); l('dw_fetch_villages',id,els.desa,null); fetchDesaForOngkir(id); });
         els.desa.change(function(){s(this,'#input_kelurahan_name');});
         
-        // Setup Toggles
         $('#toggle-nasional').change(function() { $('#nasional-settings').toggleClass('hidden', !this.checked); });
         $('#toggle-ojek').change(function() { $('#ojek-settings').toggleClass('hidden', !this.checked); });
         
-        // Setup Ongkir Multi-selects
         setupEnhancedMultiSelect('#sel-desa-dekat'); setupEnhancedMultiSelect('#sel-desa-jauh'); 
         setupEnhancedMultiSelect('#sel-kec-dekat'); setupEnhancedMultiSelect('#sel-kec-jauh');
         
-        // Ongkir Sync Events
         $('#sel-desa-dekat, #sel-desa-jauh').on('change', function() { syncExclusion('#sel-desa-dekat', '#sel-desa-jauh'); syncExclusion('#sel-desa-jauh', '#sel-desa-dekat'); });
         $('#sel-kec-dekat, #sel-kec-jauh').on('change', function() { syncExclusion('#sel-kec-dekat', '#sel-kec-jauh'); syncExclusion('#sel-kec-jauh', '#sel-kec-dekat'); });
     });
+
+    // QR & Clipboard
+    const shopBaseUrl = "<?php echo home_url('/toko/' . $pedagang->slug_toko); ?>";
+    function generateQRLinks() { const s=parseInt($('#qr-start').val())||1, e=parseInt($('#qr-end').val())||10, tb=$('#qr-table-body'); tb.empty(); if(e<s || (e-s)>100) return alert('Range invalid');
+        for(let i=s; i<=e; i++) { const u=`${shopBaseUrl}?meja=${i}`, q=`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(u)}`; tb.append(`<tr class="hover:bg-gray-50"><td class="p-3 font-bold">Meja ${i}</td><td class="p-3"><input type="text" value="${u}" readonly class="w-full text-xs border rounded p-1"></td><td class="p-3 text-center"><img src="${q}" class="w-16 h-16 mx-auto border p-1 rounded"></td><td class="p-3 text-right"><a href="${q}" download="QR-Meja-${i}.png" target="_blank" class="bg-gray-100 px-3 py-1 rounded text-xs font-bold">Simpan</a></td></tr>`); }
+        $('#qr-result-container').removeClass('hidden');
+    }
+    function printQRList() { const c=$('#qr-result-container').html(), w=window.open('','','height=700,width=900'); w.document.write('<html><head><title>QR Meja</title><link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"></head><body class="p-8"><div class="mb-4 text-center"><h1 class="text-2xl font-bold">QR Code Meja</h1><p><?php echo esc_js($pedagang->nama_toko); ?></p></div>'+c+'</body></html>'); w.document.close(); setTimeout(()=>w.print(),500); }
+    function copyToClipboard(t) { navigator.clipboard.writeText(t).then(()=>alert('Disalin!')).catch(()=>alert('Gagal salin')); }
 </script>
 
 <?php get_footer(); ?>

@@ -24,59 +24,26 @@ $roles        = (array) $current_user->roles;
 $msg          = '';
 $msg_type     = '';
 
-// --- HELPER: FORMAT STATUS BADGE (Baru Ditambahkan) ---
+// --- HELPER: FORMAT STATUS BADGE (Peningkatan UI/UX dengan Warna & Ikon Spesifik) ---
 if (!function_exists('dw_get_status_badge')) {
     function dw_get_status_badge($status) {
-        $colors = [
-            // Status Pembayaran & Umum
-            'menunggu_pembayaran'     => 'bg-yellow-100 text-yellow-700 border-yellow-200',
-            'pembayaran_dikonfirmasi' => 'bg-green-100 text-green-700 border-green-200',
-            'pembayaran_gagal'        => 'bg-red-100 text-red-700 border-red-200',
-            'diproses'                => 'bg-blue-100 text-blue-700 border-blue-200',
-            'dikirim'                 => 'bg-indigo-100 text-indigo-700 border-indigo-200',
-            'selesai'                 => 'bg-emerald-100 text-emerald-700 border-emerald-200',
-            'dibatalkan'              => 'bg-gray-100 text-gray-600 border-gray-200',
-            'refunded'                => 'bg-pink-100 text-pink-700 border-pink-200',
-            
-            // Status Pengiriman / Ojek (Lebih Spesifik)
-            'menunggu_driver'         => 'bg-orange-100 text-orange-700 border-orange-200',
-            'penawaran_driver'        => 'bg-purple-100 text-purple-700 border-purple-200',
-            'nego'                    => 'bg-cyan-100 text-cyan-700 border-cyan-200',
-            'menunggu_penjemputan'    => 'bg-sky-100 text-sky-700 border-sky-200',
-            'dalam_perjalanan'        => 'bg-teal-100 text-teal-700 border-teal-200',
-        ];
-        
-        $labels = [
-            'menunggu_pembayaran'     => 'Belum Dibayar',
-            'pembayaran_dikonfirmasi' => 'Sudah Bayar',
-            'pembayaran_gagal'        => 'Gagal Bayar',
-            'diproses'                => 'Sedang Diproses',
-            'dikirim'                 => 'Sedang Dikirim',
-            'selesai'                 => 'Selesai',
-            'dibatalkan'              => 'Dibatalkan',
-            'refunded'                => 'Dikembalikan',
-            'menunggu_driver'         => 'Cari Driver',
-            'penawaran_driver'        => 'Driver Menawar',
-            'nego'                    => 'Nego Harga',
-            'menunggu_penjemputan'    => 'Menunggu Jemput',
-            'dalam_perjalanan'        => 'Driver OTW',
+        $status_config = [
+            'menunggu_pembayaran'     => ['c' => 'bg-amber-50 text-amber-600 border-amber-200', 'l' => 'Menunggu Bayar', 'i' => 'fa-wallet'],
+            'pembayaran_dikonfirmasi' => ['c' => 'bg-emerald-50 text-emerald-600 border-emerald-200', 'l' => 'Sudah Bayar', 'i' => 'fa-check-circle'],
+            'pembayaran_gagal'        => ['c' => 'bg-rose-50 text-rose-600 border-rose-200', 'l' => 'Gagal Bayar', 'i' => 'fa-times-circle'],
+            'menunggu_konfirmasi'     => ['c' => 'bg-orange-50 text-orange-600 border-orange-100', 'l' => 'Konfirmasi Toko', 'i' => 'fa-store-alt'],
+            'diproses'                => ['c' => 'bg-blue-50 text-blue-600 border-blue-200', 'l' => 'Sedang Diproses', 'i' => 'fa-box-open'],
+            'menunggu_driver'         => ['c' => 'bg-fuchsia-50 text-fuchsia-600 border-fuchsia-200', 'l' => 'Mencari Kurir', 'i' => 'fa-user-clock'],
+            'dalam_perjalanan'        => ['c' => 'bg-teal-50 text-teal-600 border-teal-200', 'l' => 'Kurir Di Jalan', 'i' => 'fa-motorcycle'],
+            'dikirim'                 => ['c' => 'bg-indigo-50 text-indigo-600 border-indigo-200', 'l' => 'Pesanan Dikirim', 'i' => 'fa-shipping-fast'],
+            'selesai'                 => ['c' => 'bg-green-600 text-white border-green-700', 'l' => 'Selesai', 'i' => 'fa-check-double'],
+            'dibatalkan'              => ['c' => 'bg-gray-100 text-gray-500 border-gray-200', 'l' => 'Dibatalkan', 'i' => 'fa-ban'],
+            'refunded'                => ['c' => 'bg-pink-100 text-pink-700 border-pink-200', 'l' => 'Refund', 'i' => 'fa-undo'],
         ];
 
-        // Fallback untuk status yang tidak terdaftar
-        $c = isset($colors[$status]) ? $colors[$status] : 'bg-gray-100 text-gray-600 border-gray-200';
-        $l = isset($labels[$status]) ? $labels[$status] : ucfirst(str_replace('_', ' ', $status));
+        $cfg = isset($status_config[$status]) ? $status_config[$status] : ['c' => 'bg-gray-50 text-gray-600 border-gray-200', 'l' => ucfirst(str_replace('_', ' ', $status)), 'i' => 'fa-info-circle'];
         
-        // Ikon tambahan untuk visualisasi (Opsional, tapi bagus untuk UX)
-        $icon = '';
-        switch ($status) {
-            case 'menunggu_pembayaran': $icon = '<i class="fas fa-clock mr-1"></i>'; break;
-            case 'selesai':             $icon = '<i class="fas fa-check-circle mr-1"></i>'; break;
-            case 'dikirim':             $icon = '<i class="fas fa-truck mr-1"></i>'; break;
-            case 'dibatalkan':          $icon = '<i class="fas fa-times-circle mr-1"></i>'; break;
-            case 'dalam_perjalanan':    $icon = '<i class="fas fa-motorcycle mr-1"></i>'; break;
-        }
-
-        return "<span class='px-3 py-1 rounded-full text-xs font-bold border flex items-center w-fit $c'>{$icon}{$l}</span>";
+        return "<span class='px-3 py-1.5 rounded-full text-[9px] font-black border flex items-center w-fit uppercase tracking-tighter shadow-sm {$cfg['c']}'><i class='fas {$cfg['i']} mr-1.5'></i>{$cfg['l']}</span>";
     }
 }
 
@@ -88,7 +55,6 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
         if ( isset($_POST['dw_profile_nonce']) && wp_verify_nonce($_POST['dw_profile_nonce'], 'dw_save_profile') ) {
             $error = false;
             
-            // 1. Update Data Dasar WP User (Nama & Email)
             $args = [
                 'ID'           => $user_id,
                 'user_email'   => sanitize_email($_POST['user_email']),
@@ -97,7 +63,6 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
                 'display_name' => sanitize_text_field($_POST['first_name'] . ' ' . $_POST['last_name'])
             ];
 
-            // 2. Cek Password (Opsional)
             if ( ! empty($_POST['pass1']) ) {
                 if ( $_POST['pass1'] === $_POST['pass2'] ) {
                     $args['user_pass'] = $_POST['pass1'];
@@ -115,17 +80,14 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
                     $msg = 'Gagal: ' . $update->get_error_message();
                     $msg_type = 'error';
                 } else {
-                    // 3. Update Meta & Sinkronisasi No HP
                     $phone = sanitize_text_field($_POST['billing_phone']);
                     update_user_meta($user_id, 'billing_phone', $phone);
 
-                    // Sinkronisasi No HP ke Tabel Custom (Sesuai kolom di activation.php)
                     if ( in_array('pedagang', $roles) ) {
                         $wpdb->update($wpdb->prefix . 'dw_pedagang', ['nomor_wa' => $phone], ['id_user' => $user_id]);
                     } elseif ( in_array('verifikator_umkm', $roles) ) { 
                         $wpdb->update($wpdb->prefix . 'dw_verifikator', ['nomor_wa' => $phone], ['id_user' => $user_id]);
                     } elseif ( !in_array('admin_desa', $roles) && !in_array('administrator', $roles) ) {
-                         // Default: Pembeli/Member
                          $table_pembeli = $wpdb->prefix . 'dw_pembeli';
                          $cek = $wpdb->get_var($wpdb->prepare("SELECT id FROM $table_pembeli WHERE id_user = %d", $user_id));
                          if($cek) {
@@ -133,41 +95,28 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
                          }
                     }
                     
-                    // --- 4. HANDLE UPLOAD FOTO PROFIL ---
                     if ( ! empty($_FILES['profile_pic']['name']) ) {
                         $uploadedfile = $_FILES['profile_pic'];
                         $upload_overrides = array( 'test_form' => false );
-                        
-                        // Upload ke wp-content/uploads
                         $movefile = wp_handle_upload( $uploadedfile, $upload_overrides );
 
                         if ( $movefile && ! isset( $movefile['error'] ) ) {
                             $foto_url = $movefile['url']; 
-                            
-                            // A. Simpan ke User Meta (Kunci agar tersambung ke Akun WP via filter)
                             update_user_meta($user_id, 'dw_custom_avatar_url', $foto_url);
 
-                            // B. Sinkronisasi ke Tabel Custom (Sesuai Role & Skema Database)
                             if ( in_array('pedagang', $roles) ) {
-                                // Tabel dw_pedagang -> kolom 'foto_admin'
                                 $wpdb->update($wpdb->prefix . 'dw_pedagang', ['foto_admin' => $foto_url], ['id_user' => $user_id]);
                             } elseif ( in_array('admin_desa', $roles) ) {
-                                // Tabel dw_desa -> kolom 'foto_admin'
                                 $wpdb->update($wpdb->prefix . 'dw_desa', ['foto_admin' => $foto_url], ['id_user_desa' => $user_id]);
                             } elseif ( in_array('verifikator_umkm', $roles) ) { 
-                                // Tabel dw_verifikator -> kolom 'foto_profil'
                                 $wpdb->update($wpdb->prefix . 'dw_verifikator', ['foto_profil' => $foto_url], ['id_user' => $user_id]);
                             } else {
-                                // Default: Pembeli / Member Biasa
-                                // Tabel dw_pembeli -> kolom 'foto_profil'
                                 $table_pembeli = $wpdb->prefix . 'dw_pembeli';
                                 $cek_pembeli = $wpdb->get_var($wpdb->prepare("SELECT id FROM $table_pembeli WHERE id_user = %d", $user_id));
-                                
                                 if ($cek_pembeli) {
                                     $wpdb->update($table_pembeli, ['foto_profil' => $foto_url], ['id_user' => $user_id]);
                                 }
                             }
-                            
                         } else {
                             $msg = 'Gagal upload foto: ' . $movefile['error'];
                             $msg_type = 'error';
@@ -177,18 +126,16 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
                     if(empty($msg_type)) {
                         $msg = 'Profil akun berhasil diperbarui.';
                         $msg_type = 'success';
-                        $current_user = wp_get_current_user(); // Refresh object user
+                        $current_user = wp_get_current_user();
                     }
                 }
             }
         }
     }
 
-    // B. UPDATE ALAMAT (SINKRONISASI KE TABEL CUSTOM)
+    // B. UPDATE ALAMAT
     if ( isset($_POST['dw_action']) && $_POST['dw_action'] == 'update_address' ) {
         if ( isset($_POST['dw_address_nonce']) && wp_verify_nonce($_POST['dw_address_nonce'], 'dw_save_address') ) {
-            
-            // 1. Tangkap Data Input
             $addr_input = [
                 'alamat'    => sanitize_textarea_field($_POST['alamat_lengkap']),
                 'prov_name' => sanitize_text_field($_POST['provinsi_nama']),
@@ -202,23 +149,17 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
                 'kel_id'    => sanitize_text_field($_POST['api_kelurahan_id']),
             ];
 
-            // 2. Selalu Update User Meta (Standar WP/WooCommerce)
             update_user_meta($user_id, 'billing_address_1', $addr_input['alamat']);
             update_user_meta($user_id, 'billing_state', $addr_input['prov_name']); 
             update_user_meta($user_id, 'billing_city', $addr_input['city_name']);
             update_user_meta($user_id, 'billing_kecamatan', $addr_input['kec_name']);
             update_user_meta($user_id, 'billing_kelurahan', $addr_input['kel_name']);
             update_user_meta($user_id, 'billing_postcode', $addr_input['postcode']);
-
-            // Simpan ID API untuk Auto-fill dropdown
             update_user_meta($user_id, 'api_provinsi_id', $addr_input['prov_id']);
             update_user_meta($user_id, 'api_kabupaten_id', $addr_input['city_id']);
             update_user_meta($user_id, 'api_kecamatan_id', $addr_input['kec_id']);
             update_user_meta($user_id, 'api_kelurahan_id', $addr_input['kel_id']);
 
-            $msg = 'Alamat pengiriman berhasil disimpan.';
-
-            // 3. Sinkronisasi Data Wilayah ke Tabel Custom
             $data_wilayah = [
                 'alamat_lengkap'   => $addr_input['alamat'],
                 'provinsi_nama'    => $addr_input['prov_name'], 
@@ -234,64 +175,46 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
             ];
 
             if ( in_array('pedagang', $roles) ) {
-                // Tabel Pedagang menggunakan suffix '_nama' untuk wilayah
                 $wpdb->update($wpdb->prefix . 'dw_pedagang', $data_wilayah, ['id_user' => $user_id]);
-            } 
-            elseif ( in_array('admin_desa', $roles) ) {
-                // Tabel Desa kolomnya: provinsi, kabupaten, kecamatan, kelurahan (tanpa _nama)
+            } elseif ( in_array('admin_desa', $roles) ) {
                 $data_desa = $data_wilayah;
                 $data_desa['provinsi']  = $data_wilayah['provinsi_nama']; unset($data_desa['provinsi_nama']);
                 $data_desa['kabupaten'] = $data_wilayah['kabupaten_nama']; unset($data_desa['kabupaten_nama']);
                 $data_desa['kecamatan'] = $data_wilayah['kecamatan_nama']; unset($data_desa['kecamatan_nama']);
                 $data_desa['kelurahan'] = $data_wilayah['kelurahan_nama']; unset($data_desa['kelurahan_nama']);
-                
                 $wpdb->update($wpdb->prefix . 'dw_desa', $data_desa, ['id_user_desa' => $user_id]);
-            }
-            elseif ( in_array('verifikator_umkm', $roles) ) { 
-                // Tabel Verifikator strukturnya mirip desa (tanpa _nama) & Punya kode_pos
+            } elseif ( in_array('verifikator_umkm', $roles) ) { 
                 $data_verif = $data_wilayah;
                 $data_verif['provinsi']  = $data_wilayah['provinsi_nama']; unset($data_verif['provinsi_nama']);
                 $data_verif['kabupaten'] = $data_wilayah['kabupaten_nama']; unset($data_verif['kabupaten_nama']);
                 $data_verif['kecamatan'] = $data_wilayah['kecamatan_nama']; unset($data_verif['kecamatan_nama']);
                 $data_verif['kelurahan'] = $data_wilayah['kelurahan_nama']; unset($data_verif['kelurahan_nama']);
-                
                 $wpdb->update($wpdb->prefix . 'dw_verifikator', $data_verif, ['id_user' => $user_id]);
-                $msg = 'Alamat Verifikator berhasil diperbarui.';
-            }
-            else {
-                // Tabel Pembeli kolomnya juga mirip desa/verifikator (tanpa _nama)
+            } else {
                 $table_pembeli = $wpdb->prefix . 'dw_pembeli';
                 $cek_pembeli = $wpdb->get_var($wpdb->prepare("SELECT id FROM $table_pembeli WHERE id_user = %d", $user_id));
-                
                 if ( $cek_pembeli ) {
                     $data_pembeli = $data_wilayah;
                     $data_pembeli['provinsi']  = $data_wilayah['provinsi_nama']; unset($data_pembeli['provinsi_nama']);
                     $data_pembeli['kabupaten'] = $data_wilayah['kabupaten_nama']; unset($data_pembeli['kabupaten_nama']);
                     $data_pembeli['kecamatan'] = $data_wilayah['kecamatan_nama']; unset($data_pembeli['kecamatan_nama']);
                     $data_pembeli['kelurahan'] = $data_wilayah['kelurahan_nama']; unset($data_pembeli['kelurahan_nama']);
-
                     $wpdb->update($table_pembeli, $data_pembeli, ['id_user' => $user_id]);
-                    $msg = 'Alamat Profil Member berhasil diperbarui.';
                 }
             }
-            
+            $msg = 'Alamat pengiriman berhasil disimpan.';
             $msg_type = 'success';
         }
     }
 }
 
-// --- PERSIAPAN DATA TAMPILAN (Pre-fill Form) ---
-
-// 1. Data User Meta
+// --- PERSIAPAN DATA TAMPILAN ---
 $user_phone    = get_user_meta($user_id, 'billing_phone', true);
 $user_address  = get_user_meta($user_id, 'billing_address_1', true);
 $user_postcode = get_user_meta($user_id, 'billing_postcode', true);
-
-// 2. Data Avatar Custom
 $custom_avatar = get_user_meta($user_id, 'dw_custom_avatar_url', true);
 $display_avatar = $custom_avatar ? $custom_avatar : get_avatar_url($user_id, ['size' => 200]);
 
-// Data Wilayah
 $saved_prov_id = get_user_meta($user_id, 'api_provinsi_id', true);
 $saved_kota_id = get_user_meta($user_id, 'api_kabupaten_id', true);
 $saved_kec_id  = get_user_meta($user_id, 'api_kecamatan_id', true);
@@ -302,7 +225,7 @@ $saved_kota_name = get_user_meta($user_id, 'billing_city', true);
 $saved_kec_name  = get_user_meta($user_id, 'billing_kecamatan', true);
 $saved_kel_name  = get_user_meta($user_id, 'billing_kelurahan', true);
 
-// Override Data jika Role Khusus (Ambil dari tabel custom jika meta kosong)
+// Override Data jika Role Khusus
 if ( in_array('pedagang', $roles) ) {
     $pedagang_data = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}dw_pedagang WHERE id_user = %d", $user_id));
     if ($pedagang_data) {
@@ -317,12 +240,9 @@ if ( in_array('pedagang', $roles) ) {
         $saved_kel_name  = $pedagang_data->kelurahan_nama;
         if (!empty($pedagang_data->kode_pos)) $user_postcode = $pedagang_data->kode_pos;
         if(empty($user_phone)) $user_phone = $pedagang_data->nomor_wa;
-        
-        // Prioritaskan custom avatar dari usermeta, fallback ke foto_admin di tabel
         if(empty($custom_avatar) && !empty($pedagang_data->foto_admin)) $display_avatar = $pedagang_data->foto_admin;
     }
-} 
-elseif ( in_array('admin_desa', $roles) ) {
+} elseif ( in_array('admin_desa', $roles) ) {
     $desa_data = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}dw_desa WHERE id_user_desa = %d", $user_id));
     if ($desa_data) {
         $user_address    = $desa_data->alamat_lengkap;
@@ -335,53 +255,10 @@ elseif ( in_array('admin_desa', $roles) ) {
         $saved_kec_name  = $desa_data->kecamatan;
         $saved_kel_name  = $desa_data->kelurahan;
         if (!empty($desa_data->kode_pos)) $user_postcode = $desa_data->kode_pos;
-
         if(empty($custom_avatar) && !empty($desa_data->foto_admin)) $display_avatar = $desa_data->foto_admin;
     }
 }
-elseif ( in_array('verifikator_umkm', $roles) ) {
-    $verif_data = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}dw_verifikator WHERE id_user = %d", $user_id));
-    if ($verif_data) {
-        $user_address    = $verif_data->alamat_lengkap;
-        $saved_prov_id   = $verif_data->api_provinsi_id;
-        $saved_kota_id   = $verif_data->api_kabupaten_id;
-        $saved_kec_id    = $verif_data->api_kecamatan_id;
-        $saved_kel_id    = $verif_data->api_kelurahan_id;
-        $saved_prov_name = $verif_data->provinsi;
-        $saved_kota_name = $verif_data->kabupaten;
-        $saved_kec_name  = $verif_data->kecamatan;
-        $saved_kel_name  = $verif_data->kelurahan;
-        
-        if (!empty($verif_data->kode_pos)) {
-            $user_postcode = $verif_data->kode_pos;
-        }
-        
-        if(empty($user_phone)) $user_phone = $verif_data->nomor_wa;
 
-        if(empty($custom_avatar) && !empty($verif_data->foto_profil)) $display_avatar = $verif_data->foto_profil;
-    }
-}
-elseif ( !in_array('pedagang', $roles) && !in_array('admin_desa', $roles) && !in_array('administrator', $roles) ) {
-    // Pembeli / Member
-    $pembeli_data = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}dw_pembeli WHERE id_user = %d", $user_id));
-    if ($pembeli_data) {
-        $user_address    = $pembeli_data->alamat_lengkap;
-        $saved_prov_id   = $pembeli_data->api_provinsi_id;
-        $saved_kota_id   = $pembeli_data->api_kabupaten_id;
-        $saved_kec_id    = $pembeli_data->api_kecamatan_id;
-        $saved_kel_id    = $pembeli_data->api_kelurahan_id;
-        $saved_prov_name = $pembeli_data->provinsi;
-        $saved_kota_name = $pembeli_data->kabupaten;
-        $saved_kec_name  = $pembeli_data->kecamatan;
-        $saved_kel_name  = $pembeli_data->kelurahan;
-        if (!empty($pembeli_data->kode_pos)) $user_postcode = $pembeli_data->kode_pos;
-        if(empty($user_phone)) $user_phone = $pembeli_data->no_hp;
-
-        if(empty($custom_avatar) && !empty($pembeli_data->foto_profil)) $display_avatar = $pembeli_data->foto_profil;
-    }
-}
-
-// Setup Label Role & Style
 $role_label = 'Member';
 $role_badge_color = 'bg-gray-100 text-gray-600';
 $role_icon = 'fa-user';
@@ -392,8 +269,6 @@ if ( in_array('administrator', $roles) || in_array('admin_kabupaten', $roles) ) 
     $role_label = 'Admin Desa'; $role_badge_color = 'bg-green-100 text-green-600'; $role_icon = 'fa-landmark';
 } elseif ( in_array('pedagang', $roles) ) {
     $role_label = 'Mitra UMKM'; $role_badge_color = 'bg-purple-100 text-purple-600'; $role_icon = 'fa-store';
-} elseif ( in_array('verifikator_umkm', $roles) ) { 
-    $role_label = 'Verifikator'; $role_badge_color = 'bg-orange-100 text-orange-600'; $role_icon = 'fa-user-check';
 }
 
 get_header();
@@ -407,12 +282,11 @@ get_header();
     .tab-content.active { display: block; }
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     .nav-link { transition: all 0.2s ease; }
-    .nav-link.active { background-color: #f0f9ff; color: #0284c7; border-right: 3px solid #0284c7; font-weight: 600; }
+    .nav-link.active { background-color: #f0fdf4; color: #16a34a; border-right: 3px solid #16a34a; font-weight: 600; }
     .nav-link:hover:not(.active) { background-color: #f8fafc; color: #334155; }
     .form-input { transition: all 0.2s; }
-    .form-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); }
+    .form-input:focus { border-color: #16a34a; box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15); }
     
-    /* Simple Modal Animation */
     .dw-modal { 
         transition: opacity 0.3s ease-in-out;
         opacity: 0;
@@ -429,16 +303,18 @@ get_header();
     .dw-modal.open .dw-modal-content {
         transform: scale(1);
     }
+    .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d1d1; border-radius: 10px; }
 </style>
 
 <div class="bg-gray-50 min-h-screen font-sans text-slate-800 py-10">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        <!-- Notifikasi Global -->
         <?php if($msg): ?>
             <div class="mb-8 p-4 rounded-xl shadow-sm border-l-4 <?php echo ($msg_type == 'error') ? 'bg-red-50 text-red-700 border-red-500' : 'bg-green-50 text-green-700 border-green-500'; ?> flex items-start gap-3 animate-fade-in">
                 <div class="mt-0.5"><i class="fas <?php echo ($msg_type == 'error') ? 'fa-exclamation-circle' : 'fa-check-circle'; ?>"></i></div>
-                <div><p class="font-medium"><?php echo esc_html($msg); ?></p></div>
+                <div><p class="font-medium text-sm font-bold"><?php echo esc_html($msg); ?></p></div>
             </div>
         <?php endif; ?>
 
@@ -446,9 +322,8 @@ get_header();
             
             <!-- LEFT SIDEBAR -->
             <aside class="w-full lg:w-1/4 flex-shrink-0">
-                <!-- User Card -->
                 <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden mb-6 relative group">
-                    <div class="h-24 bg-gradient-to-r from-blue-600 to-indigo-600 relative">
+                    <div class="h-24 bg-primary relative">
                         <div class="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-20 transition"></div>
                     </div>
                     <div class="px-6 pb-6 text-center relative">
@@ -456,17 +331,15 @@ get_header();
                             <div class="p-1.5 bg-white rounded-full shadow-md">
                                 <img src="<?php echo esc_url($display_avatar); ?>" class="w-24 h-24 rounded-full object-cover border-2 border-gray-50">
                             </div>
-                            <div class="absolute bottom-1 right-1 w-6 h-6 bg-green-500 border-2 border-white rounded-full" title="Online"></div>
                         </div>
                         <h2 class="text-lg font-bold text-gray-900 leading-tight"><?php echo esc_html($current_user->display_name); ?></h2>
                         <p class="text-sm text-gray-500 mb-3"><?php echo esc_html($current_user->user_email); ?></p>
-                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold <?php echo $role_badge_color; ?>">
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest <?php echo $role_badge_color; ?>">
                             <i class="fas <?php echo $role_icon; ?>"></i> <?php echo $role_label; ?>
                         </span>
                     </div>
                 </div>
 
-                <!-- Navigation Menu -->
                 <nav class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden py-2">
                     <button onclick="switchTab('dashboard', this)" class="nav-link active w-full text-left px-6 py-3.5 flex items-center gap-3 text-sm text-gray-600">
                         <i class="fas fa-home w-5 text-center text-lg opacity-70"></i> Dashboard
@@ -481,7 +354,7 @@ get_header();
                         <i class="fas fa-user-cog w-5 text-center text-lg opacity-70"></i> Edit Profil
                     </button>
                     <div class="border-t border-gray-100 my-2 pt-2">
-                        <a href="<?php echo home_url('/keranjang'); ?>" class="nav-link w-full text-left px-6 py-3.5 flex items-center gap-3 text-sm text-gray-600 hover:text-blue-600">
+                        <a href="<?php echo home_url('/keranjang'); ?>" class="nav-link w-full text-left px-6 py-3.5 flex items-center gap-3 text-sm text-gray-600 hover:text-green-600">
                             <i class="fas fa-shopping-cart w-5 text-center text-lg opacity-70"></i> Keranjang Belanja
                         </a>
                         <a href="<?php echo wp_logout_url(home_url()); ?>" class="nav-link w-full text-left px-6 py-3.5 flex items-center gap-3 text-sm text-red-600 hover:bg-red-50">
@@ -494,20 +367,20 @@ get_header();
             <!-- RIGHT CONTENT -->
             <main class="w-full lg:w-3/4">
                 
-                <!-- 1. DASHBOARD TAB -->
+                <!-- 1. DASHBOARD -->
                 <div id="tab-dashboard" class="tab-content active">
                     <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-8 mb-6">
-                        <h1 class="text-2xl font-bold text-gray-800 mb-2">Selamat Datang!</h1>
+                        <h1 class="text-2xl font-bold text-gray-800 mb-2 font-black italic">Selamat Datang!</h1>
                         <p class="text-gray-500 mb-8">Ini adalah dashboard akun Anda. Anda dapat melihat aktivitas terbaru dan mengelola informasi akun Anda di sini.</p>
                         
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <?php if ( in_array('pedagang', $roles) || in_array('administrator', $roles) ) : ?>
-                            <a href="<?php echo home_url('/dashboard-toko'); ?>" class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-700 text-white p-6 shadow-lg transform hover:-translate-y-1 transition duration-300 group">
+                            <a href="<?php echo home_url('/dashboard-toko'); ?>" class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-600 to-emerald-700 text-white p-6 shadow-lg transform hover:-translate-y-1 transition duration-300 group">
                                 <div class="absolute right-0 top-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10 group-hover:scale-110 transition"></div>
                                 <div class="relative z-10">
                                     <div class="w-12 h-12 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center mb-4"><i class="fas fa-store text-2xl"></i></div>
                                     <h3 class="text-xl font-bold mb-1">Dashboard Toko</h3>
-                                    <p class="text-purple-100 text-sm">Kelola produk, pesanan toko, dan laporan penjualan.</p>
+                                    <p class="text-green-100 text-sm">Kelola produk, pesanan toko, dan laporan penjualan.</p>
                                 </div>
                             </a>
                             <?php endif; ?>
@@ -523,59 +396,32 @@ get_header();
                             </a>
                             <?php endif; ?>
 
-                             <?php if ( in_array('verifikator_umkm', $roles) ) : ?>
-                            <a href="<?php echo home_url('/dashboard-verifikator'); ?>" class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 to-red-500 text-white p-6 shadow-lg transform hover:-translate-y-1 transition duration-300 group">
-                                <div class="absolute right-0 top-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10 group-hover:scale-110 transition"></div>
-                                <div class="relative z-10">
-                                    <div class="w-12 h-12 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center mb-4"><i class="fas fa-user-check text-2xl"></i></div>
-                                    <h3 class="text-xl font-bold mb-1">Dashboard Verifikator</h3>
-                                    <p class="text-orange-100 text-sm">Verifikasi data UMKM di lapangan.</p>
-                                </div>
-                            </a>
-                            <?php endif; ?>
-
                             <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100 hover:border-gray-200 transition group cursor-pointer" onclick="document.querySelector('button[onclick*=\'orders\']').click()">
                                 <div class="flex items-center gap-4">
-                                    <div class="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center text-blue-600 group-hover:text-blue-700"><i class="fas fa-shopping-bag text-xl"></i></div>
+                                    <div class="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center text-green-600 group-hover:text-green-700"><i class="fas fa-shopping-bag text-xl"></i></div>
                                     <div>
                                         <h4 class="font-bold text-gray-800">Pesanan Saya</h4>
                                         <p class="text-sm text-gray-500">Lacak status belanjaan Anda.</p>
                                     </div>
-                                    <div class="ml-auto text-gray-300 group-hover:text-blue-600 transition"><i class="fas fa-arrow-right"></i></div>
-                                </div>
-                            </div>
-
-                            <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100 hover:border-gray-200 transition group cursor-pointer" onclick="document.querySelector('button[onclick*=\'account\']').click()">
-                                <div class="flex items-center gap-4">
-                                    <div class="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center text-orange-500 group-hover:text-orange-600"><i class="fas fa-user-circle text-xl"></i></div>
-                                    <div>
-                                        <h4 class="font-bold text-gray-800">Profil Akun</h4>
-                                        <p class="text-sm text-gray-500">Perbarui biodata dan password.</p>
-                                    </div>
-                                    <div class="ml-auto text-gray-300 group-hover:text-orange-500 transition"><i class="fas fa-arrow-right"></i></div>
+                                    <div class="ml-auto text-gray-300 group-hover:text-green-600 transition"><i class="fas fa-arrow-right"></i></div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- 2. ORDERS TAB (INTEGRATED & IMPROVED) -->
+                <!-- 2. TAB PESANAN (Improved UI/UX & Dynamic Badges) -->
                 <div id="tab-orders" class="tab-content">
-                    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                        <div class="px-8 py-6 border-b border-gray-100 flex justify-between items-center">
+                    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden min-h-[500px]">
+                        <div class="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                             <h2 class="text-xl font-bold text-gray-800">Riwayat Pesanan</h2>
-                            <a href="<?php echo home_url('/keranjang'); ?>" class="text-sm text-blue-600 hover:underline">Ke Keranjang</a>
+                            <a href="<?php echo home_url('/keranjang'); ?>" class="text-xs font-bold text-green-600 hover:underline">Ke Keranjang</a>
                         </div>
 
-                        <div class="p-6 bg-gray-50/50 min-h-[400px]">
+                        <div class="p-6 space-y-4">
                             <?php
-                            // QUERY TRANSAKSI USER
-                            // Mengambil data pesanan dari tabel custom dw_transaksi
-                            // JOIN dengan tabel sub transaksi dan item untuk data detail modal
                             $transactions = $wpdb->get_results($wpdb->prepare(
-                                "SELECT * FROM {$wpdb->prefix}dw_transaksi 
-                                 WHERE id_pembeli = %d 
-                                 ORDER BY created_at DESC", 
+                                "SELECT * FROM {$wpdb->prefix}dw_transaksi WHERE id_pembeli = %d ORDER BY created_at DESC", 
                                 $user_id
                             ));
 
@@ -583,69 +429,71 @@ get_header();
                                 <div class="space-y-4">
                                     <?php foreach ($transactions as $trx): 
                                         $tgl = date_i18n('d M Y, H:i', strtotime($trx->created_at));
-                                        $total_fmt = 'Rp ' . number_format($trx->total_transaksi, 0, ',', '.');
                                         
-                                        // Ambil Data Item untuk Modal (Optimasi Query: Ambil saat loop atau pakai GROUP_CONCAT di query utama)
-                                        // Di sini kita query lagi per transaksi untuk simplifikasi logika view
-                                        $trx_items = $wpdb->get_results($wpdb->prepare(
-                                            "SELECT i.*, p.nama_toko 
-                                             FROM {$wpdb->prefix}dw_transaksi_items i
-                                             JOIN {$wpdb->prefix}dw_transaksi_sub s ON i.id_sub_transaksi = s.id
-                                             JOIN {$wpdb->prefix}dw_pedagang p ON s.id_pedagang = p.id
-                                             WHERE s.id_transaksi = %d",
-                                            $trx->id
-                                        ));
-                                        
-                                        // Serialize data item untuk dikirim ke JS
-                                        $items_json = json_encode($trx_items);
-                                        
-                                        // Logika Tombol Aksi
-                                        if ($trx->status_transaksi == 'menunggu_pembayaran') {
-                                            $action_btn = '<a href="'.home_url('/pembayaran?id=' . $trx->kode_unik).'" class="px-5 py-2 rounded-xl text-sm font-bold bg-yellow-500 hover:bg-yellow-600 text-white transition-colors shadow-sm">Bayar Sekarang</a>';
-                                        } else {
-                                            // Tombol Modal Trigger
-                                            $action_btn = "<button onclick='openTrxModal(".json_encode($trx).", $items_json)' class='px-5 py-2 rounded-xl text-sm font-bold bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors shadow-sm'>Lihat Detail</button>";
+                                        // Ambil Sub Transaksi & Items untuk payload modal detail
+                                        $sub_orders = $wpdb->get_results($wpdb->prepare("SELECT * FROM {$wpdb->prefix}dw_transaksi_sub WHERE id_transaksi = %d", $trx->id));
+                                        $payload_subs = [];
+                                        foreach($sub_orders as $sub) {
+                                            $items = $wpdb->get_results($wpdb->prepare("SELECT * FROM {$wpdb->prefix}dw_transaksi_items WHERE id_sub_transaksi = %d", $sub->id));
+                                            $payload_subs[] = ['data' => $sub, 'items' => $items];
                                         }
+
+                                        $json_data = json_encode(['master' => $trx, 'subs' => $payload_subs]);
                                     ?>
-                                    <!-- Card Item Pesanan -->
-                                    <div class="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                                    <div class="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all group">
                                         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
                                             <div class="flex items-center gap-3">
-                                                <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
-                                                    <i class="fas fa-shopping-bag"></i>
+                                                <div class="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-green-600 group-hover:bg-green-600 group-hover:text-white transition-colors">
+                                                    <i class="fas fa-receipt"></i>
                                                 </div>
                                                 <div>
-                                                    <p class="text-xs text-gray-500 font-mono">ID: <?php echo esc_html($trx->kode_unik); ?></p>
-                                                    <p class="text-xs text-gray-400"><?php echo $tgl; ?></p>
+                                                    <p class="text-[10px] text-gray-400 font-mono uppercase tracking-widest leading-none mb-1">ID: <?php echo esc_html($trx->kode_unik); ?></p>
+                                                    <p class="text-xs text-gray-500 font-bold"><?php echo $tgl; ?></p>
                                                 </div>
                                             </div>
-                                            <div>
+                                            <div class="flex flex-col items-end gap-1">
+                                                <span class="text-[8px] font-black text-gray-300 uppercase tracking-tighter">Status Transaksi</span>
                                                 <?php echo dw_get_status_badge($trx->status_transaksi); ?>
                                             </div>
                                         </div>
                                         
-                                        <div class="flex justify-between items-end border-t border-gray-100 pt-4">
-                                            <div>
-                                                <p class="text-xs text-gray-500 mb-1">Total Belanja</p>
-                                                <p class="font-bold text-lg text-gray-800"><?php echo $total_fmt; ?></p>
+                                        <div class="bg-gray-50/50 rounded-xl p-4 flex flex-wrap justify-between items-end border border-gray-100">
+                                            <div class="flex items-center gap-3">
+                                                <div class="text-gray-400"><i class="fas fa-credit-card"></i></div>
+                                                <div>
+                                                    <p class="text-[9px] text-gray-400 font-bold uppercase mb-0.5">Metode Bayar</p>
+                                                    <p class="text-xs font-black text-gray-700 uppercase italic tracking-tighter">
+                                                        <?php echo str_replace('_', ' ', $trx->metode_pembayaran); ?>
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <!-- Tombol Aksi Dinamis -->
-                                            <?php echo $action_btn; ?>
+                                            <div class="text-right">
+                                                <p class="text-[9px] text-gray-400 font-bold uppercase mb-1">Total Tagihan</p>
+                                                <p class="font-black text-lg text-green-600 leading-none"><?php echo 'Rp ' . number_format($trx->total_transaksi, 0, ',', '.'); ?></p>
+                                            </div>
+                                        </div>
+
+                                        <div class="mt-4 flex justify-end gap-3">
+                                            <?php if($trx->status_transaksi == 'menunggu_pembayaran'): ?>
+                                                <a href="<?php echo home_url('/pembayaran?id=' . $trx->kode_unik); ?>" class="px-6 py-2.5 rounded-xl text-xs font-black bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-100 transition-all flex items-center gap-2">
+                                                    <i class="fas fa-wallet"></i> Bayar Sekarang
+                                                </a>
+                                            <?php endif; ?>
+                                            <button onclick='openDetailTrx(<?php echo $json_data; ?>)' class="px-6 py-2.5 rounded-xl text-xs font-black bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-green-600 transition-all shadow-sm flex items-center gap-2">
+                                                <i class="fas fa-list-ul"></i> Detail Pesanan
+                                            </button>
                                         </div>
                                     </div>
                                     <?php endforeach; ?>
                                 </div>
                             <?php else: ?>
-                                <!-- Empty State -->
-                                <div class="text-center py-12">
-                                    <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-300">
-                                        <i class="fas fa-receipt text-3xl"></i>
+                                <div class="text-center py-24">
+                                    <div class="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-300">
+                                        <i class="fas fa-shopping-basket text-3xl"></i>
                                     </div>
                                     <h3 class="text-lg font-bold text-gray-700">Belum ada pesanan</h3>
-                                    <p class="text-gray-500 text-sm mb-6">Yuk mulai belanja produk desa menarik!</p>
-                                    <a href="<?php echo home_url('/produk'); ?>" class="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-blue-700 transition">
-                                        Mulai Belanja
-                                    </a>
+                                    <p class="text-gray-500 text-sm mb-8">Ayo mulai belanja produk desa kami!</p>
+                                    <a href="<?php echo home_url('/produk'); ?>" class="bg-green-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-green-100 hover:bg-green-700 transition">Buka Toko</a>
                                 </div>
                             <?php endif; ?>
                         </div>
@@ -654,202 +502,89 @@ get_header();
 
                 <!-- 3. ADDRESS TAB -->
                 <div id="tab-address" class="tab-content">
-                    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                        <div class="p-6 md:p-8 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gray-50/50">
-                            <div>
-                                <h2 class="text-xl font-bold text-gray-800">Alamat Pengiriman</h2>
-                                <p class="text-sm text-gray-500">Alamat ini akan digunakan untuk checkout dan perhitungan ongkir.</p>
+                    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-8">
+                        <h2 class="text-xl font-bold text-gray-800 mb-6">Informasi Alamat</h2>
+                        <form method="post" action="">
+                            <?php wp_nonce_field('dw_save_address', 'dw_address_nonce'); ?>
+                            <input type="hidden" name="dw_action" value="update_address">
+                            <input type="hidden" name="provinsi_nama" id="input_provinsi_nama" value="<?php echo esc_attr($saved_prov_name); ?>">
+                            <input type="hidden" name="kota_nama" id="input_kota_nama" value="<?php echo esc_attr($saved_kota_name); ?>">
+                            <input type="hidden" name="kecamatan_nama" id="input_kecamatan_nama" value="<?php echo esc_attr($saved_kec_name); ?>">
+                            <input type="hidden" name="kelurahan_nama" id="input_kelurahan_nama" value="<?php echo esc_attr($saved_kel_name); ?>">
+                            <div id="region-data" data-prov="<?php echo esc_attr($saved_prov_id); ?>" data-kota="<?php echo esc_attr($saved_kota_id); ?>" data-kec="<?php echo esc_attr($saved_kec_id); ?>" data-kel="<?php echo esc_attr($saved_kel_id); ?>"></div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Provinsi</label>
+                                    <select name="api_provinsi_id" id="dw_provinsi" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:bg-white outline-none appearance-none font-bold"></select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Kota / Kabupaten</label>
+                                    <select name="api_kabupaten_id" id="dw_kota" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:bg-white outline-none appearance-none disabled:opacity-50 font-bold" disabled></select>
+                                </div>
                             </div>
-                            
-                            <?php if(in_array('pedagang', $roles)): ?>
-                                <div class="bg-blue-100 text-blue-800 text-xs px-4 py-2 rounded-lg font-bold flex items-center gap-2 border border-blue-200">
-                                    <i class="fas fa-store"></i> Tersinkron dengan Toko
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Kecamatan</label>
+                                    <select name="api_kecamatan_id" id="dw_kecamatan" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:bg-white outline-none appearance-none disabled:opacity-50 font-bold" disabled></select>
                                 </div>
-                            <?php elseif(in_array('admin_desa', $roles)): ?>
-                                <div class="bg-green-100 text-green-800 text-xs px-4 py-2 rounded-lg font-bold flex items-center gap-2 border border-green-200">
-                                    <i class="fas fa-landmark"></i> Tersinkron dengan Desa
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Kelurahan / Desa</label>
+                                    <select name="api_kelurahan_id" id="dw_kelurahan" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:bg-white outline-none appearance-none disabled:opacity-50 font-bold" disabled></select>
                                 </div>
-                            <?php elseif(in_array('verifikator_umkm', $roles)): ?>
-                                <div class="bg-orange-100 text-orange-800 text-xs px-4 py-2 rounded-lg font-bold flex items-center gap-2 border border-orange-200">
-                                    <i class="fas fa-user-check"></i> Tersinkron dengan Profil Verifikator
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                                <div class="md:col-span-2">
+                                    <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Detail Alamat</label>
+                                    <textarea name="alamat_lengkap" rows="2" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-green-500 outline-none font-bold" placeholder="Nama Jalan, No. Rumah..."><?php echo esc_textarea($user_address); ?></textarea>
                                 </div>
-                            <?php else: ?>
-                                <div class="bg-gray-100 text-gray-800 text-xs px-4 py-2 rounded-lg font-bold flex items-center gap-2 border border-gray-200">
-                                    <i class="fas fa-user"></i> Tersinkron dengan Profil Member
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Kode Pos</label>
+                                    <input type="text" name="kode_pos" value="<?php echo esc_attr($user_postcode); ?>" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm outline-none font-bold">
                                 </div>
-                            <?php endif; ?>
-                        </div>
-                        
-                        <div class="p-6 md:p-8">
-                            <form method="post" action="">
-                                <?php wp_nonce_field('dw_save_address', 'dw_address_nonce'); ?>
-                                <input type="hidden" name="dw_action" value="update_address">
-
-                                <!-- Hidden Fields for Text Values -->
-                                <input type="hidden" name="provinsi_nama" id="input_provinsi_nama" value="<?php echo esc_attr($saved_prov_name); ?>">
-                                <input type="hidden" name="kota_nama" id="input_kota_nama" value="<?php echo esc_attr($saved_kota_name); ?>">
-                                <input type="hidden" name="kecamatan_nama" id="input_kecamatan_nama" value="<?php echo esc_attr($saved_kec_name); ?>">
-                                <input type="hidden" name="kelurahan_nama" id="input_kelurahan_nama" value="<?php echo esc_attr($saved_kel_name); ?>">
-                                
-                                <div id="region-data" 
-                                    data-prov="<?php echo esc_attr($saved_prov_id); ?>" 
-                                    data-kota="<?php echo esc_attr($saved_kota_id); ?>" 
-                                    data-kec="<?php echo esc_attr($saved_kec_id); ?>" 
-                                    data-kel="<?php echo esc_attr($saved_kel_id); ?>">
-                                </div>
-
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                                    <div>
-                                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Provinsi</label>
-                                        <div class="relative">
-                                            <select name="api_provinsi_id" id="dw_provinsi" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:bg-white outline-none appearance-none">
-                                                <option value="">Memuat...</option>
-                                            </select>
-                                            <div class="absolute inset-y-0 right-4 flex items-center pointer-events-none text-gray-400"><i class="fas fa-chevron-down text-xs"></i></div>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Kota / Kabupaten</label>
-                                        <div class="relative">
-                                            <select name="api_kabupaten_id" id="dw_kota" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:bg-white outline-none appearance-none disabled:opacity-50" disabled>
-                                                <option value="">Pilih Kota/Kab...</option>
-                                            </select>
-                                            <div class="absolute inset-y-0 right-4 flex items-center pointer-events-none text-gray-400"><i class="fas fa-chevron-down text-xs"></i></div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                                    <div>
-                                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Kecamatan</label>
-                                        <div class="relative">
-                                            <select name="api_kecamatan_id" id="dw_kecamatan" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:bg-white outline-none appearance-none disabled:opacity-50" disabled>
-                                                <option value="">Pilih Kecamatan...</option>
-                                            </select>
-                                            <div class="absolute inset-y-0 right-4 flex items-center pointer-events-none text-gray-400"><i class="fas fa-chevron-down text-xs"></i></div>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Kelurahan / Desa</label>
-                                        <div class="relative">
-                                            <select name="api_kelurahan_id" id="dw_kelurahan" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:bg-white outline-none appearance-none disabled:opacity-50" disabled>
-                                                <option value="">Pilih Kelurahan...</option>
-                                            </select>
-                                            <div class="absolute inset-y-0 right-4 flex items-center pointer-events-none text-gray-400"><i class="fas fa-chevron-down text-xs"></i></div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                                    <div class="md:col-span-2">
-                                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Detail Alamat</label>
-                                        <textarea name="alamat_lengkap" rows="2" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Nama Jalan, No. Rumah, RT/RW..."><?php echo esc_textarea($user_address); ?></textarea>
-                                    </div>
-                                    <div>
-                                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Kode Pos</label>
-                                        <div class="relative">
-                                            <i class="fas fa-mail-bulk absolute left-4 top-3.5 text-gray-400"></i>
-                                            <input type="text" name="kode_pos" value="<?php echo esc_attr($user_postcode); ?>" class="form-input w-full border-gray-300 rounded-xl pl-10 pr-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-mono" placeholder="Contoh: 12345">
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="flex justify-end pt-4 border-t border-gray-100">
-                                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3.5 rounded-xl font-bold shadow-lg shadow-blue-600/20 transition transform hover:-translate-y-0.5 flex items-center gap-2">
-                                        <i class="fas fa-save"></i> Simpan Perubahan
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
+                            </div>
+                            <div class="flex justify-end">
+                                <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-8 py-3.5 rounded-xl font-black shadow-xl shadow-green-100 transition transform hover:-translate-y-0.5">Simpan Alamat Pengiriman</button>
+                            </div>
+                        </form>
                     </div>
                 </div>
 
                 <!-- 4. ACCOUNT DETAILS TAB -->
                 <div id="tab-account" class="tab-content">
-                    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden p-6 md:p-8">
-                        <div class="mb-8">
-                            <h2 class="text-xl font-bold text-gray-800 mb-1">Detail Profil</h2>
-                            <p class="text-sm text-gray-500">Perbarui informasi pribadi dan foto profil Anda.</p>
-                        </div>
-                        
+                    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-8">
+                        <h2 class="text-xl font-bold text-gray-800 mb-8">Detail Profil Akun</h2>
                         <form method="post" action="" enctype="multipart/form-data">
                             <?php wp_nonce_field('dw_save_profile', 'dw_profile_nonce'); ?>
                             <input type="hidden" name="dw_action" value="update_profile">
-
-                            <!-- FOTO PROFIL SECTION -->
-                            <div class="mb-8 p-4 bg-gray-50 rounded-xl border border-gray-100 flex items-center gap-6">
+                            <div class="mb-10 p-6 bg-gray-50/50 rounded-2xl border border-gray-100 flex flex-col md:flex-row items-center gap-8">
                                 <div class="relative">
-                                    <img src="<?php echo esc_url($display_avatar); ?>" id="avatar-preview" class="w-20 h-20 rounded-full object-cover border-2 border-white shadow-md">
-                                    <div class="absolute bottom-0 right-0 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs border border-white">
-                                        <i class="fas fa-camera"></i>
-                                    </div>
+                                    <img src="<?php echo esc_url($display_avatar); ?>" id="avatar-preview" class="w-28 h-28 rounded-full object-cover border-4 border-white shadow-xl">
+                                    <label class="absolute bottom-1 right-1 w-9 h-9 bg-green-600 rounded-full flex items-center justify-center text-white text-xs border-2 border-white cursor-pointer hover:scale-110 transition shadow-lg"><i class="fas fa-camera"></i><input type="file" name="profile_pic" class="hidden" accept="image/*" onchange="previewImage(this)"></label>
                                 </div>
-                                <div class="flex-1">
-                                    <label class="block text-sm font-bold text-gray-700 mb-1">Ganti Foto Profil</label>
-                                    <input type="file" name="profile_pic" accept="image/*" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" onchange="previewImage(this)">
-                                    <p class="text-xs text-gray-400 mt-1">Format: JPG/PNG, Maks 2MB. Gambar ini akan digunakan sebagai Avatar akun Anda.</p>
+                                <div class="flex-1 text-center md:text-left">
+                                    <label class="block text-base font-black text-gray-800 mb-1">Foto Profil Anda</label>
+                                    <p class="text-xs text-gray-400 mb-3 italic">Gunakan foto asli agar mitra desa mengenali Anda.</p>
+                                    <p class="text-[10px] font-black text-green-600 uppercase tracking-widest">Avatar ini tersinkron dengan profil toko/desa Anda.</p>
                                 </div>
                             </div>
-
-                            <!-- Personal Info -->
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                                <div>
-                                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Nama Depan</label>
-                                    <div class="relative">
-                                        <i class="fas fa-user absolute left-4 top-3.5 text-gray-400"></i>
-                                        <input type="text" name="first_name" value="<?php echo esc_attr($current_user->first_name); ?>" class="form-input w-full border-gray-300 rounded-xl pl-10 pr-4 py-3 text-sm bg-gray-50 focus:bg-white outline-none" required>
-                                    </div>
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Nama Belakang</label>
-                                    <div class="relative">
-                                        <i class="fas fa-user absolute left-4 top-3.5 text-gray-400"></i>
-                                        <input type="text" name="last_name" value="<?php echo esc_attr($current_user->last_name); ?>" class="form-input w-full border-gray-300 rounded-xl pl-10 pr-4 py-3 text-sm bg-gray-50 focus:bg-white outline-none">
-                                    </div>
-                                </div>
+                                <div><label class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Nama Depan</label><input type="text" name="first_name" value="<?php echo esc_attr($current_user->first_name); ?>" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm outline-none font-bold" required></div>
+                                <div><label class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Nama Belakang</label><input type="text" name="last_name" value="<?php echo esc_attr($current_user->last_name); ?>" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm outline-none font-bold"></div>
                             </div>
-
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-                                <div>
-                                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Alamat Email</label>
-                                    <div class="relative">
-                                        <i class="fas fa-envelope absolute left-4 top-3.5 text-gray-400"></i>
-                                        <input type="email" name="user_email" value="<?php echo esc_attr($current_user->user_email); ?>" class="form-input w-full border-gray-300 rounded-xl pl-10 pr-4 py-3 text-sm bg-gray-50 focus:bg-white outline-none" required>
-                                    </div>
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">No. Handphone / WA</label>
-                                    <div class="relative">
-                                        <i class="fas fa-phone absolute left-4 top-3.5 text-gray-400"></i>
-                                        <input type="text" name="billing_phone" value="<?php echo esc_attr($user_phone); ?>" class="form-input w-full border-gray-300 rounded-xl pl-10 pr-4 py-3 text-sm bg-gray-50 focus:bg-white outline-none" placeholder="08xxx">
-                                    </div>
-                                </div>
+                                <div><label class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Alamat Email</label><input type="email" name="user_email" value="<?php echo esc_attr($current_user->user_email); ?>" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm outline-none font-bold" required></div>
+                                <div><label class="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">No. WhatsApp</label><input type="text" name="billing_phone" value="<?php echo esc_attr($user_phone); ?>" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm outline-none font-bold"></div>
                             </div>
-
-                            <!-- Change Password Section -->
-                            <div class="bg-yellow-50/50 rounded-2xl p-6 border border-yellow-100 mb-8">
-                                <div class="flex items-center gap-3 mb-4">
-                                    <div class="w-8 h-8 rounded-full bg-yellow-100 text-yellow-600 flex items-center justify-center"><i class="fas fa-lock text-xs"></i></div>
-                                    <h3 class="font-bold text-gray-800 text-sm">Ganti Kata Sandi</h3>
-                                </div>
+                            <div class="bg-amber-50 p-8 rounded-2xl border border-amber-100 mb-8">
+                                <h3 class="font-black text-amber-800 text-sm mb-6 flex items-center gap-3"><i class="fas fa-shield-alt"></i> Keamanan Kata Sandi</h3>
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div>
-                                        <label class="block text-xs font-bold text-gray-500 mb-1.5">Kata Sandi Baru</label>
-                                        <input type="password" name="pass1" class="form-input w-full border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-yellow-400 outline-none bg-white" autocomplete="new-password">
-                                    </div>
-                                    <div>
-                                        <label class="block text-xs font-bold text-gray-500 mb-1.5">Ulangi Kata Sandi</label>
-                                        <input type="password" name="pass2" class="form-input w-full border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-yellow-400 outline-none bg-white" autocomplete="new-password">
-                                    </div>
+                                    <div><label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Kata Sandi Baru</label><input type="password" name="pass1" class="form-input w-full border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none bg-white font-bold" autocomplete="new-password"></div>
+                                    <div><label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Ulangi Kata Sandi</label><input type="password" name="pass2" class="form-input w-full border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none bg-white font-bold" autocomplete="new-password"></div>
                                 </div>
-                                <p class="text-xs text-yellow-700 mt-3 flex items-center gap-1"><i class="fas fa-info-circle"></i> Biarkan kosong jika tidak ingin mengubah password.</p>
+                                <p class="text-[10px] text-amber-600 mt-5 italic">* Biarkan kosong jika Anda tidak ingin mengubah kata sandi.</p>
                             </div>
-
-                            <div class="flex justify-end pt-2">
-                                <button type="submit" class="bg-gray-900 hover:bg-black text-white px-8 py-3.5 rounded-xl font-bold shadow-lg transition transform hover:-translate-y-0.5 flex items-center gap-2">
-                                    <i class="fas fa-check"></i> Simpan Profil
-                                </button>
-                            </div>
+                            <div class="flex justify-end"><button type="submit" class="bg-gray-900 hover:bg-black text-white px-12 py-4 rounded-xl font-black shadow-2xl shadow-gray-300 transition transform hover:-translate-y-1">Update Informasi Profil</button></div>
                         </form>
                     </div>
                 </div>
@@ -859,62 +594,74 @@ get_header();
     </div>
 </div>
 
-<!-- Modal Structure (Hidden by default) -->
-<div id="trx-modal" class="dw-modal fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm hidden">
-    <div class="dw-modal-content bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden relative m-4">
+<!-- ==============================================================================
+     MODAL DETAIL PESANAN (Improved UI/UX & Realtime Details)
+     ============================================================================== -->
+<div id="trx-modal" class="dw-modal fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md hidden p-4 sm:p-6">
+    <div class="dw-modal-content bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden relative flex flex-col max-h-[95vh] sm:max-h-[90vh]">
         <!-- Header -->
-        <div class="bg-gray-50 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+        <div class="bg-gray-50 px-6 sm:px-10 py-5 sm:py-6 border-b border-gray-100 flex justify-between items-center shrink-0">
             <div>
-                <h3 class="text-lg font-bold text-gray-800">Detail Transaksi</h3>
-                <p class="text-xs text-gray-500 font-mono" id="modal-trx-id">#TRX-00000</p>
+                <h3 class="text-lg sm:text-xl font-black text-gray-800 tracking-tight leading-none mb-1">Rincian Transaksi</h3>
+                <p class="text-[9px] font-mono text-gray-400 uppercase tracking-widest" id="modal-trx-id">#TRX-XXXX</p>
             </div>
-            <button onclick="closeTrxModal()" class="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition">
-                <i class="fas fa-times text-gray-600"></i>
+            <button onclick="closeTrxModal()" class="w-10 h-10 rounded-2xl bg-white shadow-sm flex items-center justify-center hover:bg-red-50 hover:text-red-500 hover:rotate-90 transition-all duration-300">
+                <i class="fas fa-times"></i>
             </button>
         </div>
         
         <!-- Body -->
-        <div class="p-6 overflow-y-auto max-h-[70vh]">
-            <!-- Info Status -->
-            <div class="flex justify-between items-start mb-6 bg-blue-50 p-4 rounded-xl border border-blue-100">
-                <div>
-                    <p class="text-xs text-blue-600 font-bold uppercase tracking-wide mb-1">Status Pesanan</p>
-                    <div id="modal-status-badge"></div>
+        <div class="p-6 sm:p-10 overflow-y-auto custom-scrollbar flex-grow space-y-10">
+            <!-- Global Info Grid -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 sm:mb-12">
+                <div class="p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                    <p class="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Status Bayar</p>
+                    <div id="modal-status-global"></div>
                 </div>
-                <div class="text-right">
-                    <p class="text-xs text-blue-600 font-bold uppercase tracking-wide mb-1">Total Bayar</p>
-                    <p class="text-xl font-bold text-gray-900" id="modal-total-bayar">Rp 0</p>
+                <div class="p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                    <p class="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Pembayaran</p>
+                    <p class="text-[10px] font-black text-gray-800 uppercase italic tracking-tighter" id="modal-pembayaran">-</p>
+                </div>
+                <div class="p-4 bg-gray-50 rounded-[1.5rem] border border-gray-100 col-span-2 flex flex-col justify-center text-center">
+                    <p class="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Total Tagihan Akhir</p>
+                    <p class="text-xl sm:text-2xl font-black text-green-600 leading-none tracking-tighter" id="modal-total-bayar">Rp 0</p>
                 </div>
             </div>
 
-            <!-- List Item -->
-            <h4 class="font-bold text-gray-800 mb-3 text-sm border-b pb-2">Daftar Produk</h4>
-            <div id="modal-items-container" class="space-y-4">
+            <!-- List Sub Order (Store Sections) -->
+            <div class="space-y-10" id="modal-subs-container">
                 <!-- Items injected by JS -->
             </div>
 
-            <!-- Info Pengiriman -->
-            <div class="mt-6 pt-4 border-t border-gray-100">
-                <h4 class="font-bold text-gray-800 mb-2 text-sm">Info Pengiriman</h4>
-                <div class="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                        <p class="text-gray-500 text-xs">Penerima</p>
-                        <p class="font-semibold" id="modal-penerima">-</p>
-                    </div>
-                    <div>
-                        <p class="text-gray-500 text-xs">Alamat</p>
-                        <p class="font-semibold line-clamp-2" id="modal-alamat">-</p>
-                    </div>
+            <!-- Bukti Pembayaran Section -->
+            <div id="modal-bukti-section" class="hidden mt-10 pt-8 border-t border-dashed border-gray-200 text-center">
+                <h4 class="text-xs font-black text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-3">
+                    Lampiran Bukti Transfer <span class="h-px bg-gray-100 flex-grow"></span>
+                </h4>
+                <div class="bg-gray-100 p-2 rounded-3xl border border-gray-100 max-w-xs mx-auto shadow-inner overflow-hidden cursor-zoom-in group" onclick="window.open(document.getElementById('modal-bukti-img').src)">
+                    <img id="modal-bukti-img" src="" class="w-full h-auto rounded-2xl group-hover:scale-105 transition-transform duration-500">
+                </div>
+            </div>
+
+            <!-- Shipping Info Snapshot -->
+            <div class="mt-10 pt-8 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-10">
+                <div>
+                    <h4 class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3">Penerima</h4>
+                    <p class="text-sm font-black text-gray-800" id="modal-penerima">-</p>
+                    <p class="text-xs text-gray-500 font-bold mt-1" id="modal-no-hp">-</p>
+                </div>
+                <div>
+                    <h4 class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3">Tujuan Pengiriman</h4>
+                    <p class="text-[11px] text-gray-600 font-medium italic leading-relaxed" id="modal-alamat">-</p>
                 </div>
             </div>
         </div>
 
         <!-- Footer -->
-        <div class="bg-gray-50 px-6 py-4 border-t border-gray-100 text-right">
-            <button onclick="closeTrxModal()" class="px-5 py-2 rounded-xl text-sm font-bold bg-white border border-gray-300 text-gray-700 hover:bg-gray-100 transition mr-2">Tutup</button>
-            <!-- Optional: Tombol Bantuan -->
-            <a href="https://wa.me/628123456789" target="_blank" class="px-5 py-2 rounded-xl text-sm font-bold bg-green-500 hover:bg-green-600 text-white transition inline-flex items-center gap-2">
-                <i class="fab fa-whatsapp"></i> Bantuan
+        <div class="bg-gray-50 px-6 sm:px-10 py-5 sm:py-6 border-t border-gray-100 flex justify-end gap-3 shrink-0">
+            <button onclick="closeTrxModal()" class="px-6 sm:px-8 py-3 rounded-xl text-xs font-black bg-white border border-gray-300 text-gray-500 hover:bg-gray-100 transition shadow-sm">Tutup</button>
+            <a id="modal-invoice-btn" href="#" class="px-6 sm:px-8 py-3 rounded-xl text-xs font-black bg-green-600 text-white hover:bg-green-700 transition shadow-lg shadow-green-100 flex items-center gap-2">
+                <i class="fas fa-file-download"></i> Download Invoice
             </a>
         </div>
     </div>
@@ -922,165 +669,158 @@ get_header();
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
-    // AJAX URL dari WordPress
     var ajaxurl = "<?php echo admin_url('admin-ajax.php'); ?>";
 
-    // Tab Switching Logic
     function switchTab(tabId, btn) {
         $('.tab-content').removeClass('active');
         $('#tab-' + tabId).addClass('active');
-        
         $('.nav-link').removeClass('active');
         $(btn).addClass('active');
-    }
-    
-    // Auto open tab from URL hash
-    if(window.location.hash) {
-        const hash = window.location.hash.substring(1);
-        const btn = document.querySelector(`button[onclick*='${hash}']`);
-        if(btn) btn.click();
+        history.pushState(null, null, '#' + tabId);
     }
 
-    // Preview Image Logic
     function previewImage(input) {
         if (input.files && input.files[0]) {
             var reader = new FileReader();
-            reader.onload = function (e) {
-                $('#avatar-preview').attr('src', e.target.result);
-            }
+            reader.onload = function (e) { $('#avatar-preview').attr('src', e.target.result); }
             reader.readAsDataURL(input.files[0]);
         }
     }
 
-    // --- MODAL LOGIC (Baru) ---
-    function openTrxModal(trx, items) {
-        // Isi Data Modal
-        document.getElementById('modal-trx-id').innerText = trx.kode_unik;
-        document.getElementById('modal-total-bayar').innerText = 'Rp ' + new Intl.NumberFormat('id-ID').format(trx.total_transaksi);
-        document.getElementById('modal-penerima').innerText = trx.nama_penerima;
-        document.getElementById('modal-alamat').innerText = trx.alamat_lengkap;
-        
-        // Status Badge (Simple text replacement, or use helper logic if available in JS)
-        document.getElementById('modal-status-badge').innerHTML = `<span class="px-3 py-1 rounded-full text-xs font-bold bg-gray-200 text-gray-700">${trx.status_transaksi}</span>`;
+    // --- MODAL LOGIC UPGRADED ---
+    function openDetailTrx(payload) {
+        const master = payload.master;
+        const subs = payload.subs;
 
-        // Render Items
-        const container = document.getElementById('modal-items-container');
-        container.innerHTML = ''; // Clear prev items
+        document.getElementById('modal-trx-id').innerText = '#' + master.kode_unik;
+        document.getElementById('modal-pembayaran').innerText = master.metode_pembayaran.replace('_', ' ');
+        document.getElementById('modal-total-bayar').innerText = formatRupiah(master.total_transaksi);
+        document.getElementById('modal-status-global').innerHTML = getBadge(master.status_transaksi);
+        document.getElementById('modal-penerima').innerText = master.nama_penerima;
+        document.getElementById('modal-no-hp').innerText = master.no_hp;
+        document.getElementById('modal-alamat').innerText = `${master.alamat_lengkap}, ${master.kelurahan}, ${master.kecamatan}, ${master.kabupaten}, ${master.provinsi} ${master.kode_pos}`;
         
-        items.forEach(item => {
-            const html = `
-                <div class="flex gap-4 items-center">
-                    <img src="${item.foto_snapshot || 'https://via.placeholder.com/60'}" class="w-14 h-14 rounded-lg object-cover bg-gray-100 border border-gray-200">
-                    <div class="flex-grow">
-                        <p class="text-xs text-gray-500 mb-0.5">${item.nama_toko}</p>
-                        <h5 class="font-bold text-sm text-gray-800 line-clamp-1">${item.nama_produk}</h5>
-                        <p class="text-xs text-gray-500">${item.jumlah} x Rp ${new Intl.NumberFormat('id-ID').format(item.harga_satuan)}</p>
+        // Update Invoice Link
+        document.getElementById('modal-invoice-btn').href = '<?php echo home_url('/pembayaran?id='); ?>' + master.kode_unik + '&invoice=1';
+
+        // Bukti Bayar Section
+        const buktiSec = document.getElementById('modal-bukti-section');
+        const buktiImg = document.getElementById('modal-bukti-img');
+        if (master.bukti_pembayaran) {
+            buktiSec.classList.remove('hidden');
+            buktiImg.src = master.bukti_pembayaran;
+        } else {
+            buktiSec.classList.add('hidden');
+        }
+
+        // Subs Container
+        const container = document.getElementById('modal-subs-container');
+        container.innerHTML = '';
+
+        subs.forEach(row => {
+            let itemsHtml = '';
+            row.items.forEach(it => {
+                itemsHtml += `
+                    <div class="flex items-center gap-4 py-3 border-b border-gray-50 last:border-0">
+                        <img src="${it.foto_snapshot}" class="w-12 h-12 rounded-xl object-cover bg-gray-50 border border-gray-100 shadow-sm">
+                        <div class="flex-grow">
+                            <p class="text-[11px] font-black text-gray-800 line-clamp-1 leading-tight mb-1">${it.nama_produk}</p>
+                            <p class="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">${it.jumlah} Unit x ${formatRupiah(it.harga_satuan)}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-xs font-black text-gray-900 leading-none">${formatRupiah(it.total_harga)}</p>
+                        </div>
                     </div>
-                    <div class="text-right">
-                        <p class="font-bold text-sm text-gray-900">Rp ${new Intl.NumberFormat('id-ID').format(item.total_harga)}</p>
+                `;
+            });
+
+            // Delivery Icon logic
+            let deliveryIcon = '<i class="fas fa-truck text-blue-600"></i>';
+            if(row.data.metode_pengiriman.toLowerCase().includes('ojek')) deliveryIcon = '<i class="fas fa-motorcycle text-teal-600"></i>';
+            if(row.data.metode_pengiriman.toLowerCase().includes('ambil')) deliveryIcon = '<i class="fas fa-store-alt text-amber-600"></i>';
+
+            container.innerHTML += `
+                <div class="rounded-[2rem] border border-gray-100 overflow-hidden shadow-sm bg-white hover:border-green-100 transition-colors">
+                    <div class="px-6 py-4 bg-gray-50/80 flex flex-wrap items-center justify-between border-b gap-3">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-xl bg-green-100 text-green-600 flex items-center justify-center text-xs shadow-sm"><i class="fas fa-store"></i></div>
+                            <span class="text-sm font-black text-gray-800 tracking-tight leading-none">${row.data.nama_toko}</span>
+                        </div>
+                        ${getBadge(row.data.status_pesanan)}
+                    </div>
+                    <div class="p-6">
+                        <div class="flex items-center justify-between mb-5 bg-gray-50/50 px-4 py-3 rounded-2xl border border-gray-100">
+                            <span class="text-[9px] font-black text-gray-400 uppercase tracking-widest">Pengiriman</span>
+                            <span class="text-xs font-black text-gray-700 flex items-center gap-2">${deliveryIcon} ${row.data.metode_pengiriman}</span>
+                        </div>
+                        <div class="space-y-1">${itemsHtml}</div>
+                        <div class="mt-5 pt-5 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                            <div class="text-[10px] text-gray-400 font-bold italic tracking-tighter">Biaya Kirim: ${formatRupiah(row.data.ongkir)}</div>
+                            <div class="text-sm font-black text-gray-900 tracking-tighter">Subtotal: ${formatRupiah(row.data.total_pesanan_toko)}</div>
+                        </div>
+                        ${row.data.no_resi ? `<div class="mt-4 text-[9px] font-black text-indigo-600 bg-indigo-50 px-4 py-2 rounded-full w-fit border border-indigo-100 flex items-center gap-2"><i class="fas fa-barcode"></i> Resi: ${row.data.no_resi}</div>` : ''}
                     </div>
                 </div>
             `;
-            container.innerHTML += html;
         });
 
-        // Show Modal
-        const modal = document.getElementById('trx-modal');
-        modal.classList.remove('hidden');
-        setTimeout(() => modal.classList.add('open'), 10);
+        $('#trx-modal').removeClass('hidden').addClass('open');
     }
 
-    function closeTrxModal() {
-        const modal = document.getElementById('trx-modal');
-        modal.classList.remove('open');
-        setTimeout(() => modal.classList.add('hidden'), 300);
-    }
+    function closeTrxModal() { $('#trx-modal').removeClass('open'); setTimeout(()=>$('#trx-modal').addClass('hidden'),300); }
+    function formatRupiah(n) { return 'Rp ' + new Intl.NumberFormat('id-ID').format(n); }
 
-    // Close on click outside
-    document.getElementById('trx-modal').addEventListener('click', function(e) {
-        if (e.target === this) closeTrxModal();
-    });
-
-    // --- LOGIC ADDRESS API (AJAX CHAINING) ---
-    jQuery(document).ready(function($) {
-        var els = { 
-            prov: $('#dw_provinsi'), 
-            kota: $('#dw_kota'), 
-            kec: $('#dw_kecamatan'), 
-            kel: $('#dw_kelurahan') 
+    function getBadge(status) {
+        const config = {
+            'menunggu_pembayaran': {l: 'BELUM BAYAR', c: 'bg-amber-50 text-amber-600 border-amber-200', i: 'fa-wallet'},
+            'pembayaran_dikonfirmasi': {l: 'SUDAH BAYAR', c: 'bg-emerald-50 text-emerald-600 border-emerald-200', i: 'fa-check-circle'},
+            'menunggu_konfirmasi': {l: 'KONFIRMASI TOKO', c: 'bg-orange-50 text-orange-600 border-orange-100', i: 'fa-store-alt'},
+            'diproses': {l: 'DIPROSES', c: 'bg-blue-50 text-blue-600 border-blue-200', i: 'fa-box-open'},
+            'menunggu_driver': {l: 'CARI DRIVER', c: 'bg-fuchsia-50 text-fuchsia-600 border-fuchsia-200', i: 'fa-user-clock'},
+            'dalam_perjalanan': {l: 'KURIR DI JALAN', c: 'bg-teal-50 text-teal-600 border-teal-200', i: 'fa-motorcycle'},
+            'dikirim': {l: 'DIKIRIM', c: 'bg-indigo-50 text-indigo-600 border-indigo-200', i: 'fa-truck'},
+            'selesai': {l: 'SELESAI', c: 'bg-green-600 text-white border-green-700 shadow-sm', i: 'fa-check-double'},
+            'dibatalkan': {l: 'BATAL', c: 'bg-rose-50 text-rose-600 border-rose-200', i: 'fa-ban'},
+            'expired': {l: 'EXPIRED', c: 'bg-gray-50 text-gray-400 border-gray-200', i: 'fa-clock'}
         };
-        var data = $('#region-data').data(); // Data ID tersimpan (dari PHP)
+        const res = config[status] || {l: status.toUpperCase().replace('_',' '), c: 'bg-gray-50 text-gray-500 border-gray-200', i: 'fa-info-circle'};
+        return `<span class="px-3 py-1 rounded-lg text-[8px] font-black border tracking-tighter flex items-center ${res.c}"><i class="fas ${res.i} mr-1.5"></i>${res.l}</span>`;
+    }
 
-        // Fungsi Load Data AJAX
+    // --- REGION API ---
+    jQuery(document).ready(function($) {
+        var els = { prov: $('#dw_provinsi'), kota: $('#dw_kota'), kec: $('#dw_kecamatan'), kel: $('#dw_kelurahan') };
+        var data = $('#region-data').data();
+
         function loadR(act, pid, el, sel, cb) {
-            el.html('<option>Memuat data...</option>').prop('disabled', true);
-            var p = { action: act };
-            if(act=='dw_fetch_regencies') p.province_id = pid;
-            if(act=='dw_fetch_districts') p.regency_id = pid;
-            if(act=='dw_fetch_villages') p.district_id = pid;
-            
-            $.get(ajaxurl, p, function(res){
+            el.html('<option>Memuat...</option>').prop('disabled', true);
+            $.get(ajaxurl, { action: act, province_id: pid, regency_id: pid, district_id: pid }, function(res){
                 if(res.success) {
                     var o = '<option value="">-- Pilih --</option>';
-                    $.each(res.data.data||res.data, function(i,v){ 
-                        var id = v.id || v.code; 
-                        var name = v.name || v.nama;
-                        o+='<option value="'+id+'" '+(id==sel?'selected':'')+'>'+name+'</option>'; 
-                    });
-                    el.html(o).prop('disabled', false);
-                    if(cb) cb();
-                } else {
-                    el.html('<option>Gagal memuat data</option>');
+                    $.each(res.data, function(i,v){ o+='<option value="'+(v.id||v.code)+'" '+((v.id||v.code)==sel?'selected':'')+'>'+(v.name||v.nama)+'</option>'; });
+                    el.html(o).prop('disabled', false); if(cb) cb();
                 }
             });
         }
-        
-        // Fungsi Set Text ke Hidden Input
-        function setText(el, target) { 
-            var txt = $(el).find('option:selected').text();
-            if(txt && txt !== 'Memuat data...' && txt !== '-- Pilih --') {
-                $(target).val(txt); 
-            }
+        function setH() {
+            $('#input_provinsi_nama').val(els.prov.find('option:selected').text());
+            $('#input_kota_nama').val(els.kota.find('option:selected').text());
+            $('#input_kecamatan_nama').val(els.kec.find('option:selected').text());
+            $('#input_kelurahan_nama').val(els.kel.find('option:selected').text());
         }
 
-        // 1. Initial Load (Provinsi)
         loadR('dw_fetch_provinces', null, els.prov, data.prov, function(){
-            // Chain Load jika ada data tersimpan
-            if(data.prov) {
-                loadR('dw_fetch_regencies', data.prov, els.kota, data.kota, function(){
-                    if(data.kota) {
-                        loadR('dw_fetch_districts', data.kota, els.kec, data.kec, function(){
-                            if(data.kec) {
-                                loadR('dw_fetch_villages', data.kec, els.kel, data.kel);
-                            }
-                        });
-                    }
+            if(data.prov) loadR('dw_fetch_regencies', data.prov, els.kota, data.kota, function(){
+                if(data.kota) loadR('dw_fetch_districts', data.kota, els.kec, data.kec, function(){
+                    if(data.kec) loadR('dw_fetch_villages', data.kec, els.kel, data.kel, setH);
                 });
-            }
+            });
         });
 
-        // 2. Event Listeners (Change)
-        els.prov.change(function(){ 
-            setText(this, '#input_provinsi_nama'); 
-            loadR('dw_fetch_regencies', $(this).val(), els.kota, null); 
-            els.kota.val(''); els.kec.empty().prop('disabled',true); els.kel.empty().prop('disabled',true); 
-        });
-
-        els.kota.change(function(){ 
-            setText(this, '#input_kota_nama'); 
-            loadR('dw_fetch_districts', $(this).val(), els.kec, null); 
-            els.kec.val(''); els.kel.empty().prop('disabled',true); 
-        });
-
-        els.kec.change(function(){ 
-            setText(this, '#input_kecamatan_nama'); 
-            loadR('dw_fetch_villages', $(this).val(), els.kel, null);
-            els.kel.val('');
-        });
-
-        els.kel.change(function(){ 
-            setText(this, '#input_kelurahan_nama'); 
-        });
+        els.prov.change(function(){ setH(); loadR('dw_fetch_regencies', $(this).val(), els.kota, null); els.kec.html('').prop('disabled',true); els.kel.html('').prop('disabled',true); });
+        els.kota.change(function(){ setH(); loadR('dw_fetch_districts', $(this).val(), els.kec, null); els.kel.html('').prop('disabled',true); });
+        els.kec.change(function(){ loadR('dw_fetch_villages', $(this).val(), els.kel, null); });
+        els.kel.change(setH);
     });
 </script>
 
