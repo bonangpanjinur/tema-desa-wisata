@@ -1,7 +1,7 @@
 <?php
 /**
  * Template Name: Checkout Marketplace (Complete Logic)
- * Description: Checkout dengan perbaikan penangkapan Kurir & Logika Redirect Tunai/COD + UI/UX Premium + Auto Save Address.
+ * Description: Checkout dengan Logika Smart Phone (Billing Phone Priority + Sync) & UI Premium.
  */
 
 if (!session_id()) session_start();
@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dw_place_order'])) {
 
     // Ambil data formulir teks
     $nama_penerima = sanitize_text_field($_POST['nama_penerima']);
-    $no_hp         = sanitize_text_field($_POST['no_hp']);
+    $no_hp         = sanitize_text_field($_POST['no_hp']); // Ini akan menjadi billing_phone
     $alamat_lengkap = sanitize_textarea_field($_POST['alamat_lengkap']);
     $kode_pos      = sanitize_text_field($_POST['kode_pos']);
     $metode_bayar  = sanitize_text_field($_POST['payment_method']);
@@ -73,82 +73,77 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dw_place_order'])) {
 
     if ($selected_items) {
         
-        // --- FITUR AUTO-SAVE ADDRESS KE PROFIL PENGGUNA ---
-        // Logika: Jika alamat di profil masih kosong atau user ingin update, data checkout ini akan menimpa data profil.
-        // Ini memastikan checkout berikutnya otomatis terisi.
+        // --- FITUR AUTO-SAVE ADDRESS & PHONE SYNC ---
+        // 1. Selalu Update Billing Phone (Meta Data Standar)
+        update_user_meta($user_id, 'billing_phone', $no_hp);
         
+        // 2. Update Tabel Custom (Sesuai Role)
         $table_user = '';
         $where_user = [];
         $data_update_user = [];
 
+        // Data alamat standar untuk update
+        $data_address_base = [
+            'alamat_lengkap'   => $alamat_lengkap,
+            'api_provinsi_id'  => $prov_id,
+            'api_kabupaten_id' => $kota_id,
+            'api_kecamatan_id' => $kec_id,
+            'api_kelurahan_id' => $kel_id,
+            'kode_pos'         => $kode_pos,
+        ];
+
         if (in_array('pedagang', $roles)) {
-            // Role Pedagang
             $table_user = "{$wpdb->prefix}dw_pedagang";
             $where_user = ['id_user' => $user_id];
-            $data_update_user = [
-                'alamat_lengkap'   => $alamat_lengkap,
+            $data_update_user = array_merge($data_address_base, [
                 'provinsi_nama'    => $provinsi,
                 'kabupaten_nama'   => $kabupaten,
                 'kecamatan_nama'   => $kecamatan,
                 'kelurahan_nama'   => $kelurahan,
-                'api_provinsi_id'  => $prov_id,
-                'api_kabupaten_id' => $kota_id,
-                'api_kecamatan_id' => $kec_id,
-                'api_kelurahan_id' => $kel_id,
-                'kode_pos'         => $kode_pos,
-                'nomor_wa'         => $no_hp
-            ];
+                'nomor_wa'         => $no_hp // Sinkronisasi ke tabel pedagang
+            ]);
         } elseif (in_array('admin_desa', $roles) || in_array('editor_desa', $roles)) {
-            // Role Desa
             $table_user = "{$wpdb->prefix}dw_desa";
             $where_user = ['id_user_desa' => $user_id];
-            $data_update_user = [
-                'alamat_lengkap'   => $alamat_lengkap,
+            $data_update_user = array_merge($data_address_base, [
+                'provinsi'         => $provinsi,
+                'kabupaten'        => $kabupaten,
+                'kecamatan'        => $kecamatan,
+                'kelurahan'        => $kelurahan
+                // Tabel desa biasanya tidak punya kolom no_hp personal, jadi cukup di user_meta
+            ]);
+        } elseif (in_array('verifikator_umkm', $roles)) {
+            $table_user = "{$wpdb->prefix}dw_verifikator";
+            $where_user = ['id_user' => $user_id];
+            $data_update_user = array_merge($data_address_base, [
                 'provinsi'         => $provinsi,
                 'kabupaten'        => $kabupaten,
                 'kecamatan'        => $kecamatan,
                 'kelurahan'        => $kelurahan,
-                'api_provinsi_id'  => $prov_id,
-                'api_kabupaten_id' => $kota_id,
-                'api_kecamatan_id' => $kec_id,
-                'api_kelurahan_id' => $kel_id,
-                'kode_pos'         => $kode_pos
-            ];
-            // No HP desa biasanya disimpan di user meta karena tabel desa tidak selalu punya kolom no_hp personal
-            update_user_meta($user_id, 'billing_phone', $no_hp);
-
+                'nomor_wa'         => $no_hp // Sinkronisasi ke tabel verifikator
+            ]);
         } else {
-            // Role Pembeli (Default)
+            // Role Pembeli
             $table_user = "{$wpdb->prefix}dw_pembeli";
             $where_user = ['id_user' => $user_id];
-            
-            // Cek dulu apakah kolom 'nomor_wa' atau 'no_hp' yang ada di tabel pembeli
-            // Kita asumsikan update keduanya atau salah satu yang umum
-            $data_update_user = [
-                'alamat_lengkap'   => $alamat_lengkap,
+            $data_update_user = array_merge($data_address_base, [
                 'provinsi'         => $provinsi,
                 'kabupaten'        => $kabupaten,
                 'kecamatan'        => $kecamatan,
                 'kelurahan'        => $kelurahan,
-                'api_provinsi_id'  => $prov_id,
-                'api_kabupaten_id' => $kota_id,
-                'api_kecamatan_id' => $kec_id,
-                'api_kelurahan_id' => $kel_id,
-                'kode_pos'         => $kode_pos,
-                'no_hp'            => $no_hp // Mengupdate no_hp agar tersimpan
-            ];
+                'no_hp'            => $no_hp // Sinkronisasi ke tabel pembeli
+            ]);
         }
 
         // Eksekusi Update Profil
         if ($table_user && !empty($data_update_user)) {
-            // Cek apakah user ada di tabel tersebut
             $check_user = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM $table_user WHERE " . key($where_user) . " = %d", current($where_user)));
             if ($check_user) {
                 $wpdb->update($table_user, $data_update_user, $where_user);
             }
         }
         
-        // --- LANJUT PROSES TRANSAKSI SEPERTI BIASA ---
+        // --- LANJUT PROSES TRANSAKSI ---
 
         $total_produk = 0;
         $total_ongkir = 0;
@@ -201,21 +196,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dw_place_order'])) {
 
             $ongkir_toko = floatval($post_ongkir[$toko_id] ?? 0);
             
-            // PERBAIKAN: Tangkap kode pengiriman dan ubah ke label yang user-friendly untuk database
             $kode_kirim_raw = isset($post_kurir[$toko_id]) ? sanitize_text_field($post_kurir[$toko_id]) : 'pickup';
-            $metode_kirim_db = 'Ambil Sendiri'; // Default
+            $metode_kirim_db = 'Ambil Sendiri'; 
 
             switch ($kode_kirim_raw) {
-                case 'ojek':
-                    $metode_kirim_db = 'Ojek Lokal';
-                    break;
-                case 'ekspedisi':
-                    $metode_kirim_db = 'Ekspedisi';
-                    break;
-                case 'pickup':
-                default:
-                    $metode_kirim_db = 'Ambil Sendiri';
-                    break;
+                case 'ojek': $metode_kirim_db = 'Ojek Lokal'; break;
+                case 'ekspedisi': $metode_kirim_db = 'Ekspedisi'; break;
+                case 'pickup': default: $metode_kirim_db = 'Ambil Sendiri'; break;
             }
             
             $nama_toko = $wpdb->get_var($wpdb->prepare("SELECT nama_toko FROM {$wpdb->prefix}dw_pedagang WHERE id = %d", $toko_id));
@@ -227,7 +214,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dw_place_order'])) {
                 'sub_total'          => $sub_total_toko,
                 'ongkir'             => $ongkir_toko,
                 'total_pesanan_toko' => $sub_total_toko + $ongkir_toko,
-                'metode_pengiriman'  => $metode_kirim_db, // Simpan teks yang sudah diformat (Ambil Sendiri/Ojek Lokal/Ekspedisi)
+                'metode_pengiriman'  => $metode_kirim_db,
                 'status_pesanan'     => 'menunggu_konfirmasi',
                 'created_at'         => current_time('mysql')
             ]);
@@ -250,10 +237,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dw_place_order'])) {
             }
         }
 
-        // Hapus item dari keranjang setelah berhasil checkout
         $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}dw_cart WHERE id IN ($ids_placeholder)", $selected_cart_ids));
 
-        // LOGIKA REDIRECT BERDASARKAN METODE PEMBAYARAN
         if (in_array($metode_bayar, ['tunai', 'cod'])) {
             wp_redirect(home_url('/terima-kasih?id=' . $kode_unik . '&method=' . $metode_bayar));
         } else {
@@ -263,7 +248,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dw_place_order'])) {
     }
 }
 
-// --- 2. PENGAMBILAN DATA ALAMAT OTOMATIS BERDASARKAN ROLE ---
+// --- 2. PENGAMBILAN DATA ALAMAT & TELEPON OTOMATIS ---
 $data_source = null;
 $role_type   = 'pembeli'; 
 
@@ -281,27 +266,39 @@ if (in_array('pedagang', $roles)) {
 }
 
 $nama_penerima = $user_wp->display_name;
-$no_hp = ''; $alamat_detail = ''; $kode_pos = '';
+$alamat_detail = ''; $kode_pos = '';
 $prov_id = ''; $kota_id = ''; $kec_id = ''; $kel_id = '';
 $prov_nm = ''; $kota_nm = ''; $kec_nm = ''; $kel_nm = '';
+
+// *** LOGIKA SMART PHONE RETRIEVAL ***
+// 1. Coba ambil dari billing_phone (Meta) karena ini data paling relevan untuk checkout
+$no_hp = get_user_meta($user_id, 'billing_phone', true);
+
+// 2. Jika kosong, fallback ke data profil berdasarkan role
+if (empty($no_hp) && $data_source) {
+    if (isset($data_source->nomor_wa) && !empty($data_source->nomor_wa)) {
+        $no_hp = $data_source->nomor_wa;
+    } elseif (isset($data_source->no_hp) && !empty($data_source->no_hp)) {
+        $no_hp = $data_source->no_hp;
+    }
+}
 
 if ($data_source) {
     switch ($role_type) {
         case 'pedagang':
-            $nama_penerima = $data_source->nama_pemilik; $no_hp = $data_source->nomor_wa;
+            $nama_penerima = $data_source->nama_pemilik;
             $alamat_detail = $data_source->alamat_lengkap;
             $prov_nm = $data_source->provinsi_nama; $kota_nm = $data_source->kabupaten_nama;
             $kec_nm = $data_source->kecamatan_nama; $kel_nm = $data_source->kelurahan_nama;
             break;
         case 'desa':
-            $nama_penerima = $data_source->nama_desa; $no_hp = get_user_meta($user_id, 'billing_phone', true);
+            $nama_penerima = $data_source->nama_desa;
             $alamat_detail = $data_source->alamat_lengkap;
             $prov_nm = $data_source->provinsi; $kota_nm = $data_source->kabupaten;
             $kec_nm = $data_source->kecamatan; $kel_nm = $data_source->kelurahan;
             break;
-        default:
-            $nama_penerima = $data_source->nama_lengkap;
-            $no_hp = isset($data_source->nomor_wa) ? $data_source->nomor_wa : (isset($data_source->no_hp) ? $data_source->no_hp : '');
+        default: // Pembeli & Verifikator
+            $nama_penerima = isset($data_source->nama_lengkap) ? $data_source->nama_lengkap : $user_wp->display_name;
             $alamat_detail = $data_source->alamat_lengkap;
             $prov_nm = $data_source->provinsi; $kota_nm = $data_source->kabupaten;
             $kec_nm = $data_source->kecamatan; $kel_nm = $data_source->kelurahan;
