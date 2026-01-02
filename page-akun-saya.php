@@ -1,8 +1,7 @@
 <?php
 /**
  * Template Name: Halaman Akun Saya Custom
- * Description: Dashboard user lengkap. Sinkronisasi Foto Profil & Data ke Tabel Custom (Desa, Pedagang, Verifikator, Pembeli).
- * UPDATE: Support Full Sync untuk semua role sesuai skema database activation.php.
+ * Description: Dashboard user lengkap. Sinkronisasi Foto Profil & Data ke Tabel Custom + Riwayat Pesanan Langsung + Modal Detail.
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -24,6 +23,62 @@ $user_id      = $current_user->ID;
 $roles        = (array) $current_user->roles;
 $msg          = '';
 $msg_type     = '';
+
+// --- HELPER: FORMAT STATUS BADGE (Baru Ditambahkan) ---
+if (!function_exists('dw_get_status_badge')) {
+    function dw_get_status_badge($status) {
+        $colors = [
+            // Status Pembayaran & Umum
+            'menunggu_pembayaran'     => 'bg-yellow-100 text-yellow-700 border-yellow-200',
+            'pembayaran_dikonfirmasi' => 'bg-green-100 text-green-700 border-green-200',
+            'pembayaran_gagal'        => 'bg-red-100 text-red-700 border-red-200',
+            'diproses'                => 'bg-blue-100 text-blue-700 border-blue-200',
+            'dikirim'                 => 'bg-indigo-100 text-indigo-700 border-indigo-200',
+            'selesai'                 => 'bg-emerald-100 text-emerald-700 border-emerald-200',
+            'dibatalkan'              => 'bg-gray-100 text-gray-600 border-gray-200',
+            'refunded'                => 'bg-pink-100 text-pink-700 border-pink-200',
+            
+            // Status Pengiriman / Ojek (Lebih Spesifik)
+            'menunggu_driver'         => 'bg-orange-100 text-orange-700 border-orange-200',
+            'penawaran_driver'        => 'bg-purple-100 text-purple-700 border-purple-200',
+            'nego'                    => 'bg-cyan-100 text-cyan-700 border-cyan-200',
+            'menunggu_penjemputan'    => 'bg-sky-100 text-sky-700 border-sky-200',
+            'dalam_perjalanan'        => 'bg-teal-100 text-teal-700 border-teal-200',
+        ];
+        
+        $labels = [
+            'menunggu_pembayaran'     => 'Belum Dibayar',
+            'pembayaran_dikonfirmasi' => 'Sudah Bayar',
+            'pembayaran_gagal'        => 'Gagal Bayar',
+            'diproses'                => 'Sedang Diproses',
+            'dikirim'                 => 'Sedang Dikirim',
+            'selesai'                 => 'Selesai',
+            'dibatalkan'              => 'Dibatalkan',
+            'refunded'                => 'Dikembalikan',
+            'menunggu_driver'         => 'Cari Driver',
+            'penawaran_driver'        => 'Driver Menawar',
+            'nego'                    => 'Nego Harga',
+            'menunggu_penjemputan'    => 'Menunggu Jemput',
+            'dalam_perjalanan'        => 'Driver OTW',
+        ];
+
+        // Fallback untuk status yang tidak terdaftar
+        $c = isset($colors[$status]) ? $colors[$status] : 'bg-gray-100 text-gray-600 border-gray-200';
+        $l = isset($labels[$status]) ? $labels[$status] : ucfirst(str_replace('_', ' ', $status));
+        
+        // Ikon tambahan untuk visualisasi (Opsional, tapi bagus untuk UX)
+        $icon = '';
+        switch ($status) {
+            case 'menunggu_pembayaran': $icon = '<i class="fas fa-clock mr-1"></i>'; break;
+            case 'selesai':             $icon = '<i class="fas fa-check-circle mr-1"></i>'; break;
+            case 'dikirim':             $icon = '<i class="fas fa-truck mr-1"></i>'; break;
+            case 'dibatalkan':          $icon = '<i class="fas fa-times-circle mr-1"></i>'; break;
+            case 'dalam_perjalanan':    $icon = '<i class="fas fa-motorcycle mr-1"></i>'; break;
+        }
+
+        return "<span class='px-3 py-1 rounded-full text-xs font-bold border flex items-center w-fit $c'>{$icon}{$l}</span>";
+    }
+}
 
 // --- LOGIC: HANDLE POST REQUESTS ---
 if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
@@ -356,6 +411,24 @@ get_header();
     .nav-link:hover:not(.active) { background-color: #f8fafc; color: #334155; }
     .form-input { transition: all 0.2s; }
     .form-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); }
+    
+    /* Simple Modal Animation */
+    .dw-modal { 
+        transition: opacity 0.3s ease-in-out;
+        opacity: 0;
+        pointer-events: none;
+    }
+    .dw-modal.open {
+        opacity: 1;
+        pointer-events: auto;
+    }
+    .dw-modal-content {
+        transform: scale(0.95);
+        transition: transform 0.3s ease-in-out;
+    }
+    .dw-modal.open .dw-modal-content {
+        transform: scale(1);
+    }
 </style>
 
 <div class="bg-gray-50 min-h-screen font-sans text-slate-800 py-10">
@@ -486,17 +559,96 @@ get_header();
                     </div>
                 </div>
 
-                <!-- 2. ORDERS TAB -->
+                <!-- 2. ORDERS TAB (INTEGRATED & IMPROVED) -->
                 <div id="tab-orders" class="tab-content">
-                    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-10 text-center">
-                        <div class="inline-block p-6 rounded-full bg-blue-50 text-blue-600 mb-6">
-                            <i class="fas fa-receipt text-4xl"></i>
+                    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                        <div class="px-8 py-6 border-b border-gray-100 flex justify-between items-center">
+                            <h2 class="text-xl font-bold text-gray-800">Riwayat Pesanan</h2>
+                            <a href="<?php echo home_url('/keranjang'); ?>" class="text-sm text-blue-600 hover:underline">Ke Keranjang</a>
                         </div>
-                        <h2 class="text-2xl font-bold text-gray-800 mb-3">Halaman Pesanan</h2>
-                        <p class="text-gray-500 mb-8 max-w-md mx-auto">Lihat riwayat belanja, lacak pengiriman, dan kelola semua transaksi Anda di halaman khusus.</p>
-                        <a href="<?php echo home_url('/transaksi-saya'); ?>" class="inline-flex items-center justify-center px-8 py-4 bg-gray-900 text-white font-bold rounded-xl hover:bg-black transition shadow-lg gap-2">
-                            <span>Buka Riwayat Pesanan</span> <i class="fas fa-external-link-alt text-sm"></i>
-                        </a>
+
+                        <div class="p-6 bg-gray-50/50 min-h-[400px]">
+                            <?php
+                            // QUERY TRANSAKSI USER
+                            // Mengambil data pesanan dari tabel custom dw_transaksi
+                            // JOIN dengan tabel sub transaksi dan item untuk data detail modal
+                            $transactions = $wpdb->get_results($wpdb->prepare(
+                                "SELECT * FROM {$wpdb->prefix}dw_transaksi 
+                                 WHERE id_pembeli = %d 
+                                 ORDER BY created_at DESC", 
+                                $user_id
+                            ));
+
+                            if ($transactions): ?>
+                                <div class="space-y-4">
+                                    <?php foreach ($transactions as $trx): 
+                                        $tgl = date_i18n('d M Y, H:i', strtotime($trx->created_at));
+                                        $total_fmt = 'Rp ' . number_format($trx->total_transaksi, 0, ',', '.');
+                                        
+                                        // Ambil Data Item untuk Modal (Optimasi Query: Ambil saat loop atau pakai GROUP_CONCAT di query utama)
+                                        // Di sini kita query lagi per transaksi untuk simplifikasi logika view
+                                        $trx_items = $wpdb->get_results($wpdb->prepare(
+                                            "SELECT i.*, p.nama_toko 
+                                             FROM {$wpdb->prefix}dw_transaksi_items i
+                                             JOIN {$wpdb->prefix}dw_transaksi_sub s ON i.id_sub_transaksi = s.id
+                                             JOIN {$wpdb->prefix}dw_pedagang p ON s.id_pedagang = p.id
+                                             WHERE s.id_transaksi = %d",
+                                            $trx->id
+                                        ));
+                                        
+                                        // Serialize data item untuk dikirim ke JS
+                                        $items_json = json_encode($trx_items);
+                                        
+                                        // Logika Tombol Aksi
+                                        if ($trx->status_transaksi == 'menunggu_pembayaran') {
+                                            $action_btn = '<a href="'.home_url('/pembayaran?id=' . $trx->kode_unik).'" class="px-5 py-2 rounded-xl text-sm font-bold bg-yellow-500 hover:bg-yellow-600 text-white transition-colors shadow-sm">Bayar Sekarang</a>';
+                                        } else {
+                                            // Tombol Modal Trigger
+                                            $action_btn = "<button onclick='openTrxModal(".json_encode($trx).", $items_json)' class='px-5 py-2 rounded-xl text-sm font-bold bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors shadow-sm'>Lihat Detail</button>";
+                                        }
+                                    ?>
+                                    <!-- Card Item Pesanan -->
+                                    <div class="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                                            <div class="flex items-center gap-3">
+                                                <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
+                                                    <i class="fas fa-shopping-bag"></i>
+                                                </div>
+                                                <div>
+                                                    <p class="text-xs text-gray-500 font-mono">ID: <?php echo esc_html($trx->kode_unik); ?></p>
+                                                    <p class="text-xs text-gray-400"><?php echo $tgl; ?></p>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <?php echo dw_get_status_badge($trx->status_transaksi); ?>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="flex justify-between items-end border-t border-gray-100 pt-4">
+                                            <div>
+                                                <p class="text-xs text-gray-500 mb-1">Total Belanja</p>
+                                                <p class="font-bold text-lg text-gray-800"><?php echo $total_fmt; ?></p>
+                                            </div>
+                                            <!-- Tombol Aksi Dinamis -->
+                                            <?php echo $action_btn; ?>
+                                        </div>
+                                    </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php else: ?>
+                                <!-- Empty State -->
+                                <div class="text-center py-12">
+                                    <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-300">
+                                        <i class="fas fa-receipt text-3xl"></i>
+                                    </div>
+                                    <h3 class="text-lg font-bold text-gray-700">Belum ada pesanan</h3>
+                                    <p class="text-gray-500 text-sm mb-6">Yuk mulai belanja produk desa menarik!</p>
+                                    <a href="<?php echo home_url('/produk'); ?>" class="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-blue-700 transition">
+                                        Mulai Belanja
+                                    </a>
+                                </div>
+                            <?php endif; ?>
+                        </div>
                     </div>
                 </div>
 
@@ -620,7 +772,6 @@ get_header();
                             <p class="text-sm text-gray-500">Perbarui informasi pribadi dan foto profil Anda.</p>
                         </div>
                         
-                        <!-- UPDATE: Tambahkan enctype agar bisa upload file -->
                         <form method="post" action="" enctype="multipart/form-data">
                             <?php wp_nonce_field('dw_save_profile', 'dw_profile_nonce'); ?>
                             <input type="hidden" name="dw_action" value="update_profile">
@@ -708,6 +859,67 @@ get_header();
     </div>
 </div>
 
+<!-- Modal Structure (Hidden by default) -->
+<div id="trx-modal" class="dw-modal fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm hidden">
+    <div class="dw-modal-content bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden relative m-4">
+        <!-- Header -->
+        <div class="bg-gray-50 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+            <div>
+                <h3 class="text-lg font-bold text-gray-800">Detail Transaksi</h3>
+                <p class="text-xs text-gray-500 font-mono" id="modal-trx-id">#TRX-00000</p>
+            </div>
+            <button onclick="closeTrxModal()" class="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition">
+                <i class="fas fa-times text-gray-600"></i>
+            </button>
+        </div>
+        
+        <!-- Body -->
+        <div class="p-6 overflow-y-auto max-h-[70vh]">
+            <!-- Info Status -->
+            <div class="flex justify-between items-start mb-6 bg-blue-50 p-4 rounded-xl border border-blue-100">
+                <div>
+                    <p class="text-xs text-blue-600 font-bold uppercase tracking-wide mb-1">Status Pesanan</p>
+                    <div id="modal-status-badge"></div>
+                </div>
+                <div class="text-right">
+                    <p class="text-xs text-blue-600 font-bold uppercase tracking-wide mb-1">Total Bayar</p>
+                    <p class="text-xl font-bold text-gray-900" id="modal-total-bayar">Rp 0</p>
+                </div>
+            </div>
+
+            <!-- List Item -->
+            <h4 class="font-bold text-gray-800 mb-3 text-sm border-b pb-2">Daftar Produk</h4>
+            <div id="modal-items-container" class="space-y-4">
+                <!-- Items injected by JS -->
+            </div>
+
+            <!-- Info Pengiriman -->
+            <div class="mt-6 pt-4 border-t border-gray-100">
+                <h4 class="font-bold text-gray-800 mb-2 text-sm">Info Pengiriman</h4>
+                <div class="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <p class="text-gray-500 text-xs">Penerima</p>
+                        <p class="font-semibold" id="modal-penerima">-</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500 text-xs">Alamat</p>
+                        <p class="font-semibold line-clamp-2" id="modal-alamat">-</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="bg-gray-50 px-6 py-4 border-t border-gray-100 text-right">
+            <button onclick="closeTrxModal()" class="px-5 py-2 rounded-xl text-sm font-bold bg-white border border-gray-300 text-gray-700 hover:bg-gray-100 transition mr-2">Tutup</button>
+            <!-- Optional: Tombol Bantuan -->
+            <a href="https://wa.me/628123456789" target="_blank" class="px-5 py-2 rounded-xl text-sm font-bold bg-green-500 hover:bg-green-600 text-white transition inline-flex items-center gap-2">
+                <i class="fab fa-whatsapp"></i> Bantuan
+            </a>
+        </div>
+    </div>
+</div>
+
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
     // AJAX URL dari WordPress
@@ -739,6 +951,55 @@ get_header();
             reader.readAsDataURL(input.files[0]);
         }
     }
+
+    // --- MODAL LOGIC (Baru) ---
+    function openTrxModal(trx, items) {
+        // Isi Data Modal
+        document.getElementById('modal-trx-id').innerText = trx.kode_unik;
+        document.getElementById('modal-total-bayar').innerText = 'Rp ' + new Intl.NumberFormat('id-ID').format(trx.total_transaksi);
+        document.getElementById('modal-penerima').innerText = trx.nama_penerima;
+        document.getElementById('modal-alamat').innerText = trx.alamat_lengkap;
+        
+        // Status Badge (Simple text replacement, or use helper logic if available in JS)
+        document.getElementById('modal-status-badge').innerHTML = `<span class="px-3 py-1 rounded-full text-xs font-bold bg-gray-200 text-gray-700">${trx.status_transaksi}</span>`;
+
+        // Render Items
+        const container = document.getElementById('modal-items-container');
+        container.innerHTML = ''; // Clear prev items
+        
+        items.forEach(item => {
+            const html = `
+                <div class="flex gap-4 items-center">
+                    <img src="${item.foto_snapshot || 'https://via.placeholder.com/60'}" class="w-14 h-14 rounded-lg object-cover bg-gray-100 border border-gray-200">
+                    <div class="flex-grow">
+                        <p class="text-xs text-gray-500 mb-0.5">${item.nama_toko}</p>
+                        <h5 class="font-bold text-sm text-gray-800 line-clamp-1">${item.nama_produk}</h5>
+                        <p class="text-xs text-gray-500">${item.jumlah} x Rp ${new Intl.NumberFormat('id-ID').format(item.harga_satuan)}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="font-bold text-sm text-gray-900">Rp ${new Intl.NumberFormat('id-ID').format(item.total_harga)}</p>
+                    </div>
+                </div>
+            `;
+            container.innerHTML += html;
+        });
+
+        // Show Modal
+        const modal = document.getElementById('trx-modal');
+        modal.classList.remove('hidden');
+        setTimeout(() => modal.classList.add('open'), 10);
+    }
+
+    function closeTrxModal() {
+        const modal = document.getElementById('trx-modal');
+        modal.classList.remove('open');
+        setTimeout(() => modal.classList.add('hidden'), 300);
+    }
+
+    // Close on click outside
+    document.getElementById('trx-modal').addEventListener('click', function(e) {
+        if (e.target === this) closeTrxModal();
+    });
 
     // --- LOGIC ADDRESS API (AJAX CHAINING) ---
     jQuery(document).ready(function($) {
