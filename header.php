@@ -15,16 +15,25 @@
     <meta name="theme-color" content="<?php echo get_theme_mod('dw_pwa_theme_color', '#0d6efd'); ?>">
     <link rel="manifest" href="<?php echo home_url('/?dw-manifest=1'); ?>">
     <link rel="apple-touch-icon" href="<?php echo get_site_icon_url(180); ?>">
+<?php if ( get_theme_mod('dw_pwa_enabled', '1') ) : ?>
+    <meta name="theme-color" content="<?php echo get_theme_mod('dw_pwa_theme_color', '#0d6efd'); ?>">
+    <link rel="manifest" href="<?php echo home_url('/?dw-manifest=1'); ?>">
+    <link rel="apple-touch-icon" href="<?php echo get_site_icon_url(180); ?>">
     <script>
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('<?php echo home_url('/?dw-sw=1'); ?>')
-                    .then(reg => console.log('PWA Desa Wisata Siap!'))
-                    .catch(err => console.log('SW fail: ', err));
+            window.addEventListener('load', function() {
+                // Menambahkan { scope: '/' } sangat penting jika menggunakan URL dinamis
+                navigator.serviceWorker.register('<?php echo home_url('/?dw-sw=1'); ?>', { scope: '/' })
+                .then(function(registration) {
+                    console.log('PWA: ServiceWorker terdaftar dengan scope: ', registration.scope);
+                }, function(err) {
+                    console.log('PWA: Registrasi gagal: ', err);
+                });
             });
         }
     </script>
-    <?php endif; ?>
+<?php endif; ?>
+
     <?php wp_head(); ?>
 </head>
 

@@ -321,7 +321,7 @@ function dw_handle_add_to_cart() {
     global $wpdb;
 
     $product_id = intval($_POST['product_id']);
-    $qty        = intval($_POST['qty']);
+    $qty         = intval($_POST['qty']);
 
     if (!$product_id) wp_send_json_error(['message' => 'Produk tidak valid']);
 
@@ -646,9 +646,34 @@ function dw_ajax_desa_save_profile() {
 
 /**
  * ==============================================================================
- * 8. WISHLIST
+ * 8. WISHLIST & PROGRESSIVE WEB APP (PWA)
  * ==============================================================================
  */
+
+// Wishlist AJAX
+add_action('wp_ajax_dw_toggle_wishlist', 'dw_handle_toggle_wishlist');
+add_action('wp_ajax_nopriv_dw_toggle_wishlist', 'dw_handle_toggle_wishlist');
+function dw_handle_toggle_wishlist() {
+    check_ajax_referer('dw_cart_nonce', 'security');
+    if (!is_user_logged_in()) wp_send_json_error(['code' => 'not_logged_in']);
+    
+    global $wpdb;
+    $user_id = get_current_user_id();
+    $item_id = intval($_POST['item_id']);
+    $type = sanitize_text_field($_POST['item_type']);
+    $table = $wpdb->prefix . 'dw_wishlist';
+    
+    $exist = $wpdb->get_var($wpdb->prepare("SELECT id FROM $table WHERE user_id=%d AND item_id=%d AND item_type=%s", $user_id, $item_id, $type));
+    
+    if($exist) {
+        $wpdb->delete($table, ['id' => $exist]);
+        wp_send_json_success(['status' => 'removed']);
+    } else {
+        $wpdb->insert($table, ['user_id' => $user_id, 'item_id' => $item_id, 'item_type' => $type]);
+        wp_send_json_success(['status' => 'added']);
+    }
+}
+
 /**
  * Pengaturan PWA di Customizer
  */
@@ -683,7 +708,7 @@ function dw_pwa_customize_register( $wp_customize ) {
     ) );
 
     // Theme Color
-    $wp_customize->add_setting( 'dw_pwa_theme_color', array( 'default' => '#0d6efd' ) );
+    $wp_customize->add_setting( 'dw_pwa_theme_color', array( 'default' => '#16a34a' ) );
     $wp_customize->add_control( new WP_Customize_Color_Control( $wp_customize, 'dw_pwa_theme_color', array(
         'label'    => __( 'Warna Tema (Toolbar)', 'dw-desa-wisata' ),
         'section'  => 'dw_pwa_section',
@@ -699,83 +724,89 @@ function dw_pwa_customize_register( $wp_customize ) {
 add_action( 'customize_register', 'dw_pwa_customize_register' );
 
 /**
- * Handle Manifest JSON dinamis
+ * Handle PWA Files (Manifest & Service Worker)
  */
 add_action('init', function() {
+    // 1. MANIFEST JSON
     if (isset($_GET['dw-manifest'])) {
         header('Content-Type: application/json; charset=utf-8');
         
         $name = get_theme_mod('dw_pwa_name', get_bloginfo('name'));
-        $short_name = get_theme_mod('dw_pwa_short_name', get_bloginfo('name'));
-        $theme_color = get_theme_mod('dw_pwa_theme_color', '#0d6efd');
-        $bg_color = get_theme_mod('dw_pwa_bg_color', '#ffffff');
-        $icon_url = get_site_icon_url(512);
+        $theme_color = get_theme_mod('dw_pwa_theme_color', '#16a34a');
+        $site_icon_id = get_option('site_icon');
+
+        $icons = [];
+        if ($site_icon_id) {
+            $sizes = [192, 512];
+            foreach ($sizes as $size) {
+                $icon_data = wp_get_attachment_image_src($site_icon_id, [$size, $size]);
+                if ($icon_data) {
+                    $icons[] = [
+                        "src" => $icon_data[0],
+                        "sizes" => "{$size}x{$size}",
+                        "type" => "image/png",
+                        "purpose" => "any maskable"
+                    ];
+                }
+            }
+        }
 
         $manifest = [
             "name" => $name,
-            "short_name" => $short_name,
+            "short_name" => get_theme_mod('dw_pwa_short_name', $name),
             "start_url" => home_url('/'),
             "display" => "standalone",
-            "background_color" => $bg_color,
+            "background_color" => get_theme_mod('dw_pwa_bg_color', '#ffffff'),
             "theme_color" => $theme_color,
-            "icons" => [
-                [
-                    "src" => $icon_url ? $icon_url : get_template_directory_uri() . '/assets/img/icon-512.png',
-                    "sizes" => "512x512",
-                    "type" => "image/png",
-                    "purpose" => "any maskable"
-                ]
-            ]
+            "icons" => $icons
         ];
         echo json_encode($manifest);
         exit;
     }
 
+    // 2. SERVICE WORKER
     if (isset($_GET['dw-sw'])) {
         header('Content-Type: application/javascript; charset=utf-8');
+        // PENTING: Header ini memberitahu browser bahwa script ini punya akses ke seluruh situs
+        header('Service-Worker-Allowed: /'); 
         ?>
-        const CACHE_NAME = 'dw-v1';
-        const urlsToCache = [
-            '<?php echo home_url('/'); ?>',
-            '<?php echo get_stylesheet_uri(); ?>'
-        ];
+        const CACHE_NAME = 'dw-cache-v16';
+        const OFFLINE_URL = '<?php echo home_url('/'); ?>';
 
-        self.addEventListener('install', event => {
+        self.addEventListener('install', (event) => {
             event.waitUntil(
-                caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
+                caches.open(CACHE_NAME).then((cache) => {
+                    return cache.addAll([OFFLINE_URL]);
+                })
             );
+            self.skipWaiting();
         });
 
-        self.addEventListener('fetch', event => {
-            event.respondWith(
-                caches.match(event.request).then(response => response || fetch(event.request))
+        self.addEventListener('activate', (event) => {
+            event.waitUntil(
+                caches.keys().then((cacheNames) => {
+                    return Promise.all(
+                        cacheNames.map((cacheName) => {
+                            if (cacheName !== CACHE_NAME) {
+                                return caches.delete(cacheName);
+                            }
+                        })
+                    );
+                })
             );
+            self.clients.claim();
+        });
+
+        self.addEventListener('fetch', (event) => {
+            if (event.request.mode === 'navigate') {
+                event.respondWith(
+                    fetch(event.request).catch(() => {
+                        return caches.match(OFFLINE_URL);
+                    })
+                );
+            }
         });
         <?php
         exit;
     }
 });
-
-add_action('wp_ajax_dw_toggle_wishlist', 'dw_handle_toggle_wishlist');
-add_action('wp_ajax_nopriv_dw_toggle_wishlist', 'dw_handle_toggle_wishlist');
-function dw_handle_toggle_wishlist() {
-    check_ajax_referer('dw_cart_nonce', 'security');
-    if (!is_user_logged_in()) wp_send_json_error(['code' => 'not_logged_in']);
-    
-    global $wpdb;
-    $user_id = get_current_user_id();
-    $item_id = intval($_POST['item_id']);
-    $type = sanitize_text_field($_POST['item_type']);
-    $table = $wpdb->prefix . 'dw_wishlist';
-    
-    $exist = $wpdb->get_var($wpdb->prepare("SELECT id FROM $table WHERE user_id=%d AND item_id=%d AND item_type=%s", $user_id, $item_id, $type));
-    
-    if($exist) {
-        $wpdb->delete($table, ['id' => $exist]);
-        wp_send_json_success(['status' => 'removed']);
-    } else {
-        $wpdb->insert($table, ['user_id' => $user_id, 'item_id' => $item_id, 'item_type' => $type]);
-        wp_send_json_success(['status' => 'added']);
-    }
-}
-?>
