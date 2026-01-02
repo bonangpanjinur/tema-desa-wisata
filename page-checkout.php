@@ -1,7 +1,7 @@
 <?php
 /**
  * Template Name: Checkout Marketplace (Complete Logic)
- * Description: Checkout dengan perbaikan penangkapan Kurir & Logika Redirect Tunai.
+ * Description: Checkout dengan perbaikan penangkapan Kurir & Logika Redirect Tunai/COD + UI/UX Premium.
  */
 
 if (!session_id()) session_start();
@@ -154,11 +154,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dw_place_order'])) {
         $wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->prefix}dw_cart WHERE id IN ($ids_placeholder)", $selected_cart_ids));
 
         // LOGIKA REDIRECT BERDASARKAN METODE PEMBAYARAN
-        if ($metode_bayar === 'tunai') {
-            // Redirect ke halaman sukses dengan instruksi kasir
-            wp_redirect(home_url('/terima-kasih?id=' . $kode_unik . '&status=cash'));
+        if (in_array($metode_bayar, ['tunai', 'cod'])) {
+            wp_redirect(home_url('/terima-kasih?id=' . $kode_unik . '&method=' . $metode_bayar));
         } else {
-            // Redirect ke halaman pembayaran online/transfer
             wp_redirect(home_url('/pembayaran?id=' . $kode_unik));
         }
         exit;
@@ -166,7 +164,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dw_place_order'])) {
 }
 
 // --- 2. PENGAMBILAN DATA ALAMAT OTOMATIS BERDASARKAN ROLE ---
-// (Bagian ini tetap sama seperti kode sebelumnya untuk mengisi formulir otomatis)
 $data_source = null;
 $role_type   = 'pembeli'; 
 
@@ -218,9 +215,13 @@ if ($data_source) {
 // --- 3. AMBIL DATA CART ---
 $selected_cart_ids = isset($_POST['cart_ids']) ? array_map('intval', $_POST['cart_ids']) : [];
 if (empty($selected_cart_ids)) {
-    echo '<div class="bg-white min-h-screen flex flex-col items-center justify-center p-10 font-sans text-center">
-            <h2 class="text-xl font-bold mb-2">Keranjang Kosong</h2>
-            <a href="'.home_url('/keranjang').'" class="text-primary underline">Kembali</a>
+    echo '<div class="bg-gray-50 min-h-screen flex flex-col items-center justify-center p-10 font-sans text-center">
+            <div class="w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-lg mb-4">
+                <i class="fas fa-shopping-basket text-4xl text-gray-300"></i>
+            </div>
+            <h2 class="text-xl font-bold mb-2 text-gray-800">Keranjang Belanja Kosong</h2>
+            <p class="text-gray-500 mb-6">Sepertinya Anda belum memilih barang untuk dibayar.</p>
+            <a href="'.home_url('/keranjang').'" class="bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-full shadow-md transition-all">Kembali ke Keranjang</a>
           </div>';
     get_footer(); exit;
 }
@@ -263,13 +264,36 @@ foreach ($items as $item) {
 }
 ?>
 
-<div class="bg-gray-50 min-h-screen py-10 font-sans">
-    <div class="max-w-6xl mx-auto px-4">
+<!-- Import Tailwind & FontAwesome jika belum ada di header theme -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                colors: {
+                    primary: '#059669', // Emerald 600
+                    'primary-dark': '#047857', // Emerald 700
+                    'secondary': '#f3f4f6',
+                }
+            }
+        }
+    }
+</script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<div class="bg-gray-50 min-h-screen py-8 md:py-12 font-sans text-gray-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        <h1 class="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2">
-            <span class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm"><i class="fas fa-check"></i></span>
-            Konfirmasi Pesanan
-        </h1>
+        <!-- Header -->
+        <div class="mb-8 text-center md:text-left">
+            <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight flex items-center justify-center md:justify-start gap-3">
+                <div class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center text-lg shadow-lg">
+                    <i class="fas fa-lock"></i>
+                </div>
+                Checkout Aman
+            </h1>
+            <p class="mt-2 text-sm text-gray-500 ml-1">Selesaikan pesanan Anda dengan mengisi informasi di bawah ini.</p>
+        </div>
 
         <form id="form-checkout" action="" method="POST" class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             <?php wp_nonce_field('dw_checkout_action', 'dw_checkout_nonce'); ?>
@@ -279,142 +303,278 @@ foreach ($items as $item) {
                 <input type="hidden" name="cart_ids[]" value="<?php echo $cid; ?>">
             <?php endforeach; ?>
 
-            <div class="lg:col-span-8 space-y-6">
-                <!-- Alamat Pengiriman -->
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2 border-b pb-3">
-                        <i class="fas fa-map-marker-alt text-primary"></i> Alamat Pengiriman
-                    </h3>
-                    <div class="space-y-4">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-bold text-gray-500 mb-1">Nama Penerima</label>
-                                <input type="text" name="nama_penerima" value="<?php echo esc_attr($nama_penerima); ?>" class="w-full border-gray-300 rounded-lg text-sm" required>
+            <!-- KOLOM KIRI: Form Input & Daftar Barang -->
+            <div class="lg:col-span-8 space-y-8">
+                
+                <!-- SECTION 1: Alamat Pengiriman -->
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="bg-gray-50/50 px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                        <h3 class="font-bold text-gray-800 flex items-center gap-2">
+                            <i class="fas fa-map-marker-alt text-primary"></i> Alamat Pengiriman
+                        </h3>
+                        <span class="text-xs text-gray-400 bg-white px-2 py-1 rounded border">Wajib Diisi</span>
+                    </div>
+                    
+                    <div class="p-6 space-y-5">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-gray-600 uppercase tracking-wide">Nama Penerima</label>
+                                <div class="relative">
+                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><i class="far fa-user"></i></span>
+                                    <input type="text" name="nama_penerima" value="<?php echo esc_attr($nama_penerima); ?>" 
+                                           class="w-full pl-9 pr-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all outline-none" 
+                                           placeholder="Nama Lengkap" required>
+                                </div>
                             </div>
-                            <div>
-                                <label class="block text-xs font-bold text-gray-500 mb-1">No. WhatsApp</label>
-                                <input type="text" name="no_hp" value="<?php echo esc_attr($no_hp); ?>" class="w-full border-gray-300 rounded-lg text-sm" required>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-gray-600 uppercase tracking-wide">No. WhatsApp</label>
+                                <div class="relative">
+                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><i class="fab fa-whatsapp"></i></span>
+                                    <input type="text" name="no_hp" value="<?php echo esc_attr($no_hp); ?>" 
+                                           class="w-full pl-9 pr-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all outline-none" 
+                                           placeholder="Contoh: 08123456789" required>
+                                </div>
                             </div>
                         </div>
-                        <div>
-                            <label class="block text-xs font-bold text-gray-500 mb-1">Alamat Lengkap</label>
-                            <textarea name="alamat_lengkap" rows="2" class="w-full border-gray-300 rounded-lg text-sm" required><?php echo esc_textarea($alamat_detail); ?></textarea>
+
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-gray-600 uppercase tracking-wide">Alamat Lengkap</label>
+                            <textarea name="alamat_lengkap" rows="2" 
+                                      class="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all outline-none" 
+                                      placeholder="Nama Jalan, No. Rumah, RT/RW, Patokan..." required><?php echo esc_textarea($alamat_detail); ?></textarea>
                         </div>
+
                         <!-- Dropdown Wilayah (API) -->
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-bold text-gray-500 mb-1">Provinsi</label>
-                                <select name="provinsi_id" id="region-provinsi" class="w-full border-gray-300 rounded-lg text-sm" data-selected="<?php echo esc_attr($prov_id); ?>" required><option value="">Memuat...</option></select>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-gray-600">Provinsi</label>
+                                <select name="provinsi_id" id="region-provinsi" 
+                                        class="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none" 
+                                        data-selected="<?php echo esc_attr($prov_id); ?>" required>
+                                    <option value="">Memuat...</option>
+                                </select>
                                 <input type="hidden" name="provinsi_nama" id="provinsi_nama" value="<?php echo esc_attr($prov_nm); ?>">
                             </div>
-                            <div>
-                                <label class="block text-xs font-bold text-gray-500 mb-1">Kota/Kabupaten</label>
-                                <select name="kota_id" id="region-kabupaten" class="w-full border-gray-300 rounded-lg text-sm" data-selected="<?php echo esc_attr($kota_id); ?>" disabled required><option value="">Pilih Provinsi Dulu</option></select>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-gray-600">Kota/Kabupaten</label>
+                                <select name="kota_id" id="region-kabupaten" 
+                                        class="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none disabled:bg-gray-100 disabled:text-gray-400" 
+                                        data-selected="<?php echo esc_attr($kota_id); ?>" disabled required>
+                                    <option value="">Pilih Provinsi Dulu</option>
+                                </select>
                                 <input type="hidden" name="kabupaten_nama" id="kabupaten_nama" value="<?php echo esc_attr($kota_nm); ?>">
                             </div>
-                            <div>
-                                <label class="block text-xs font-bold text-gray-500 mb-1">Kecamatan</label>
-                                <select name="kecamatan_id" id="region-kecamatan" class="w-full border-gray-300 rounded-lg text-sm" data-selected="<?php echo esc_attr($kec_id); ?>" disabled required><option value="">Pilih Kota Dulu</option></select>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-gray-600">Kecamatan</label>
+                                <select name="kecamatan_id" id="region-kecamatan" 
+                                        class="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none disabled:bg-gray-100 disabled:text-gray-400" 
+                                        data-selected="<?php echo esc_attr($kec_id); ?>" disabled required>
+                                    <option value="">Pilih Kota Dulu</option>
+                                </select>
                                 <input type="hidden" name="kecamatan_nama" id="kecamatan_nama" value="<?php echo esc_attr($kec_nm); ?>">
                             </div>
-                            <div>
-                                <label class="block text-xs font-bold text-gray-500 mb-1">Kelurahan / Desa</label>
-                                <select name="kelurahan_id" id="region-kelurahan" class="w-full border-gray-300 rounded-lg text-sm" data-selected="<?php echo esc_attr($kel_id); ?>" disabled required><option value="">Pilih Kecamatan Dulu</option></select>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-gray-600">Kelurahan / Desa</label>
+                                <select name="kelurahan_id" id="region-kelurahan" 
+                                        class="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none disabled:bg-gray-100 disabled:text-gray-400" 
+                                        data-selected="<?php echo esc_attr($kel_id); ?>" disabled required>
+                                    <option value="">Pilih Kecamatan Dulu</option>
+                                </select>
                                 <input type="hidden" name="kelurahan_nama" id="kelurahan_nama" value="<?php echo esc_attr($kel_nm); ?>">
                             </div>
                         </div>
-                        <div class="md:w-1/3">
-                            <label class="block text-xs font-bold text-gray-500 mb-1">Kode Pos</label>
-                            <input type="text" name="kode_pos" id="kode_pos" value="<?php echo esc_attr($kode_pos); ?>" class="w-full border-gray-300 rounded-lg text-sm">
+
+                        <div class="md:w-1/3 space-y-1">
+                            <label class="text-xs font-bold text-gray-600 uppercase tracking-wide">Kode Pos</label>
+                            <input type="text" name="kode_pos" id="kode_pos" value="<?php echo esc_attr($kode_pos); ?>" 
+                                   class="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none" 
+                                   placeholder="Contoh: 59563">
                         </div>
                     </div>
                 </div>
 
-                <!-- List Produk per Toko -->
+                <!-- SECTION 2: List Produk per Toko -->
                 <?php foreach ($grouped_checkout as $toko_id => $group): $toko = $group['toko']; ?>
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <div class="border-b border-gray-100 pb-3 mb-4 flex justify-between items-center">
-                        <h4 class="font-bold text-gray-700 flex items-center gap-2"><i class="fas fa-store text-blue-500"></i> <?php echo esc_html($toko['nama']); ?></h4>
-                        <span class="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded">Asal: <?php echo esc_html($toko['kota']); ?></span>
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
+                    <!-- Header Toko -->
+                    <div class="bg-gradient-to-r from-gray-50 to-white px-6 py-3 border-b border-gray-100 flex flex-wrap justify-between items-center gap-2">
+                        <h4 class="font-bold text-gray-800 flex items-center gap-2 text-base">
+                            <i class="fas fa-store text-primary"></i> <?php echo esc_html($toko['nama']); ?>
+                        </h4>
+                        <div class="flex items-center gap-2 text-xs text-gray-500 bg-white px-2 py-1 rounded-full border border-gray-200 shadow-sm">
+                            <i class="fas fa-map-pin text-gray-400"></i> <?php echo esc_html($toko['kota']); ?>
+                        </div>
                     </div>
 
-                    <div class="space-y-4 mb-5">
-                        <?php foreach ($group['items'] as $item): ?>
-                            <div class="flex gap-4 items-center">
-                                <img src="<?php echo esc_url($item->foto_utama); ?>" class="w-16 h-16 bg-gray-100 rounded-lg object-cover shrink-0">
-                                <div class="flex-grow">
-                                    <h5 class="text-sm font-bold text-gray-800 line-clamp-1"><?php echo esc_html($item->nama_produk); ?></h5>
-                                    <div class="flex justify-between items-center mt-1">
-                                        <span class="text-xs text-gray-500"><?php echo $item->qty; ?> x <?php echo tema_dw_format_rupiah($item->final_price); ?></span>
-                                        <span class="text-sm font-bold text-gray-700"><?php echo tema_dw_format_rupiah($item->qty * $item->final_price); ?></span>
+                    <div class="p-6">
+                        <!-- List Item -->
+                        <div class="space-y-6 mb-6">
+                            <?php foreach ($group['items'] as $item): ?>
+                                <div class="flex gap-4 items-start">
+                                    <div class="w-20 h-20 rounded-lg overflow-hidden border border-gray-200 shrink-0">
+                                        <img src="<?php echo esc_url($item->foto_utama); ?>" class="w-full h-full object-cover" alt="Produk">
+                                    </div>
+                                    <div class="flex-grow">
+                                        <h5 class="text-sm font-semibold text-gray-800 line-clamp-2 leading-snug mb-1"><?php echo esc_html($item->nama_produk); ?></h5>
+                                        <?php if(!empty($item->deskripsi_variasi)): ?>
+                                            <p class="text-xs text-gray-500 mb-2 bg-gray-50 inline-block px-1.5 rounded">Var: <?php echo esc_html($item->deskripsi_variasi); ?></p>
+                                        <?php endif; ?>
+                                        
+                                        <div class="flex flex-wrap justify-between items-end mt-1">
+                                            <div class="text-xs text-gray-500">
+                                                <?php echo $item->qty; ?> barang x <span class="font-medium text-gray-700"><?php echo tema_dw_format_rupiah($item->final_price); ?></span>
+                                            </div>
+                                            <span class="text-sm font-bold text-gray-900"><?php echo tema_dw_format_rupiah($item->qty * $item->final_price); ?></span>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-
-                    <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                        <label class="block text-xs font-bold text-gray-600 mb-2 uppercase tracking-wide">Pilih Metode Pengiriman</label>
-                        <!-- NAME kurir[id_toko] adalah kunci agar data tertangkap per toko -->
-                        <select name="kurir[<?php echo $toko_id; ?>]" 
-                                class="w-full text-sm border-gray-300 rounded-lg cursor-pointer shipping-dropdown" 
-                                required
-                                data-merchant="<?php echo $toko_id; ?>"
-                                data-merchant-kecamatan="<?php echo esc_attr($toko['kec_id']); ?>"
-                                data-ojek-zones='<?php echo htmlspecialchars($toko['ojek_zona'] ?? '{}', ENT_QUOTES, 'UTF-8'); ?>'>
-                            <option value="">-- Pilih Kurir --</option>
-                            <?php if($toko['pickup_aktif']): ?><option value="pickup">Ambil Sendiri (Gratis)</option><?php endif; ?>
-                            <?php if($toko['ojek_aktif']): ?><option value="ojek">Ojek Lokal</option><?php endif; ?>
-                            <?php if($toko['nasional_aktif']): ?><option value="ekspedisi">Ekspedisi (JNE/POS)</option><?php endif; ?>
-                        </select>
-                        <div class="mt-3 flex justify-between items-center border-t border-slate-200 pt-2">
-                            <span class="text-xs text-gray-500" id="info-text-<?php echo $toko_id; ?>">Ongkir:</span>
-                            <div class="text-sm font-bold text-primary" id="ongkir-display-<?php echo $toko_id; ?>">Rp 0</div>
+                            <?php endforeach; ?>
                         </div>
-                        <input type="hidden" name="ongkir_value[<?php echo $toko_id; ?>]" id="ongkir-value-<?php echo $toko_id; ?>" value="0">
+
+                        <!-- Pilihan Pengiriman -->
+                        <div class="bg-blue-50/50 p-4 rounded-xl border border-blue-100/50">
+                            <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+                                <div class="flex-grow space-y-2">
+                                    <label class="block text-xs font-bold text-gray-600 uppercase tracking-wide flex items-center gap-1">
+                                        <i class="fas fa-truck text-blue-500"></i> Jasa Pengiriman
+                                    </label>
+                                    <div class="relative">
+                                        <select name="kurir[<?php echo $toko_id; ?>]" 
+                                                class="w-full appearance-none pl-4 pr-10 py-2.5 bg-white border border-gray-300 rounded-lg text-sm cursor-pointer focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none shipping-dropdown" 
+                                                required
+                                                data-merchant="<?php echo $toko_id; ?>"
+                                                data-merchant-kecamatan="<?php echo esc_attr($toko['kec_id']); ?>"
+                                                data-ojek-zones='<?php echo htmlspecialchars($toko['ojek_zona'] ?? '{}', ENT_QUOTES, 'UTF-8'); ?>'>
+                                            <option value="">-- Pilih Kurir --</option>
+                                            <?php if($toko['pickup_aktif']): ?><option value="pickup">Ambil Sendiri di Toko (Gratis)</option><?php endif; ?>
+                                            <?php if($toko['ojek_aktif']): ?><option value="ojek">Ojek Lokal (Kurir Desa)</option><?php endif; ?>
+                                            <?php if($toko['nasional_aktif']): ?><option value="ekspedisi">Ekspedisi (JNE/POS/J&T) - Bayar Tempat</option><?php endif; ?>
+                                        </select>
+                                        <div class="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-gray-500">
+                                            <i class="fas fa-chevron-down text-xs"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="min-w-[100px] text-right sm:text-right flex flex-row sm:flex-col justify-between items-center sm:justify-center border-t sm:border-t-0 sm:border-l border-blue-100 pt-3 sm:pt-0 sm:pl-4 mt-1 sm:mt-0">
+                                    <span class="text-xs text-gray-500 mb-0.5">Ongkos Kirim</span>
+                                    <div class="text-base font-bold text-blue-600" id="ongkir-display-<?php echo $toko_id; ?>">Rp 0</div>
+                                </div>
+                            </div>
+                            <input type="hidden" name="ongkir_value[<?php echo $toko_id; ?>]" id="ongkir-value-<?php echo $toko_id; ?>" value="0">
+                        </div>
                     </div>
                 </div>
                 <?php endforeach; ?>
 
-                <!-- Metode Pembayaran -->
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2 border-b pb-3"><i class="fas fa-wallet text-primary"></i> Metode Pembayaran</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <!-- Transfer -->
-                        <label class="border-2 border-gray-200 p-4 rounded-xl cursor-pointer hover:bg-blue-50 hover:border-blue-200 flex flex-col gap-2 transition">
-                            <input type="radio" name="payment_method" value="transfer" required checked class="w-4 h-4 text-primary">
-                            <div><span class="font-bold block text-sm">Transfer / QRIS</span><span class="text-[10px] text-gray-500">Konfirmasi via Upload Bukti</span></div>
-                        </label>
-                        <!-- Tunai -->
-                        <label class="border-2 border-gray-200 p-4 rounded-xl cursor-pointer hover:bg-yellow-50 hover:border-yellow-200 flex flex-col gap-2 transition">
-                            <input type="radio" name="payment_method" value="tunai" class="w-4 h-4 text-primary">
-                            <div><span class="font-bold block text-sm">Tunai (Bayar Kasir)</span><span class="text-[10px] text-gray-500">Bayar langsung di kasir toko</span></div>
-                        </label>
-                        <!-- COD -->
-                        <label class="border-2 border-gray-200 p-4 rounded-xl cursor-pointer hover:bg-gray-50 flex flex-col gap-2 transition opacity-60">
-                            <input type="radio" name="payment_method" value="cod" class="w-4 h-4 text-primary">
-                            <div><span class="font-bold block text-sm">COD</span><span class="text-[10px] text-gray-500">Bayar saat barang sampai</span></div>
-                        </label>
+                <!-- SECTION 3: Metode Pembayaran -->
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="bg-gray-50/50 px-6 py-4 border-b border-gray-100">
+                        <h3 class="font-bold text-gray-800 flex items-center gap-2">
+                            <i class="fas fa-wallet text-primary"></i> Metode Pembayaran
+                        </h3>
                     </div>
-                </div>
-            </div>
+                    
+                    <div class="p-6">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <!-- Option: Transfer -->
+                            <label class="relative cursor-pointer group">
+                                <input type="radio" name="payment_method" value="transfer" class="peer sr-only" required checked>
+                                <div class="p-4 rounded-xl border-2 border-gray-200 bg-white hover:bg-gray-50 peer-checked:border-primary peer-checked:bg-green-50 transition-all h-full flex flex-col items-center text-center justify-center gap-2">
+                                    <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-lg mb-1">
+                                        <i class="fas fa-university"></i>
+                                    </div>
+                                    <div>
+                                        <span class="block font-bold text-sm text-gray-800">Transfer / QRIS</span>
+                                        <span class="block text-[10px] text-gray-500 leading-tight mt-1">Konfirmasi Manual via Bukti Foto</span>
+                                    </div>
+                                    <div class="absolute top-3 right-3 opacity-0 peer-checked:opacity-100 text-primary">
+                                        <i class="fas fa-check-circle text-lg"></i>
+                                    </div>
+                                </div>
+                            </label>
 
-            <!-- Summary Samping -->
-            <div class="lg:col-span-4">
-                <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100 sticky top-24">
-                    <h3 class="font-bold text-lg mb-4">Ringkasan Biaya</h3>
-                    <div class="space-y-3 text-sm text-gray-600 mb-6">
-                        <div class="flex justify-between"><span>Total Harga</span><span class="font-bold text-gray-800"><?php echo tema_dw_format_rupiah($grand_total_barang); ?></span></div>
-                        <div class="flex justify-between"><span>Ongkos Kirim</span><span class="font-bold text-gray-800" id="summary-ongkir">Rp 0</span></div>
-                        <div class="flex justify-between"><span>Biaya Layanan</span><span class="font-bold text-gray-800">Rp 1.000</span></div>
-                    </div>
-                    <div class="border-t border-dashed border-gray-300 pt-4 mb-6">
-                        <div class="flex justify-between items-end">
-                            <span class="font-bold text-gray-800 text-base">Total Tagihan</span>
-                            <span class="text-2xl font-extrabold text-primary" id="summary-grand-total"><?php echo tema_dw_format_rupiah($grand_total_barang + 1000); ?></span>
+                            <!-- Option: Tunai -->
+                            <label class="relative cursor-pointer group">
+                                <input type="radio" name="payment_method" value="tunai" class="peer sr-only">
+                                <div class="p-4 rounded-xl border-2 border-gray-200 bg-white hover:bg-gray-50 peer-checked:border-yellow-400 peer-checked:bg-yellow-50 transition-all h-full flex flex-col items-center text-center justify-center gap-2">
+                                    <div class="w-10 h-10 rounded-full bg-yellow-100 text-yellow-600 flex items-center justify-center text-lg mb-1">
+                                        <i class="fas fa-cash-register"></i>
+                                    </div>
+                                    <div>
+                                        <span class="block font-bold text-sm text-gray-800">Tunai (Kasir)</span>
+                                        <span class="block text-[10px] text-gray-500 leading-tight mt-1">Bayar langsung di kasir toko</span>
+                                    </div>
+                                    <div class="absolute top-3 right-3 opacity-0 peer-checked:opacity-100 text-yellow-500">
+                                        <i class="fas fa-check-circle text-lg"></i>
+                                    </div>
+                                </div>
+                            </label>
+
+                            <!-- Option: COD -->
+                            <label class="relative cursor-pointer group">
+                                <input type="radio" name="payment_method" value="cod" class="peer sr-only">
+                                <div class="p-4 rounded-xl border-2 border-gray-200 bg-white hover:bg-gray-50 peer-checked:border-orange-400 peer-checked:bg-orange-50 transition-all h-full flex flex-col items-center text-center justify-center gap-2">
+                                    <div class="w-10 h-10 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-lg mb-1">
+                                        <i class="fas fa-hand-holding-dollar"></i>
+                                    </div>
+                                    <div>
+                                        <span class="block font-bold text-sm text-gray-800">COD (Bayar Tempat)</span>
+                                        <span class="block text-[10px] text-gray-500 leading-tight mt-1">Bayar saat kurir sampai rumah</span>
+                                    </div>
+                                    <div class="absolute top-3 right-3 opacity-0 peer-checked:opacity-100 text-orange-500">
+                                        <i class="fas fa-check-circle text-lg"></i>
+                                    </div>
+                                </div>
+                            </label>
                         </div>
                     </div>
-                    <button type="submit" class="w-full bg-primary hover:bg-green-700 text-white font-bold py-4 rounded-xl shadow-lg transition-all transform active:scale-95">Buat Pesanan <i class="fas fa-arrow-right ml-2"></i></button>
+                </div>
+
+            </div>
+
+            <!-- KOLOM KANAN: Ringkasan Biaya (Sticky) -->
+            <div class="lg:col-span-4">
+                <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100 sticky top-24">
+                    <h3 class="font-bold text-lg mb-6 flex items-center gap-2 text-gray-800">
+                        <i class="fas fa-receipt text-gray-400"></i> Ringkasan Belanja
+                    </h3>
+                    
+                    <div class="space-y-4 text-sm text-gray-600 mb-6">
+                        <div class="flex justify-between items-center">
+                            <span>Total Harga Barang</span>
+                            <span class="font-bold text-gray-800"><?php echo tema_dw_format_rupiah($grand_total_barang); ?></span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span>Total Ongkos Kirim</span>
+                            <span class="font-bold text-gray-800 transition-all duration-300" id="summary-ongkir">Rp 0</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="flex items-center gap-1 cursor-help" title="Biaya pemeliharaan sistem">
+                                Biaya Layanan <i class="far fa-question-circle text-gray-400 text-xs"></i>
+                            </span>
+                            <span class="font-bold text-gray-800">Rp 1.000</span>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-dashed border-gray-300 pt-5 mb-6">
+                        <div class="flex justify-between items-end">
+                            <span class="font-bold text-gray-800 text-base">Total Tagihan</span>
+                            <span class="text-2xl font-extrabold text-primary" id="summary-grand-total">
+                                <?php echo tema_dw_format_rupiah($grand_total_barang + 1000); ?>
+                            </span>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="btn-submit-order" class="w-full bg-primary hover:bg-primary-dark text-white font-bold py-4 rounded-xl shadow-lg shadow-green-200 transition-all transform active:scale-95 flex items-center justify-center gap-2 group">
+                        <span>Buat Pesanan Sekarang</span>
+                        <i class="fas fa-arrow-right group-hover:translate-x-1 transition-transform"></i>
+                    </button>
+                    
+                    <div class="mt-4 text-center">
+                        <p class="text-xs text-gray-400 flex items-center justify-center gap-1">
+                            <i class="fas fa-shield-alt"></i> Transaksi Anda Dijamin Aman
+                        </p>
+                    </div>
                 </div>
             </div>
         </form>
@@ -432,8 +592,14 @@ foreach ($items as $item) {
         function loadRegion(action, parentId, target, ph) {
             let url = `${ajaxUrl}?action=${action}`;
             if(parentId) url += `&${parentId.key}=${parentId.value}`;
-            target.innerHTML = '<option value="">Memuat...</option>'; target.disabled = true;
+            
+            // UI Loading state
+            target.innerHTML = '<option value="">Memuat...</option>'; 
+            target.disabled = true;
+            target.classList.add('bg-gray-50', 'animate-pulse');
+
             fetch(url).then(r=>r.json()).then(res=>{
+                target.classList.remove('bg-gray-50', 'animate-pulse');
                 if(res.success) {
                     target.innerHTML = `<option value="">${ph}</option>`;
                     res.data.forEach(item => {
@@ -475,6 +641,7 @@ foreach ($items as $item) {
         const dropdowns = document.querySelectorAll('.shipping-dropdown');
         const dispOngkir = document.getElementById('summary-ongkir');
         const dispTotal = document.getElementById('summary-grand-total');
+        const btnSubmit = document.getElementById('btn-submit-order');
 
         function formatRupiah(num) {
             return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num);
@@ -482,6 +649,7 @@ foreach ($items as $item) {
 
         function calculateShippingAll() {
             let totalOngkir = 0;
+            let allValid = true;
             const userKecId = kec.value; 
             const userKelId = kel.value;
 
@@ -493,14 +661,19 @@ foreach ($items as $item) {
                 
                 let cost = 0;
                 let note = 'Gratis';
+                
+                // Visual feedback saat memilih
+                if(sel.value === '') {
+                    allValid = false; // User belum memilih kurir
+                }
 
                 if(sel.value === 'pickup') {
                     cost = 0;
-                    note = '<span class="text-green-600">Ambil Sendiri</span>';
+                    note = '<span class="text-green-600"><i class="fas fa-check"></i> Gratis</span>';
                 } 
                 else if(sel.value === 'ekspedisi') {
                     cost = 0; 
-                    note = '<span class="text-orange-500">Bayar di Tempat</span>';
+                    note = '<span class="text-orange-500 text-xs">Bayar di Tempat</span>';
                 }
                 else if(sel.value === 'ojek') {
                     const zones = JSON.parse(sel.dataset.ojekZones);
@@ -534,9 +707,11 @@ foreach ($items as $item) {
                         cost = foundCost;
                         note = formatRupiah(cost);
                     } else if(!userKecId) {
-                        note = '<span class="text-red-500 text-[10px]">Pilih Alamat Dulu</span>';
+                        note = '<span class="text-red-500 text-[10px]">Alamat?</span>';
+                        allValid = false;
                     } else {
-                        note = '<span class="text-red-500 text-[10px]">Diluar Jangkauan</span>';
+                        note = '<span class="text-red-500 text-[10px]">Tidak Terjangkau</span>';
+                        allValid = false;
                     }
                 }
 
@@ -545,11 +720,29 @@ foreach ($items as $item) {
                 totalOngkir += cost;
             });
 
+            // Update Ringkasan dengan animasi angka (simple)
             dispOngkir.innerText = formatRupiah(totalOngkir);
             dispTotal.innerText = formatRupiah(baseTotalBarang + totalOngkir + biayaLayanan);
+            
+            // Highlight total changes
+            dispTotal.classList.remove('text-primary');
+            dispTotal.classList.add('text-orange-500');
+            setTimeout(() => {
+                dispTotal.classList.remove('text-orange-500');
+                dispTotal.classList.add('text-primary');
+            }, 300);
         }
 
         dropdowns.forEach(s => s.addEventListener('change', calculateShippingAll));
+        
+        // Prevent submit kalau alamat/kurir belum lengkap
+        document.getElementById('form-checkout').addEventListener('submit', function(e){
+            if(!kec.value) {
+                e.preventDefault();
+                alert('Mohon lengkapi alamat pengiriman (Kecamatan/Kelurahan) untuk menghitung ongkir yang akurat.');
+                kec.focus();
+            }
+        });
     });
 </script>
 

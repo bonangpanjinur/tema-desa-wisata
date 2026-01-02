@@ -1,7 +1,7 @@
 <?php
 /**
  * Template Name: Terima Kasih Order Premium
- * Description: Desain eksklusif untuk konfirmasi pesanan dengan instruksi dinamis + Fitur Download PDF.
+ * Description: Desain eksklusif untuk konfirmasi pesanan dengan instruksi dinamis + Fitur Download PDF High Quality.
  */
 
 get_header();
@@ -9,7 +9,7 @@ get_header();
 // Tangkap data dari URL
 $kode_unik = isset($_GET['id']) ? sanitize_text_field($_GET['id']) : 'TRX-' . strtoupper(wp_generate_password(6, false));
 
-// Tangkap Metode Pembayaran (Support parameter 'method' dari checkout baru atau 'status' legacy)
+// Tangkap Metode Pembayaran
 $method_param = isset($_GET['method']) ? sanitize_text_field($_GET['method']) : (isset($_GET['status']) ? sanitize_text_field($_GET['status']) : '');
 
 // Logika Tampilan Berdasarkan Metode
@@ -17,7 +17,7 @@ $is_tunai = ($method_param === 'tunai' || $method_param === 'cash');
 $is_cod   = ($method_param === 'cod');
 $is_offline = ($is_tunai || $is_cod);
 
-// Warna Tema (Amber untuk pembayaran tertunda/offline, Emerald untuk sukses/online)
+// Warna Tema
 $primary_color = $is_offline ? 'amber' : 'emerald';
 
 // Judul & Subjudul Dinamis
@@ -38,10 +38,11 @@ if ($is_tunai) {
 
 <!-- Import Resource -->
 <script src="https://cdn.tailwindcss.com"></script>
-<!-- Import html2pdf.js untuk fitur download PDF -->
+<!-- Import html2pdf.js Versi Terbaru -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
+    /* Animasi UI Web */
     @keyframes fadeInUp {
         from { opacity: 0; transform: translateY(30px); }
         to { opacity: 1; transform: translateY(0); }
@@ -74,13 +75,25 @@ if ($is_tunai) {
     }
     .ticket-shape::before { left: -12px; }
     .ticket-shape::after { right: -12px; }
+
+    /* CSS Khusus Saat Print/PDF (Menghapus shadow agar hasil bersih) */
+    .printing .shadow-xl, .printing .shadow-lg, .printing .shadow-sm {
+        box-shadow: none !important;
+        border: 1px solid #e2e8f0 !important;
+    }
+    .printing .animate-fade-up {
+        animation: none !important;
+        transform: none !important;
+        opacity: 1 !important;
+    }
 </style>
 
 <div class="min-h-screen bg-gradient-premium py-16 px-4 flex items-center justify-center font-sans antialiased text-slate-900">
     <div class="max-w-2xl w-full">
         
-        <!-- Main Container (Diberi ID untuk target PDF) -->
-        <div id="receipt-container" class="animate-fade-up overflow-hidden p-4">
+        <!-- Main Container (Target PDF) -->
+        <!-- Tambahkan padding putih ekstra agar rapi di PDF -->
+        <div id="receipt-container" class="animate-fade-up overflow-hidden p-6 bg-white md:bg-transparent rounded-xl">
             
             <!-- Top Status Bar -->
             <div class="flex justify-center mb-8">
@@ -115,7 +128,7 @@ if ($is_tunai) {
                         <span id="order-id-display" class="text-4xl font-mono font-black text-slate-800 tracking-tighter">
                             <?php echo esc_html($kode_unik); ?>
                         </span>
-                        <!-- Tombol copy tidak perlu masuk PDF -->
+                        <!-- Tombol copy diabaikan di PDF -->
                         <button onclick="copyID('<?php echo $kode_unik; ?>')" data-html2canvas-ignore="true" class="text-slate-300 hover:text-<?php echo $primary_color; ?>-600 transition-colors p-2">
                             <i class="far fa-copy text-xl"></i>
                         </button>
@@ -125,36 +138,35 @@ if ($is_tunai) {
                 <!-- Ticket Bottom: The Instructions -->
                 <div class="p-10 bg-slate-50/50">
                     <?php if ($is_tunai): ?>
-                        <!-- INSTRUKSI TUNAI (KASIR) -->
                         <div class="space-y-8">
                             <div class="flex items-center gap-4 mb-4">
                                 <div class="h-px flex-1 bg-slate-200"></div>
                                 <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Instruksi Kasir</span>
                                 <div class="h-px flex-1 bg-slate-200"></div>
                             </div>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <!-- Grid 3 Kolom -->
+                            <div class="grid grid-cols-3 gap-6">
                                 <div class="text-center group">
-                                    <div class="w-12 h-12 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center mx-auto mb-3 group-hover:border-amber-200 transition-colors"><i class="fas fa-mobile-alt text-amber-500"></i></div>
+                                    <div class="w-12 h-12 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center mx-auto mb-3"><i class="fas fa-mobile-alt text-amber-500"></i></div>
                                     <p class="text-xs font-bold text-slate-700">Tunjukkan Kode</p>
                                 </div>
                                 <div class="text-center group">
-                                    <div class="w-12 h-12 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center mx-auto mb-3 group-hover:border-amber-200 transition-colors"><i class="fas fa-store text-amber-500"></i></div>
+                                    <div class="w-12 h-12 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center mx-auto mb-3"><i class="fas fa-store text-amber-500"></i></div>
                                     <p class="text-xs font-bold text-slate-700">Datang ke Toko</p>
                                 </div>
                                 <div class="text-center group">
-                                    <div class="w-12 h-12 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center mx-auto mb-3 group-hover:border-amber-200 transition-colors"><i class="fas fa-receipt text-amber-500"></i></div>
+                                    <div class="w-12 h-12 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center mx-auto mb-3"><i class="fas fa-receipt text-amber-500"></i></div>
                                     <p class="text-xs font-bold text-slate-700">Bayar & Ambil</p>
                                 </div>
                             </div>
-                            <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm mt-4">
-                                <p class="text-sm text-slate-600 leading-relaxed text-center italic">
-                                    "Silakan tunjukkan nomor transaksi <strong class="text-slate-900"><?php echo esc_html($kode_unik); ?></strong> kepada petugas kasir untuk melakukan pembayaran."
+                            <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm mt-4 text-center">
+                                <p class="text-sm text-slate-600 leading-relaxed italic">
+                                    "Silakan tunjukkan nomor transaksi <strong class="text-slate-900"><?php echo esc_html($kode_unik); ?></strong> kepada petugas kasir."
                                 </p>
                             </div>
                         </div>
 
                     <?php elseif ($is_cod): ?>
-                        <!-- INSTRUKSI COD -->
                         <div class="space-y-8">
                             <div class="flex items-center gap-4 mb-4">
                                 <div class="h-px flex-1 bg-slate-200"></div>
@@ -162,22 +174,17 @@ if ($is_tunai) {
                                 <div class="h-px flex-1 bg-slate-200"></div>
                             </div>
                             <div class="text-center">
-                                <div class="inline-block p-4 bg-blue-50 rounded-full mb-4 animate-pulse-soft">
+                                <div class="inline-block p-4 bg-blue-50 rounded-full mb-4">
                                     <i class="fas fa-truck-fast text-2xl text-blue-500"></i>
                                 </div>
-                                <h3 class="font-bold text-slate-800 mb-2">Pesanan Segera Dikirim</h3>
+                                <h3 class="font-bold text-slate-800 mb-2">Segera Dikirim</h3>
                                 <p class="text-sm text-slate-500 max-w-xs mx-auto">
-                                    Mohon siapkan uang tunai pas (sesuai total tagihan) untuk diserahkan kepada kurir saat barang sampai.
+                                    Siapkan uang tunai pas untuk kurir.
                                 </p>
-                            </div>
-                            <div class="bg-amber-50 p-4 rounded-xl border border-amber-100 flex gap-3 items-start">
-                                <i class="fas fa-exclamation-circle text-amber-500 mt-1"></i>
-                                <p class="text-xs text-amber-800">Pastikan nomor HP Anda aktif agar kurir mudah menghubungi saat pengiriman.</p>
                             </div>
                         </div>
 
                     <?php else: ?>
-                        <!-- INSTRUKSI LAIN (TRANSFER / SUKSES) -->
                         <div class="text-center py-4">
                             <p class="text-slate-500 font-medium">Pesanan Anda telah kami terima.</p>
                             <a href="<?php echo home_url('/akun/pesanan'); ?>" data-html2canvas-ignore="true" class="text-emerald-600 font-bold hover:underline mt-2 inline-block">Lihat Detail Pesanan</a>
@@ -186,14 +193,13 @@ if ($is_tunai) {
                 </div>
             </div>
 
-            <!-- Footer Buttons (IGNORED IN PDF using data-html2canvas-ignore) -->
+            <!-- Footer Buttons (IGNORED IN PDF) -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" data-html2canvas-ignore="true">
                 <a href="<?php echo home_url('/akun/pesanan'); ?>" class="flex items-center justify-center gap-3 bg-slate-900 hover:bg-black text-white font-bold py-5 rounded-[1.5rem] transition-all shadow-xl hover:-translate-y-1">
                     <i class="fas fa-list-ul text-sm opacity-50"></i>
-                    <span>Cek Status Pesanan</span>
+                    <span>Cek Status</span>
                 </a>
                 
-                <!-- Tombol Download PDF -->
                 <button onclick="downloadPDF()" id="btn-download" class="flex items-center justify-center gap-3 bg-white border-2 border-slate-200 hover:border-slate-400 text-slate-600 font-bold py-5 rounded-[1.5rem] transition-all group">
                     <i class="fas fa-download text-sm opacity-50 group-hover:text-blue-600"></i>
                     <span class="group-hover:text-blue-600">Download Bukti</span>
@@ -202,9 +208,9 @@ if ($is_tunai) {
 
             <!-- Help Support (IGNORED IN PDF) -->
             <div class="mt-12 text-center" data-html2canvas-ignore="true">
-                <p class="text-sm text-slate-400 font-medium mb-4">Ada kendala? Hubungi tim support kami</p>
+                <p class="text-sm text-slate-400 font-medium mb-4">Butuh bantuan?</p>
                 <div class="flex justify-center gap-8">
-                    <a href="https://wa.me/628123456789" class="text-slate-400 hover:text-green-500 transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
+                    <a href="#" class="text-slate-400 hover:text-green-500 transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
                         <i class="fab fa-whatsapp text-lg"></i> WhatsApp
                     </a>
                 </div>
@@ -212,55 +218,63 @@ if ($is_tunai) {
         </div>
 
         <p class="text-center mt-12 text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em]" data-html2canvas-ignore="true">
-            &copy; <?php echo date('Y'); ?> <?php bloginfo('name'); ?> Marketplace
+            &copy; <?php echo date('Y'); ?> <?php bloginfo('name'); ?>
         </p>
     </div>
 </div>
 
 <script>
-// Fungsi Download PDF menggunakan html2pdf.js
+// Fungsi Download PDF High Quality
 function downloadPDF() {
-    // Ambil elemen wrapper yang memiliki ID 'receipt-container'
     const element = document.getElementById('receipt-container');
     const btn = document.getElementById('btn-download');
-    
-    // Ubah text tombol saat proses agar user tahu sedang berjalan
     const originalText = btn.innerHTML;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin text-blue-500"></i> <span class="text-blue-500">Memproses...</span>';
+    
+    // 1. Feedback UI Loading
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin text-blue-500"></i> <span class="text-blue-500">Memproses PDF...</span>';
     btn.disabled = true;
 
-    // Konfigurasi PDF
+    // 2. Tambahkan class khusus agar CSS print aktif (hapus shadow dll)
+    element.classList.add('printing');
+
+    // 3. Konfigurasi Optimal untuk A4
     const opt = {
-        margin:       [0.5, 0.5, 0.5, 0.5], // Margin halaman (inch)
+        margin:       [0.5, 0.5, 0.5, 0.5], // Margin 0.5 inch
         filename:     'Bukti-Pesanan-<?php echo $kode_unik; ?>.pdf',
         image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true }, // Scale 2 agar teks tajam
+        html2canvas:  { 
+            scale: 3, // Resolusi tinggi (3x) agar tidak blur
+            useCORS: true, // Izinkan gambar cross-origin
+            windowWidth: 1200, // PAKSA RENDER MODE DESKTOP (Agar tidak layout HP)
+            scrollY: 0
+        },
         jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
     };
 
-    // Generate dan Download
+    // 4. Generate
     html2pdf().set(opt).from(element).save().then(function(){
-        // Kembalikan tombol seperti semula setelah selesai
+        // Reset tombol dan class
         btn.innerHTML = originalText;
         btn.disabled = false;
+        element.classList.remove('printing');
+    }).catch(function(err) {
+        alert('Gagal membuat PDF. Silakan coba screenshot manual.');
+        console.error(err);
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        element.classList.remove('printing');
     });
 }
 
-// Fungsi untuk copy text ID Transaksi
 function copyID(text) {
     navigator.clipboard.writeText(text).then(() => {
-        const btn = event.currentTarget;
-        const originalHTML = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-check text-emerald-500"></i>';
-        
-        // Animasi feedback visual
+        // Simple feedback
         const display = document.getElementById('order-id-display');
-        display.classList.add('text-emerald-500', 'scale-110');
-        
+        const originalColor = display.className;
+        display.classList.add('text-emerald-500');
         setTimeout(() => {
-            btn.innerHTML = originalHTML;
-            display.classList.remove('text-emerald-500', 'scale-110');
-        }, 2000);
+            display.classList.remove('text-emerald-500');
+        }, 1000);
     });
 }
 </script>
