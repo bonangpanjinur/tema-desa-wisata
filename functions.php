@@ -101,17 +101,14 @@ function dw_get_desa_id() {
 // Helper: Redirect Login Custom (Updated for Verifikator)
 function tema_dw_login_redirect($url, $request, $user) {
     if ($user && is_object($user) && is_a($user, 'WP_User')) {
-        // Jika Administrator, tetap bisa ke wp-admin, tapi preferensi dashboard frontend
-        // Kita arahkan semua role custom ke /dashboard frontend
         if (in_array('administrator', $user->roles) || 
             in_array('editor_desa', $user->roles) || 
             in_array('pedagang', $user->roles) || 
             in_array('dw_ojek', $user->roles) ||
-            in_array('verifikator_umkm', $user->roles) // Tambahan Verifikator
+            in_array('verifikator_umkm', $user->roles)
         ) {
             return home_url('/dashboard');
         } else {
-            // User biasa/pembeli
             return home_url('/akun-saya');
         }
     }
@@ -119,13 +116,9 @@ function tema_dw_login_redirect($url, $request, $user) {
 }
 add_filter('login_redirect', 'tema_dw_login_redirect', 10, 3);
 
-// Tambahkan filter ini di file functions.php
 add_filter( 'get_avatar_url', 'dw_custom_avatar_url', 10, 3 );
-
 function dw_custom_avatar_url( $url, $id_or_email, $args ) {
     $user_id = 0;
-    
-    // Deteksi User ID dari berbagai format input
     if ( is_numeric( $id_or_email ) ) {
         $user_id = $id_or_email;
     } elseif ( is_string( $id_or_email ) && ( $user = get_user_by( 'email', $id_or_email ) ) ) {
@@ -136,26 +129,22 @@ function dw_custom_avatar_url( $url, $id_or_email, $args ) {
         $user_id = $id_or_email->ID;
     }
 
-    // Jika User ID ketemu, cek custom meta
     if ( $user_id ) {
         $custom_avatar = get_user_meta( $user_id, 'dw_custom_avatar_url', true );
         if ( $custom_avatar ) {
-            return $custom_avatar; // Pakai foto upload kita
+            return $custom_avatar;
         }
     }
-    
-    return $url; // Balik ke default jika tidak ada
+    return $url;
 }
 
 function tema_dw_disable_admin_bar() {
-    // Sembunyikan admin bar untuk semua user kecuali admin yang sedang akses wp-admin area
     if (!current_user_can('edit_posts') && !is_admin()) {
         show_admin_bar(false);
     }
 }
 add_action('after_setup_theme', 'tema_dw_disable_admin_bar');
 
-// PERBAIKAN: Cek headers_sent() agar tidak error session_start warning
 function tema_dw_start_session() {
     if (!session_id() && !headers_sent()) {
         session_start();
@@ -170,34 +159,22 @@ add_action('init', 'tema_dw_start_session');
  */
 
 function tema_dw_rewrite_rules() {
-    // Single Pages (Wisata & Produk)
     add_rewrite_rule('^wisata/([^/]*)/?', 'index.php?dw_type=wisata&dw_slug=$matches[1]', 'top');
     add_rewrite_rule('^produk/([^/]*)/?', 'index.php?dw_type=produk&dw_slug=$matches[1]', 'top');
-    
-    // PERBAIKAN: Rule untuk Profil Toko (URL: /toko/slug-toko)
-    // Ini mencocokkan logic di single-dw_produk.php
     add_rewrite_rule('^toko/([^/]*)/?', 'index.php?dw_type=profil_toko&dw_slug_toko=$matches[1]', 'top');
-    
-    // --- BARU: Rule untuk Profil Desa (URL: /desa/slug-desa) ---
-    // Agar tombol "Lihat Profil Desa" di single-dw_wisata.php berfungsi
     add_rewrite_rule('^desa/([^/]*)/?', 'index.php?dw_type=profil_desa&dw_slug_desa=$matches[1]', 'top');
-
-    // Dashboard Router (Pusat Kontrol)
     add_rewrite_rule('^dashboard/?$', 'index.php?dw_type=dashboard_router', 'top');
     
-    // Legacy/Direct Access (Opsional, bisa dihapus jika ingin force /dashboard)
     add_rewrite_rule('^dashboard-toko/?$', 'index.php?dw_type=dashboard_toko', 'top');
     add_rewrite_rule('^dashboard-desa/?$', 'index.php?dw_type=dashboard_desa', 'top');
     add_rewrite_rule('^dashboard-ojek/?$', 'index.php?dw_type=dashboard_ojek', 'top');
     add_rewrite_rule('^dashboard-verifikator/?$', 'index.php?dw_type=dashboard_verifikator', 'top'); 
     add_rewrite_rule('^akun-saya/?$', 'index.php?dw_type=akun_saya', 'top');
     
-    // Transaction
     add_rewrite_rule('^keranjang/?$', 'index.php?dw_type=cart', 'top');
     add_rewrite_rule('^checkout/?$', 'index.php?dw_type=checkout', 'top');
     add_rewrite_rule('^pembayaran/?$', 'index.php?dw_type=pembayaran', 'top');
     
-    // AUTO FLUSH: Update versi flush ke v16 (sebelumnya v15) untuk menerapkan rule desa
     if (get_option('tema_dw_rules_flushed_v16') !== 'yes') {
         flush_rewrite_rules();
         update_option('tema_dw_rules_flushed_v16', 'yes');
@@ -213,7 +190,7 @@ function tema_dw_query_vars($vars) {
     $vars[] = 'dw_type';
     $vars[] = 'dw_slug';
     $vars[] = 'dw_slug_toko';
-    $vars[] = 'dw_slug_desa'; // Tambahan variable query desa
+    $vars[] = 'dw_slug_desa';
     return $vars;
 }
 add_filter('query_vars', 'tema_dw_query_vars');
@@ -221,56 +198,27 @@ add_filter('query_vars', 'tema_dw_query_vars');
 function tema_dw_template_include($template) {
     $dw_type = get_query_var('dw_type');
     
-    // --- SMART ROUTER LOGIC ---
     if ($dw_type == 'dashboard_router') {
         if (!is_user_logged_in()) {
             return get_template_directory() . '/page-login.php';
         }
-
         $user = wp_get_current_user();
         $roles = (array) $user->roles;
-
-        // Prioritas 1: Admin Desa
-        if (in_array('admin_desa', $roles) || in_array('administrator', $roles)) {
-            // Administrator juga bisa akses dashboard desa untuk testing
-            // Note: Jika admin ingin akses dashboard lain, bisa gunakan URL direct
-            return get_template_directory() . '/page-dashboard-desa.php';
-        } 
-        // Prioritas 2: Pedagang
-        elseif (in_array('pedagang', $roles)) {
-            return get_template_directory() . '/page-dashboard-toko.php';
-        } 
-        // Prioritas 3: Ojek
-        elseif (in_array('dw_ojek', $roles)) {
-            return get_template_directory() . '/page-dashboard-ojek.php';
-        } 
-        // Prioritas 4: Verifikator UMKM
-        elseif (in_array('verifikator_umkm', $roles)) {
-            return get_template_directory() . '/page-dashboard-verifikator.php';
-        }
-        // Default: User Biasa / Pembeli
-        else {
-            return get_template_directory() . '/page-dashboard.php'; // Atau page-akun-saya.php
-        }
+        if (in_array('admin_desa', $roles) || in_array('administrator', $roles)) return get_template_directory() . '/page-dashboard-desa.php';
+        if (in_array('pedagang', $roles)) return get_template_directory() . '/page-dashboard-toko.php';
+        if (in_array('dw_ojek', $roles)) return get_template_directory() . '/page-dashboard-ojek.php';
+        if (in_array('verifikator_umkm', $roles)) return get_template_directory() . '/page-dashboard-verifikator.php';
+        return get_template_directory() . '/page-dashboard.php';
     }
 
-    // Direct Access Handlers
     if ($dw_type == 'wisata') return get_template_directory() . '/single-dw_wisata.php';
     if ($dw_type == 'produk') return get_template_directory() . '/single-dw_produk.php';
     if ($dw_type == 'profil_toko') return get_template_directory() . '/page-profil-toko.php';
-    
-    // --- BARU: Route ke file Profil Desa ---
     if ($dw_type == 'profil_desa') return get_template_directory() . '/page-profil-desa.php';
-    
     if ($dw_type == 'cart')       return get_template_directory() . '/page-cart.php';
     if ($dw_type == 'checkout')   return get_template_directory() . '/page-checkout.php';
     if ($dw_type == 'pembayaran') return get_template_directory() . '/page-pembayaran.php';
-    
-    if ($dw_type == 'dashboard_toko') return get_template_directory() . '/page-dashboard-toko.php';
-    if ($dw_type == 'dashboard_desa') return get_template_directory() . '/page-dashboard-desa.php';
-    if ($dw_type == 'dashboard_ojek') return get_template_directory() . '/page-dashboard-ojek.php';
-    if ($dw_type == 'dashboard_verifikator') return get_template_directory() . '/page-dashboard-verifikator.php';
-    if ($dw_type == 'akun_saya')      return get_template_directory() . '/page-akun-saya.php';
+    if ($dw_type == 'akun_saya')  return get_template_directory() . '/page-akun-saya.php';
     
     return $template;
 }
@@ -283,24 +231,10 @@ add_filter('template_include', 'tema_dw_template_include');
  */
 function dw_load_region_scripts() {
     $type = get_query_var('dw_type');
-    
-    // Load script jika user berada di URL /dashboard atau URL spesifik lainnya
-    // Script ini diperlukan untuk dropdown wilayah
-    if ( $type == 'dashboard_router' || $type == 'dashboard_toko' || $type == 'dashboard_desa' || $type == 'dashboard_verifikator' ||
-         is_page_template('page-dashboard-toko.php') || is_page_template('page-dashboard-desa.php') ) {
-        
+    if ( $type == 'dashboard_router' || $type == 'dashboard_toko' || $type == 'dashboard_desa' || $type == 'dashboard_verifikator') {
         if( file_exists( get_template_directory() . '/assets/js/dw-region.js' ) ) {
-            wp_enqueue_script( 
-                'dw-region-js', 
-                get_template_directory_uri() . '/assets/js/dw-region.js', 
-                array('jquery'), 
-                '1.2', 
-                true 
-            );
-
-            wp_localize_script( 'dw-region-js', 'dwRegionVars', array(
-                'ajax_url' => admin_url( 'admin-ajax.php' )
-            ));
+            wp_enqueue_script( 'dw-region-js', get_template_directory_uri() . '/assets/js/dw-region.js', array('jquery'), '1.2', true );
+            wp_localize_script( 'dw-region-js', 'dwRegionVars', array( 'ajax_url' => admin_url( 'admin-ajax.php' ) ));
         }
     }
 }
@@ -315,26 +249,17 @@ add_action( 'wp_enqueue_scripts', 'dw_load_region_scripts' );
 // Add to Cart
 add_action('wp_ajax_dw_add_to_cart', 'dw_handle_add_to_cart');
 add_action('wp_ajax_nopriv_dw_add_to_cart', 'dw_handle_add_to_cart');
-
 function dw_handle_add_to_cart() {
     check_ajax_referer('dw_cart_nonce', 'security');
     global $wpdb;
-
     $product_id = intval($_POST['product_id']);
-    $qty         = intval($_POST['qty']);
-
+    $qty = intval($_POST['qty']);
     if (!$product_id) wp_send_json_error(['message' => 'Produk tidak valid']);
-
     $table_name = $wpdb->prefix . 'dw_cart';
     $user_id = get_current_user_id();
     $session_id = session_id() ?: ($_COOKIE['PHPSESSID'] ?? '');
-
-    $where = ($user_id > 0) 
-        ? $wpdb->prepare("user_id = %d AND id_produk = %d", $user_id, $product_id)
-        : $wpdb->prepare("session_id = %s AND id_produk = %d", $session_id, $product_id);
-
+    $where = ($user_id > 0) ? $wpdb->prepare("user_id = %d AND id_produk = %d", $user_id, $product_id) : $wpdb->prepare("session_id = %s AND id_produk = %d", $session_id, $product_id);
     $existing = $wpdb->get_row("SELECT id, qty FROM $table_name WHERE $where");
-
     if ($existing) {
         $wpdb->update($table_name, ['qty' => $existing->qty + $qty, 'updated_at' => current_time('mysql')], ['id' => $existing->id]);
     } else {
@@ -346,71 +271,39 @@ function dw_handle_add_to_cart() {
             'created_at' => current_time('mysql')
         ]);
     }
-
-    $total_items = ($user_id > 0)
-        ? $wpdb->get_var($wpdb->prepare("SELECT SUM(qty) FROM $table_name WHERE user_id = %d", $user_id))
-        : $wpdb->get_var($wpdb->prepare("SELECT SUM(qty) FROM $table_name WHERE session_id = %s", $session_id));
-
+    $total_items = ($user_id > 0) ? $wpdb->get_var($wpdb->prepare("SELECT SUM(qty) FROM $table_name WHERE user_id = %d", $user_id)) : $wpdb->get_var($wpdb->prepare("SELECT SUM(qty) FROM $table_name WHERE session_id = %s", $session_id));
     wp_send_json_success(['message' => 'Berhasil ditambahkan', 'cart_count' => (int)$total_items]);
 }
 
 // Update Qty
 add_action('wp_ajax_dw_update_cart_qty', 'dw_handle_update_cart_qty');
 add_action('wp_ajax_nopriv_dw_update_cart_qty', 'dw_handle_update_cart_qty');
-
 function dw_handle_update_cart_qty() {
     check_ajax_referer('dw_cart_nonce', 'security');
     global $wpdb;
     $cart_id = intval($_POST['cart_id']);
     $qty = intval($_POST['qty']);
     $table_cart = $wpdb->prefix . 'dw_cart';
-    
     if($qty < 1) wp_send_json_error(['message' => 'Minimal 1']);
-    
     $wpdb->update($table_cart, ['qty' => $qty], ['id' => $cart_id]);
-    
     $user_id = get_current_user_id();
     $session_id = session_id() ?: ($_COOKIE['PHPSESSID'] ?? '');
-    
-    // Calc Totals
-    $totals = $wpdb->get_row($wpdb->prepare(
-        "SELECT SUM(c.qty * p.harga) as grand_total, SUM(c.qty) as total_items
-         FROM $table_cart c JOIN {$wpdb->prefix}dw_produk p ON c.id_produk = p.id
-         WHERE c.user_id = %d OR (c.user_id IS NULL AND c.session_id = %s)",
-        $user_id, $session_id
-    ));
-
-    wp_send_json_success([
-        'new_qty' => $qty,
-        'grand_total_fmt' => tema_dw_format_rupiah($totals->grand_total ?? 0),
-        'total_items' => intval($totals->total_items ?? 0)
-    ]);
+    $totals = $wpdb->get_row($wpdb->prepare("SELECT SUM(c.qty * p.harga) as grand_total, SUM(c.qty) as total_items FROM $table_cart c JOIN {$wpdb->prefix}dw_produk p ON c.id_produk = p.id WHERE c.user_id = %d OR (c.user_id IS NULL AND c.session_id = %s)", $user_id, $session_id));
+    wp_send_json_success([ 'new_qty' => $qty, 'grand_total_fmt' => tema_dw_format_rupiah($totals->grand_total ?? 0), 'total_items' => intval($totals->total_items ?? 0) ]);
 }
 
 // Remove Item
 add_action('wp_ajax_dw_remove_cart_item', 'dw_handle_remove_cart_item');
 add_action('wp_ajax_nopriv_dw_remove_cart_item', 'dw_handle_remove_cart_item');
-
 function dw_handle_remove_cart_item() {
     check_ajax_referer('dw_cart_nonce', 'security');
     global $wpdb;
     $cart_id = intval($_POST['cart_id']);
     $wpdb->delete($wpdb->prefix . 'dw_cart', ['id' => $cart_id]);
-    
     $user_id = get_current_user_id();
     $session_id = session_id() ?: ($_COOKIE['PHPSESSID'] ?? '');
-    
-    $totals = $wpdb->get_row($wpdb->prepare(
-        "SELECT SUM(c.qty * p.harga) as grand_total, SUM(c.qty) as total_items
-         FROM {$wpdb->prefix}dw_cart c JOIN {$wpdb->prefix}dw_produk p ON c.id_produk = p.id
-         WHERE c.user_id = %d OR (c.user_id IS NULL AND c.session_id = %s)",
-        $user_id, $session_id
-    ));
-
-    wp_send_json_success([
-        'grand_total_fmt' => tema_dw_format_rupiah($totals->grand_total ?? 0),
-        'total_items' => intval($totals->total_items ?? 0)
-    ]);
+    $totals = $wpdb->get_row($wpdb->prepare("SELECT SUM(c.qty * p.harga) as grand_total, SUM(c.qty) as total_items FROM {$wpdb->prefix}dw_cart c JOIN {$wpdb->prefix}dw_produk p ON c.id_produk = p.id WHERE c.user_id = %d OR (c.user_id IS NULL AND c.session_id = %s)", $user_id, $session_id));
+    wp_send_json_success([ 'grand_total_fmt' => tema_dw_format_rupiah($totals->grand_total ?? 0), 'total_items' => intval($totals->total_items ?? 0) ]);
 }
 
 /**
@@ -419,22 +312,18 @@ function dw_handle_remove_cart_item() {
  * ==============================================================================
  */
 
-// Stats Toko
 add_action('wp_ajax_dw_merchant_stats', 'dw_ajax_merchant_stats');
 function dw_ajax_merchant_stats() {
     check_ajax_referer('dw_cart_nonce', 'security');
     global $wpdb;
     $pid = dw_get_merchant_id();
     if (!$pid) wp_send_json_error(['message' => 'Toko tidak ditemukan']);
-
     $sales = $wpdb->get_var($wpdb->prepare("SELECT SUM(total_pesanan_toko) FROM {$wpdb->prefix}dw_transaksi_sub WHERE id_pedagang = %d AND status_pesanan IN ('selesai', 'dikirim_ekspedisi')", $pid));
     $orders = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}dw_transaksi_sub WHERE id_pedagang = %d AND status_pesanan = 'menunggu_konfirmasi'", $pid));
     $products = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}dw_produk WHERE id_pedagang = %d AND stok <= 0", $pid));
-
     wp_send_json_success(['sales' => (int)$sales, 'orders' => (int)$orders, 'products_empty' => (int)$products]);
 }
 
-// Get Products Toko
 add_action('wp_ajax_dw_merchant_get_products', 'dw_ajax_merchant_get_products');
 function dw_ajax_merchant_get_products() {
     check_ajax_referer('dw_cart_nonce', 'security');
@@ -444,7 +333,6 @@ function dw_ajax_merchant_get_products() {
     wp_send_json_success($products);
 }
 
-// Save Product Toko
 add_action('wp_ajax_dw_merchant_save_product', 'dw_ajax_merchant_save_product');
 function dw_ajax_merchant_save_product() {
     check_ajax_referer('dw_cart_nonce', 'security');
@@ -452,6 +340,11 @@ function dw_ajax_merchant_save_product() {
     $pid = dw_get_merchant_id();
     $id = isset($_POST['id']) ? intval($_POST['id']) : 0;
     
+    // Validasi input
+    if (empty($_POST['nama_produk']) || empty($_POST['harga'])) {
+        wp_send_json_error(['message' => 'Nama produk dan harga wajib diisi']);
+    }
+
     $data = [
         'id_pedagang' => $pid,
         'nama_produk' => sanitize_text_field($_POST['nama_produk']),
@@ -459,8 +352,14 @@ function dw_ajax_merchant_save_product() {
         'stok' => intval($_POST['stok']),
         'kategori' => sanitize_text_field($_POST['kategori']),
         'deskripsi' => wp_kses_post($_POST['deskripsi']),
-        'slug' => sanitize_title($_POST['nama_produk']) . '-' . time()
+        'updated_at' => current_time('mysql')
     ];
+
+    if ($id == 0) {
+        $data['slug'] = sanitize_title($_POST['nama_produk']) . '-' . time();
+        $data['created_at'] = current_time('mysql');
+    }
+
     if (!empty($_FILES['foto_utama']['name'])) {
         require_once(ABSPATH . 'wp-admin/includes/image.php');
         require_once(ABSPATH . 'wp-admin/includes/file.php');
@@ -468,12 +367,15 @@ function dw_ajax_merchant_save_product() {
         $att_id = media_handle_upload('foto_utama', 0);
         if (!is_wp_error($att_id)) $data['foto_utama'] = wp_get_attachment_url($att_id);
     }
-    if ($id > 0) { unset($data['slug']); $wpdb->update("{$wpdb->prefix}dw_produk", $data, ['id' => $id, 'id_pedagang' => $pid]); }
-    else { $wpdb->insert("{$wpdb->prefix}dw_produk", $data); }
-    wp_send_json_success(['message' => 'Tersimpan']);
+
+    if ($id > 0) { 
+        $wpdb->update("{$wpdb->prefix}dw_produk", $data, ['id' => $id, 'id_pedagang' => $pid]); 
+    } else { 
+        $wpdb->insert("{$wpdb->prefix}dw_produk", $data); 
+    }
+    wp_send_json_success(['message' => 'Produk berhasil disimpan']);
 }
 
-// Delete Product Toko
 add_action('wp_ajax_dw_merchant_delete_product', 'dw_ajax_merchant_delete_product');
 function dw_ajax_merchant_delete_product() {
     check_ajax_referer('dw_cart_nonce', 'security');
@@ -482,21 +384,12 @@ function dw_ajax_merchant_delete_product() {
     wp_send_json_success();
 }
 
-// Get Orders Toko
 add_action('wp_ajax_dw_merchant_get_orders', 'dw_ajax_merchant_get_orders');
 function dw_ajax_merchant_get_orders() {
     check_ajax_referer('dw_cart_nonce', 'security');
     global $wpdb;
     $limit = isset($_POST['limit']) ? intval($_POST['limit']) : 20;
-    
-    $sql = $wpdb->prepare(
-        "SELECT sub.*, m.kode_unik, m.nama_penerima as nama_pembeli, m.tanggal_transaksi, m.bukti_pembayaran
-         FROM {$wpdb->prefix}dw_transaksi_sub sub
-         JOIN {$wpdb->prefix}dw_transaksi m ON sub.id_transaksi = m.id
-         WHERE sub.id_pedagang = %d 
-         ORDER BY sub.created_at DESC LIMIT %d", 
-        dw_get_merchant_id(), $limit
-    );
+    $sql = $wpdb->prepare("SELECT sub.*, m.kode_unik, m.nama_penerima as nama_pembeli, m.tanggal_transaksi, m.bukti_pembayaran FROM {$wpdb->prefix}dw_transaksi_sub sub JOIN {$wpdb->prefix}dw_transaksi m ON sub.id_transaksi = m.id WHERE sub.id_pedagang = %d ORDER BY sub.created_at DESC LIMIT %d", dw_get_merchant_id(), $limit);
     $orders = $wpdb->get_results($sql);
     foreach($orders as $o) {
         $o->formatted_date = date('d M Y', strtotime($o->tanggal_transaksi));
@@ -506,7 +399,6 @@ function dw_ajax_merchant_get_orders() {
     wp_send_json_success($orders);
 }
 
-// Update Order Status Toko
 add_action('wp_ajax_dw_merchant_update_status', 'dw_ajax_merchant_update_status');
 function dw_ajax_merchant_update_status() {
     check_ajax_referer('dw_cart_nonce', 'security');
@@ -517,17 +409,20 @@ function dw_ajax_merchant_update_status() {
     wp_send_json_success();
 }
 
-// Get & Save Profile Toko
 add_action('wp_ajax_dw_merchant_get_profile', 'dw_ajax_merchant_get_profile');
 function dw_ajax_merchant_get_profile() {
     check_ajax_referer('dw_cart_nonce', 'security');
     global $wpdb;
     $p = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}dw_pedagang WHERE id = %d", dw_get_merchant_id()));
-    wp_send_json_success([
-        'nama_toko' => $p->nama_toko, 'deskripsi_toko' => $p->alamat_lengkap, 
-        'no_rekening' => $p->no_rekening, 'nama_bank' => $p->nama_bank, 'atas_nama_rekening' => $p->atas_nama_rekening
+    wp_send_json_success([ 
+        'nama_toko' => $p->nama_toko, 
+        'deskripsi_toko' => $p->alamat_lengkap, 
+        'no_rekening' => $p->no_rekening, 
+        'nama_bank' => $p->nama_bank, 
+        'atas_nama_rekening' => $p->atas_nama_rekening 
     ]);
 }
+
 add_action('wp_ajax_dw_merchant_save_profile', 'dw_ajax_merchant_save_profile');
 function dw_ajax_merchant_save_profile() {
     check_ajax_referer('dw_cart_nonce', 'security');
@@ -545,40 +440,30 @@ function dw_ajax_merchant_save_profile() {
 
 /**
  * ==============================================================================
- * 7. AJAX HANDLERS: DESA DASHBOARD (NEW!)
+ * 7. AJAX HANDLERS: DESA DASHBOARD
  * ==============================================================================
  */
 
-// A. Stats Desa
 add_action('wp_ajax_dw_desa_stats', 'dw_ajax_desa_stats');
 function dw_ajax_desa_stats() {
     check_ajax_referer('dw_cart_nonce', 'security');
     global $wpdb;
     $desa_id = dw_get_desa_id();
     if (!$desa_id) wp_send_json_error(['message' => 'Desa tidak ditemukan']);
-
     $wisata_count = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}dw_wisata WHERE id_desa = %d AND status = 'aktif'", $desa_id));
     $avg_rating = $wpdb->get_var($wpdb->prepare("SELECT AVG(rating_avg) FROM {$wpdb->prefix}dw_wisata WHERE id_desa = %d AND status = 'aktif'", $desa_id));
-    
-    wp_send_json_success([
-        'total_wisata' => (int)$wisata_count, 
-        'avg_rating' => number_format((float)$avg_rating, 1)
-    ]);
+    wp_send_json_success([ 'total_wisata' => (int)$wisata_count, 'avg_rating' => number_format((float)$avg_rating, 1) ]);
 }
 
-// B. Get Wisata List
 add_action('wp_ajax_dw_desa_get_wisata', 'dw_ajax_desa_get_wisata');
 function dw_ajax_desa_get_wisata() {
     check_ajax_referer('dw_cart_nonce', 'security');
     global $wpdb;
     $desa_id = dw_get_desa_id();
-    
     $wisata = $wpdb->get_results($wpdb->prepare("SELECT * FROM {$wpdb->prefix}dw_wisata WHERE id_desa = %d AND status != 'nonaktif' ORDER BY created_at DESC", $desa_id));
-    
     wp_send_json_success($wisata);
 }
 
-// C. Save Wisata (Add/Edit)
 add_action('wp_ajax_dw_desa_save_wisata', 'dw_ajax_desa_save_wisata');
 function dw_ajax_desa_save_wisata() {
     check_ajax_referer('dw_cart_nonce', 'security');
@@ -593,8 +478,13 @@ function dw_ajax_desa_save_wisata() {
         'kategori' => sanitize_text_field($_POST['kategori']),
         'deskripsi' => wp_kses_post($_POST['deskripsi']),
         'jam_buka' => sanitize_text_field($_POST['jam_buka']),
-        'slug' => sanitize_title($_POST['nama_wisata']) . '-' . time()
+        'updated_at' => current_time('mysql')
     ];
+
+    if ($id == 0) {
+        $data['slug'] = sanitize_title($_POST['nama_wisata']) . '-' . time();
+        $data['created_at'] = current_time('mysql');
+    }
 
     if (!empty($_FILES['foto_utama']['name'])) {
         require_once(ABSPATH . 'wp-admin/includes/image.php');
@@ -604,13 +494,14 @@ function dw_ajax_desa_save_wisata() {
         if (!is_wp_error($att_id)) $data['foto_utama'] = wp_get_attachment_url($att_id);
     }
 
-    if ($id > 0) { unset($data['slug']); $wpdb->update("{$wpdb->prefix}dw_wisata", $data, ['id' => $id, 'id_desa' => $desa_id]); }
-    else { $wpdb->insert("{$wpdb->prefix}dw_wisata", $data); }
-
-    wp_send_json_success(['message' => 'Wisata Tersimpan']);
+    if ($id > 0) { 
+        $wpdb->update("{$wpdb->prefix}dw_wisata", $data, ['id' => $id, 'id_desa' => $desa_id]); 
+    } else { 
+        $wpdb->insert("{$wpdb->prefix}dw_wisata", $data); 
+    }
+    wp_send_json_success(['message' => 'Wisata berhasil disimpan']);
 }
 
-// D. Delete Wisata
 add_action('wp_ajax_dw_desa_delete_wisata', 'dw_ajax_desa_delete_wisata');
 function dw_ajax_desa_delete_wisata() {
     check_ajax_referer('dw_cart_nonce', 'security');
@@ -619,17 +510,19 @@ function dw_ajax_desa_delete_wisata() {
     wp_send_json_success();
 }
 
-// E. Get & Save Profil Desa
 add_action('wp_ajax_dw_desa_get_profile', 'dw_ajax_desa_get_profile');
 function dw_ajax_desa_get_profile() {
     check_ajax_referer('dw_cart_nonce', 'security');
     global $wpdb;
     $p = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}dw_desa WHERE id = %d", dw_get_desa_id()));
-    wp_send_json_success([
-        'nama_desa' => $p->nama_desa, 'deskripsi' => $p->deskripsi, 
-        'provinsi' => $p->provinsi, 'kabupaten' => $p->kabupaten
+    wp_send_json_success([ 
+        'nama_desa' => $p->nama_desa, 
+        'deskripsi' => $p->deskripsi, 
+        'provinsi' => $p->provinsi, 
+        'kabupaten' => $p->kabupaten 
     ]);
 }
+
 add_action('wp_ajax_dw_desa_save_profile', 'dw_ajax_desa_save_profile');
 function dw_ajax_desa_save_profile() {
     check_ajax_referer('dw_cart_nonce', 'security');
@@ -650,21 +543,17 @@ function dw_ajax_desa_save_profile() {
  * ==============================================================================
  */
 
-// Wishlist AJAX
 add_action('wp_ajax_dw_toggle_wishlist', 'dw_handle_toggle_wishlist');
 add_action('wp_ajax_nopriv_dw_toggle_wishlist', 'dw_handle_toggle_wishlist');
 function dw_handle_toggle_wishlist() {
     check_ajax_referer('dw_cart_nonce', 'security');
     if (!is_user_logged_in()) wp_send_json_error(['code' => 'not_logged_in']);
-    
     global $wpdb;
     $user_id = get_current_user_id();
     $item_id = intval($_POST['item_id']);
     $type = sanitize_text_field($_POST['item_type']);
     $table = $wpdb->prefix . 'dw_wishlist';
-    
     $exist = $wpdb->get_var($wpdb->prepare("SELECT id FROM $table WHERE user_id=%d AND item_id=%d AND item_type=%s", $user_id, $item_id, $type));
-    
     if($exist) {
         $wpdb->delete($table, ['id' => $exist]);
         wp_send_json_success(['status' => 'removed']);
@@ -675,137 +564,75 @@ function dw_handle_toggle_wishlist() {
 }
 
 /**
- * Pengaturan PWA di Customizer
+ * PWA Integrasi
  */
+function dw_add_pwa_tags() {
+    if (get_theme_mod('dw_pwa_enabled', '1') !== '1') return;
+    $manifest_url = add_query_arg('dw-manifest', '1', home_url('/'));
+    $sw_url       = add_query_arg('dw-sw', '1', home_url('/'));
+    $theme_color  = get_theme_mod('dw_pwa_theme_color', '#16a34a');
+    $site_icon    = get_option('site_icon');
+    ?>
+    <link rel="manifest" href="<?php echo esc_url($manifest_url); ?>">
+    <meta name="theme-color" content="<?php echo esc_attr($theme_color); ?>">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <?php if ($site_icon) : ?>
+    <link rel="apple-touch-icon" href="<?php echo esc_url(wp_get_attachment_image_url($site_icon, 'full')); ?>">
+    <?php endif; ?>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('<?php echo esc_url($sw_url); ?>', { scope: '/' })
+                .then(function(reg) { console.log('DW PWA: Registered'); })
+                .catch(function(err) { console.log('DW PWA: Failed', err); });
+            });
+        }
+    </script>
+    <?php
+}
+add_action('wp_head', 'dw_add_pwa_tags');
+
 function dw_pwa_customize_register( $wp_customize ) {
-    $wp_customize->add_section( 'dw_pwa_section', array(
-        'title'    => __( 'Pengaturan PWA', 'dw-desa-wisata' ),
-        'priority' => 160,
-    ) );
-
-    // Enable/Disable PWA
+    $wp_customize->add_section( 'dw_pwa_section', array( 'title' => __( 'Pengaturan PWA', 'dw-desa-wisata' ), 'priority' => 160 ));
     $wp_customize->add_setting( 'dw_pwa_enabled', array( 'default' => '1' ) );
-    $wp_customize->add_control( 'dw_pwa_enabled', array(
-        'label'    => __( 'Aktifkan PWA', 'dw-desa-wisata' ),
-        'section'  => 'dw_pwa_section',
-        'type'     => 'checkbox',
-    ) );
-
-    // App Name
+    $wp_customize->add_control( 'dw_pwa_enabled', array( 'label' => __( 'Aktifkan PWA', 'dw-desa-wisata' ), 'section' => 'dw_pwa_section', 'type' => 'checkbox' ));
     $wp_customize->add_setting( 'dw_pwa_name', array( 'default' => get_bloginfo('name') ) );
-    $wp_customize->add_control( 'dw_pwa_name', array(
-        'label'    => __( 'Nama Aplikasi', 'dw-desa-wisata' ),
-        'section'  => 'dw_pwa_section',
-        'type'     => 'text',
-    ) );
-
-    // Short Name
+    $wp_customize->add_control( 'dw_pwa_name', array( 'label' => __( 'Nama Aplikasi', 'dw-desa-wisata' ), 'section' => 'dw_pwa_section', 'type' => 'text' ));
     $wp_customize->add_setting( 'dw_pwa_short_name', array( 'default' => get_bloginfo('name') ) );
-    $wp_customize->add_control( 'dw_pwa_short_name', array(
-        'label'    => __( 'Nama Pendek (di Layar Utama)', 'dw-desa-wisata' ),
-        'section'  => 'dw_pwa_section',
-        'type'     => 'text',
-    ) );
-
-    // Theme Color
+    $wp_customize->add_control( 'dw_pwa_short_name', array( 'label' => __( 'Nama Pendek', 'dw-desa-wisata' ), 'section' => 'dw_pwa_section', 'type' => 'text' ));
     $wp_customize->add_setting( 'dw_pwa_theme_color', array( 'default' => '#16a34a' ) );
-    $wp_customize->add_control( new WP_Customize_Color_Control( $wp_customize, 'dw_pwa_theme_color', array(
-        'label'    => __( 'Warna Tema (Toolbar)', 'dw-desa-wisata' ),
-        'section'  => 'dw_pwa_section',
-    ) ) );
-
-    // Background Color
+    $wp_customize->add_control( new WP_Customize_Color_Control( $wp_customize, 'dw_pwa_theme_color', array( 'label' => __( 'Warna Toolbar', 'dw-desa-wisata' ), 'section' => 'dw_pwa_section' )));
     $wp_customize->add_setting( 'dw_pwa_bg_color', array( 'default' => '#ffffff' ) );
-    $wp_customize->add_control( new WP_Customize_Color_Control( $wp_customize, 'dw_pwa_bg_color', array(
-        'label'    => __( 'Warna Background Splash Screen', 'dw-desa-wisata' ),
-        'section'  => 'dw_pwa_section',
-    ) ) );
+    $wp_customize->add_control( new WP_Customize_Color_Control( $wp_customize, 'dw_pwa_bg_color', array( 'label' => __( 'Warna Splash Screen', 'dw-desa-wisata' ), 'section' => 'dw_pwa_section' )));
 }
 add_action( 'customize_register', 'dw_pwa_customize_register' );
 
-/**
- * Handle PWA Files (Manifest & Service Worker)
- */
 add_action('init', function() {
-    // 1. MANIFEST JSON
     if (isset($_GET['dw-manifest'])) {
         header('Content-Type: application/json; charset=utf-8');
-        
         $name = get_theme_mod('dw_pwa_name', get_bloginfo('name'));
         $theme_color = get_theme_mod('dw_pwa_theme_color', '#16a34a');
         $site_icon_id = get_option('site_icon');
-
         $icons = [];
         if ($site_icon_id) {
-            $sizes = [192, 512];
-            foreach ($sizes as $size) {
+            foreach ([192, 512] as $size) {
                 $icon_data = wp_get_attachment_image_src($site_icon_id, [$size, $size]);
-                if ($icon_data) {
-                    $icons[] = [
-                        "src" => $icon_data[0],
-                        "sizes" => "{$size}x{$size}",
-                        "type" => "image/png",
-                        "purpose" => "any maskable"
-                    ];
-                }
+                if ($icon_data) $icons[] = [ "src" => $icon_data[0], "sizes" => "{$size}x{$size}", "type" => "image/png", "purpose" => "any maskable" ];
             }
         }
-
-        $manifest = [
-            "name" => $name,
-            "short_name" => get_theme_mod('dw_pwa_short_name', $name),
-            "start_url" => home_url('/'),
-            "display" => "standalone",
-            "background_color" => get_theme_mod('dw_pwa_bg_color', '#ffffff'),
-            "theme_color" => $theme_color,
-            "icons" => $icons
-        ];
-        echo json_encode($manifest);
+        echo json_encode([ "name" => $name, "short_name" => get_theme_mod('dw_pwa_short_name', $name), "start_url" => home_url('/'), "display" => "standalone", "background_color" => get_theme_mod('dw_pwa_bg_color', '#ffffff'), "theme_color" => $theme_color, "icons" => $icons ]);
         exit;
     }
-
-    // 2. SERVICE WORKER
     if (isset($_GET['dw-sw'])) {
         header('Content-Type: application/javascript; charset=utf-8');
-        // PENTING: Header ini memberitahu browser bahwa script ini punya akses ke seluruh situs
         header('Service-Worker-Allowed: /'); 
         ?>
-        const CACHE_NAME = 'dw-cache-v16';
+        const CACHE_NAME = 'dw-cache-v18';
         const OFFLINE_URL = '<?php echo home_url('/'); ?>';
-
-        self.addEventListener('install', (event) => {
-            event.waitUntil(
-                caches.open(CACHE_NAME).then((cache) => {
-                    return cache.addAll([OFFLINE_URL]);
-                })
-            );
-            self.skipWaiting();
-        });
-
-        self.addEventListener('activate', (event) => {
-            event.waitUntil(
-                caches.keys().then((cacheNames) => {
-                    return Promise.all(
-                        cacheNames.map((cacheName) => {
-                            if (cacheName !== CACHE_NAME) {
-                                return caches.delete(cacheName);
-                            }
-                        })
-                    );
-                })
-            );
-            self.clients.claim();
-        });
-
-        self.addEventListener('fetch', (event) => {
-            if (event.request.mode === 'navigate') {
-                event.respondWith(
-                    fetch(event.request).catch(() => {
-                        return caches.match(OFFLINE_URL);
-                    })
-                );
-            }
-        });
+        self.addEventListener('install', (event) => { event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll([OFFLINE_URL]))); self.skipWaiting(); });
+        self.addEventListener('activate', (event) => { event.waitUntil(caches.keys().then((keys) => Promise.all(keys.map((k) => k !== CACHE_NAME && caches.delete(k))))); self.clients.claim(); });
+        self.addEventListener('fetch', (event) => { if (event.request.mode === 'navigate') event.respondWith(fetch(event.request).catch(() => caches.match(OFFLINE_URL))); });
         <?php
         exit;
     }
