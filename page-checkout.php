@@ -1,7 +1,7 @@
 <?php
 /**
  * Template Name: Checkout Marketplace (Complete Logic)
- * Description: Checkout dengan Logika Smart Phone (Billing Phone Priority + Sync) & UI Premium.
+ * Description: Checkout dengan Logika Smart Phone & Address Retrieval (Billing Priority + Sync) & UI Premium.
  */
 
 if (!session_id()) session_start();
@@ -76,6 +76,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dw_place_order'])) {
         // --- FITUR AUTO-SAVE ADDRESS & PHONE SYNC ---
         // 1. Selalu Update Billing Phone (Meta Data Standar)
         update_user_meta($user_id, 'billing_phone', $no_hp);
+        
+        // Update Billing Address Meta juga agar sinkron
+        update_user_meta($user_id, 'billing_address_1', $alamat_lengkap);
+        update_user_meta($user_id, 'billing_postcode', $kode_pos);
+        update_user_meta($user_id, 'api_provinsi_id', $prov_id);
+        update_user_meta($user_id, 'api_kabupaten_id', $kota_id);
+        update_user_meta($user_id, 'api_kecamatan_id', $kec_id);
+        update_user_meta($user_id, 'api_kelurahan_id', $kel_id);
+        update_user_meta($user_id, 'billing_state', $provinsi); // Simpan nama provinsi
+        update_user_meta($user_id, 'billing_city', $kabupaten); // Simpan nama kota
         
         // 2. Update Tabel Custom (Sesuai Role)
         $table_user = '';
@@ -252,6 +262,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dw_place_order'])) {
 $data_source = null;
 $role_type   = 'pembeli'; 
 
+// Ambil data dari tabel custom sesuai role
 if (in_array('pedagang', $roles)) {
     $role_type = 'pedagang';
     $data_source = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}dw_pedagang WHERE id_user = %d", $user_id));
@@ -266,15 +277,9 @@ if (in_array('pedagang', $roles)) {
 }
 
 $nama_penerima = $user_wp->display_name;
-$alamat_detail = ''; $kode_pos = '';
-$prov_id = ''; $kota_id = ''; $kec_id = ''; $kel_id = '';
-$prov_nm = ''; $kota_nm = ''; $kec_nm = ''; $kel_nm = '';
 
-// *** LOGIKA SMART PHONE RETRIEVAL ***
-// 1. Coba ambil dari billing_phone (Meta) karena ini data paling relevan untuk checkout
+// --- A. PHONE RETRIEVAL (Priority: Billing Meta -> Custom Table) ---
 $no_hp = get_user_meta($user_id, 'billing_phone', true);
-
-// 2. Jika kosong, fallback ke data profil berdasarkan role
 if (empty($no_hp) && $data_source) {
     if (isset($data_source->nomor_wa) && !empty($data_source->nomor_wa)) {
         $no_hp = $data_source->nomor_wa;
@@ -283,30 +288,54 @@ if (empty($no_hp) && $data_source) {
     }
 }
 
-if ($data_source) {
+// --- B. ADDRESS RETRIEVAL (Priority: Billing Meta -> Custom Table) ---
+// 1. Coba ambil dari meta user dulu (standar WP)
+$alamat_detail = get_user_meta($user_id, 'billing_address_1', true);
+$kode_pos      = get_user_meta($user_id, 'billing_postcode', true);
+$prov_id       = get_user_meta($user_id, 'api_provinsi_id', true);
+$kota_id       = get_user_meta($user_id, 'api_kabupaten_id', true);
+$kec_id        = get_user_meta($user_id, 'api_kecamatan_id', true);
+$kel_id        = get_user_meta($user_id, 'api_kelurahan_id', true);
+$prov_nm       = get_user_meta($user_id, 'billing_state', true); // Nama Provinsi
+$kota_nm       = get_user_meta($user_id, 'billing_city', true); // Nama Kota
+$kec_nm        = ''; // Biasanya tidak ada standar WP utk kecamatan, ambil dari nama API jika ada atau custom
+$kel_nm        = ''; 
+
+// 2. Jika alamat meta kosong DAN data source ada, ambil dari tabel custom
+if (empty($alamat_detail) && $data_source) {
+    $alamat_detail = $data_source->alamat_lengkap;
+    $kode_pos      = $data_source->kode_pos ?? '';
+    
+    // Mapping ID Wilayah
+    $prov_id = $data_source->api_provinsi_id ?? '';
+    $kota_id = $data_source->api_kabupaten_id ?? '';
+    $kec_id  = $data_source->api_kecamatan_id ?? '';
+    $kel_id  = $data_source->api_kelurahan_id ?? '';
+
+    // Mapping Nama Wilayah
     switch ($role_type) {
         case 'pedagang':
+            $prov_nm = $data_source->provinsi_nama; 
+            $kota_nm = $data_source->kabupaten_nama;
+            $kec_nm  = $data_source->kecamatan_nama; 
+            $kel_nm  = $data_source->kelurahan_nama;
             $nama_penerima = $data_source->nama_pemilik;
-            $alamat_detail = $data_source->alamat_lengkap;
-            $prov_nm = $data_source->provinsi_nama; $kota_nm = $data_source->kabupaten_nama;
-            $kec_nm = $data_source->kecamatan_nama; $kel_nm = $data_source->kelurahan_nama;
             break;
-        case 'desa':
+        case 'desa': // Biasanya admin desa pakai alamat kantor desa
+            $prov_nm = $data_source->provinsi; 
+            $kota_nm = $data_source->kabupaten;
+            $kec_nm  = $data_source->kecamatan; 
+            $kel_nm  = $data_source->kelurahan;
             $nama_penerima = $data_source->nama_desa;
-            $alamat_detail = $data_source->alamat_lengkap;
-            $prov_nm = $data_source->provinsi; $kota_nm = $data_source->kabupaten;
-            $kec_nm = $data_source->kecamatan; $kel_nm = $data_source->kelurahan;
             break;
         default: // Pembeli & Verifikator
+            $prov_nm = $data_source->provinsi; 
+            $kota_nm = $data_source->kabupaten;
+            $kec_nm  = $data_source->kecamatan; 
+            $kel_nm  = $data_source->kelurahan;
             $nama_penerima = isset($data_source->nama_lengkap) ? $data_source->nama_lengkap : $user_wp->display_name;
-            $alamat_detail = $data_source->alamat_lengkap;
-            $prov_nm = $data_source->provinsi; $kota_nm = $data_source->kabupaten;
-            $kec_nm = $data_source->kecamatan; $kel_nm = $data_source->kelurahan;
             break;
     }
-    $kode_pos = $data_source->kode_pos;
-    $prov_id = $data_source->api_provinsi_id; $kota_id = $data_source->api_kabupaten_id;
-    $kec_id = $data_source->api_kecamatan_id; $kel_id = $data_source->api_kelurahan_id;
 }
 
 // --- 3. AMBIL DATA CART ---
