@@ -70,7 +70,7 @@ function tema_dw_scripts() {
     ));
 
     if (is_post_type_archive('dw_produk') || is_tax('kategori_produk') || is_post_type_archive('dw_wisata')) {
-         wp_enqueue_script('tema-dw-filter', get_template_directory_uri() . '/assets/js/archive-filter.js', array('jquery'), '1.0.0', true);
+          wp_enqueue_script('tema-dw-filter', get_template_directory_uri() . '/assets/js/archive-filter.js', array('jquery'), '1.0.0', true);
     }
 }
 add_action('wp_enqueue_scripts', 'tema_dw_scripts');
@@ -170,10 +170,18 @@ add_action('init', 'tema_dw_start_session');
  */
 
 function tema_dw_rewrite_rules() {
-    // Single Pages
+    // Single Pages (Wisata & Produk)
     add_rewrite_rule('^wisata/([^/]*)/?', 'index.php?dw_type=wisata&dw_slug=$matches[1]', 'top');
     add_rewrite_rule('^produk/([^/]*)/?', 'index.php?dw_type=produk&dw_slug=$matches[1]', 'top');
     
+    // PERBAIKAN: Rule untuk Profil Toko (URL: /toko/slug-toko)
+    // Ini mencocokkan logic di single-dw_produk.php
+    add_rewrite_rule('^toko/([^/]*)/?', 'index.php?dw_type=profil_toko&dw_slug_toko=$matches[1]', 'top');
+    
+    // --- BARU: Rule untuk Profil Desa (URL: /desa/slug-desa) ---
+    // Agar tombol "Lihat Profil Desa" di single-dw_wisata.php berfungsi
+    add_rewrite_rule('^desa/([^/]*)/?', 'index.php?dw_type=profil_desa&dw_slug_desa=$matches[1]', 'top');
+
     // Dashboard Router (Pusat Kontrol)
     add_rewrite_rule('^dashboard/?$', 'index.php?dw_type=dashboard_router', 'top');
     
@@ -181,7 +189,7 @@ function tema_dw_rewrite_rules() {
     add_rewrite_rule('^dashboard-toko/?$', 'index.php?dw_type=dashboard_toko', 'top');
     add_rewrite_rule('^dashboard-desa/?$', 'index.php?dw_type=dashboard_desa', 'top');
     add_rewrite_rule('^dashboard-ojek/?$', 'index.php?dw_type=dashboard_ojek', 'top');
-    add_rewrite_rule('^dashboard-verifikator/?$', 'index.php?dw_type=dashboard_verifikator', 'top'); // Tambahan
+    add_rewrite_rule('^dashboard-verifikator/?$', 'index.php?dw_type=dashboard_verifikator', 'top'); 
     add_rewrite_rule('^akun-saya/?$', 'index.php?dw_type=akun_saya', 'top');
     
     // Transaction
@@ -189,20 +197,23 @@ function tema_dw_rewrite_rules() {
     add_rewrite_rule('^checkout/?$', 'index.php?dw_type=checkout', 'top');
     add_rewrite_rule('^pembayaran/?$', 'index.php?dw_type=pembayaran', 'top');
     
-    if (get_option('tema_dw_rules_flushed_v12') !== 'yes') {
+    // AUTO FLUSH: Update versi flush ke v16 (sebelumnya v15) untuk menerapkan rule desa
+    if (get_option('tema_dw_rules_flushed_v16') !== 'yes') {
         flush_rewrite_rules();
-        update_option('tema_dw_rules_flushed_v12', 'yes');
+        update_option('tema_dw_rules_flushed_v16', 'yes');
     }
 }
 add_action('init', 'tema_dw_rewrite_rules');
 
 add_action('after_switch_theme', function() {
-    delete_option('tema_dw_rules_flushed_v12');
+    delete_option('tema_dw_rules_flushed_v16');
 });
 
 function tema_dw_query_vars($vars) {
     $vars[] = 'dw_type';
     $vars[] = 'dw_slug';
+    $vars[] = 'dw_slug_toko';
+    $vars[] = 'dw_slug_desa'; // Tambahan variable query desa
     return $vars;
 }
 add_filter('query_vars', 'tema_dw_query_vars');
@@ -246,6 +257,10 @@ function tema_dw_template_include($template) {
     // Direct Access Handlers
     if ($dw_type == 'wisata') return get_template_directory() . '/single-dw_wisata.php';
     if ($dw_type == 'produk') return get_template_directory() . '/single-dw_produk.php';
+    if ($dw_type == 'profil_toko') return get_template_directory() . '/page-profil-toko.php';
+    
+    // --- BARU: Route ke file Profil Desa ---
+    if ($dw_type == 'profil_desa') return get_template_directory() . '/page-profil-desa.php';
     
     if ($dw_type == 'cart')       return get_template_directory() . '/page-cart.php';
     if ($dw_type == 'checkout')   return get_template_directory() . '/page-checkout.php';
