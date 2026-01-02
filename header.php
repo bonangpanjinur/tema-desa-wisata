@@ -11,6 +11,20 @@
     <meta charset="<?php bloginfo( 'charset' ); ?>">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="profile" href="https://gmpg.org/xfn/11">
+    <?php if ( get_theme_mod('dw_pwa_enabled', '1') ) : ?>
+    <meta name="theme-color" content="<?php echo get_theme_mod('dw_pwa_theme_color', '#0d6efd'); ?>">
+    <link rel="manifest" href="<?php echo home_url('/?dw-manifest=1'); ?>">
+    <link rel="apple-touch-icon" href="<?php echo get_site_icon_url(180); ?>">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('<?php echo home_url('/?dw-sw=1'); ?>')
+                    .then(reg => console.log('PWA Desa Wisata Siap!'))
+                    .catch(err => console.log('SW fail: ', err));
+            });
+        }
+    </script>
+    <?php endif; ?>
     <?php wp_head(); ?>
 </head>
 

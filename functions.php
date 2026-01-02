@@ -649,6 +649,112 @@ function dw_ajax_desa_save_profile() {
  * 8. WISHLIST
  * ==============================================================================
  */
+/**
+ * Pengaturan PWA di Customizer
+ */
+function dw_pwa_customize_register( $wp_customize ) {
+    $wp_customize->add_section( 'dw_pwa_section', array(
+        'title'    => __( 'Pengaturan PWA', 'dw-desa-wisata' ),
+        'priority' => 160,
+    ) );
+
+    // Enable/Disable PWA
+    $wp_customize->add_setting( 'dw_pwa_enabled', array( 'default' => '1' ) );
+    $wp_customize->add_control( 'dw_pwa_enabled', array(
+        'label'    => __( 'Aktifkan PWA', 'dw-desa-wisata' ),
+        'section'  => 'dw_pwa_section',
+        'type'     => 'checkbox',
+    ) );
+
+    // App Name
+    $wp_customize->add_setting( 'dw_pwa_name', array( 'default' => get_bloginfo('name') ) );
+    $wp_customize->add_control( 'dw_pwa_name', array(
+        'label'    => __( 'Nama Aplikasi', 'dw-desa-wisata' ),
+        'section'  => 'dw_pwa_section',
+        'type'     => 'text',
+    ) );
+
+    // Short Name
+    $wp_customize->add_setting( 'dw_pwa_short_name', array( 'default' => get_bloginfo('name') ) );
+    $wp_customize->add_control( 'dw_pwa_short_name', array(
+        'label'    => __( 'Nama Pendek (di Layar Utama)', 'dw-desa-wisata' ),
+        'section'  => 'dw_pwa_section',
+        'type'     => 'text',
+    ) );
+
+    // Theme Color
+    $wp_customize->add_setting( 'dw_pwa_theme_color', array( 'default' => '#0d6efd' ) );
+    $wp_customize->add_control( new WP_Customize_Color_Control( $wp_customize, 'dw_pwa_theme_color', array(
+        'label'    => __( 'Warna Tema (Toolbar)', 'dw-desa-wisata' ),
+        'section'  => 'dw_pwa_section',
+    ) ) );
+
+    // Background Color
+    $wp_customize->add_setting( 'dw_pwa_bg_color', array( 'default' => '#ffffff' ) );
+    $wp_customize->add_control( new WP_Customize_Color_Control( $wp_customize, 'dw_pwa_bg_color', array(
+        'label'    => __( 'Warna Background Splash Screen', 'dw-desa-wisata' ),
+        'section'  => 'dw_pwa_section',
+    ) ) );
+}
+add_action( 'customize_register', 'dw_pwa_customize_register' );
+
+/**
+ * Handle Manifest JSON dinamis
+ */
+add_action('init', function() {
+    if (isset($_GET['dw-manifest'])) {
+        header('Content-Type: application/json; charset=utf-8');
+        
+        $name = get_theme_mod('dw_pwa_name', get_bloginfo('name'));
+        $short_name = get_theme_mod('dw_pwa_short_name', get_bloginfo('name'));
+        $theme_color = get_theme_mod('dw_pwa_theme_color', '#0d6efd');
+        $bg_color = get_theme_mod('dw_pwa_bg_color', '#ffffff');
+        $icon_url = get_site_icon_url(512);
+
+        $manifest = [
+            "name" => $name,
+            "short_name" => $short_name,
+            "start_url" => home_url('/'),
+            "display" => "standalone",
+            "background_color" => $bg_color,
+            "theme_color" => $theme_color,
+            "icons" => [
+                [
+                    "src" => $icon_url ? $icon_url : get_template_directory_uri() . '/assets/img/icon-512.png',
+                    "sizes" => "512x512",
+                    "type" => "image/png",
+                    "purpose" => "any maskable"
+                ]
+            ]
+        ];
+        echo json_encode($manifest);
+        exit;
+    }
+
+    if (isset($_GET['dw-sw'])) {
+        header('Content-Type: application/javascript; charset=utf-8');
+        ?>
+        const CACHE_NAME = 'dw-v1';
+        const urlsToCache = [
+            '<?php echo home_url('/'); ?>',
+            '<?php echo get_stylesheet_uri(); ?>'
+        ];
+
+        self.addEventListener('install', event => {
+            event.waitUntil(
+                caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
+            );
+        });
+
+        self.addEventListener('fetch', event => {
+            event.respondWith(
+                caches.match(event.request).then(response => response || fetch(event.request))
+            );
+        });
+        <?php
+        exit;
+    }
+});
 
 add_action('wp_ajax_dw_toggle_wishlist', 'dw_handle_toggle_wishlist');
 add_action('wp_ajax_nopriv_dw_toggle_wishlist', 'dw_handle_toggle_wishlist');
