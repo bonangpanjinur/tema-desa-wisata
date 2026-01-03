@@ -527,13 +527,13 @@ get_header();
     
     /* Modern Order Tabs */
     .order-tab-btn { 
-        @apply px-4 py-2.5 text-xs font-bold text-gray-500 rounded-full transition-all duration-200 hover:bg-gray-100 hover:text-gray-800 whitespace-nowrap border border-transparent flex items-center gap-2; 
+        @apply px-4 py-2 text-xs font-semibold text-gray-500 rounded-full transition-all duration-200 hover:bg-gray-100 hover:text-gray-800 whitespace-nowrap border border-transparent flex items-center gap-2; 
     }
     .order-tab-btn.active { 
         @apply bg-gray-900 text-white shadow-md transform scale-105; 
     }
     .badge-count {
-        @apply px-1.5 py-0.5 rounded-md text-[10px] bg-gray-200 text-gray-600 transition-colors;
+        @apply px-1.5 py-0.5 rounded-full text-[10px] bg-gray-200 text-gray-600 transition-colors font-bold min-w-[1.25rem] text-center;
     }
     .order-tab-btn.active .badge-count {
         @apply bg-gray-700 text-white;
@@ -739,7 +739,7 @@ get_header();
             <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                 
                 <!-- MODERN TABS WITH COUNTERS -->
-                <div class="border-b border-gray-100 bg-white p-2 sticky top-0 z-10 overflow-x-auto no-scrollbar">
+                <div class="border-b border-gray-100 bg-white p-4 sticky top-0 z-10 overflow-x-auto no-scrollbar">
                     <div class="flex space-x-2 min-w-max" id="order-tabs">
                         <button onclick="filterOrders('all')" class="order-tab-btn active" data-tab="all">
                             Semua <span class="badge-count"><?php echo $order_counts['all']; ?></span>
