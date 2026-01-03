@@ -96,6 +96,7 @@ function dw_get_desa_id() {
 function tema_dw_login_redirect($url, $request, $user) {
     if ($user && is_object($user) && is_a($user, 'WP_User')) {
         $roles = (array) $user->roles;
+        // Semua role khusus diarahkan ke /dashboard
         $dashboard_roles = array('administrator', 'editor_desa', 'admin_desa', 'pedagang', 'dw_ojek', 'verifikator_umkm');
         
         foreach ($dashboard_roles as $role) {
@@ -145,19 +146,26 @@ add_action('init', 'tema_dw_start_session');
  */
 
 function tema_dw_rewrite_rules() {
+    // Single Pages
     add_rewrite_rule('^wisata/([^/]*)/?', 'index.php?dw_type=wisata&dw_slug=$matches[1]', 'top');
     add_rewrite_rule('^produk/([^/]*)/?', 'index.php?dw_type=produk&dw_slug=$matches[1]', 'top');
     add_rewrite_rule('^toko/([^/]*)/?', 'index.php?dw_type=profil_toko&dw_slug_toko=$matches[1]', 'top');
     add_rewrite_rule('^desa/([^/]*)/?', 'index.php?dw_type=profil_desa&dw_slug_desa=$matches[1]', 'top');
+    
+    // Dashboard Utama (Satu Pintu)
     add_rewrite_rule('^dashboard/?$', 'index.php?dw_type=dashboard_router', 'top');
+    
+    // Halaman Lain
     add_rewrite_rule('^akun-saya/?$', 'index.php?dw_type=akun_saya', 'top');
     add_rewrite_rule('^keranjang/?$', 'index.php?dw_type=cart', 'top');
     add_rewrite_rule('^checkout/?$', 'index.php?dw_type=checkout', 'top');
     add_rewrite_rule('^pembayaran/?$', 'index.php?dw_type=pembayaran', 'top');
     
-    if (get_option('tema_dw_rules_flushed_v18') !== 'yes') {
+    // Hapus rewrite rule spesifik dashboard-toko, dashboard-desa, dll agar semua lewat /dashboard
+    
+    if (get_option('tema_dw_rules_flushed_v20') !== 'yes') {
         flush_rewrite_rules();
-        update_option('tema_dw_rules_flushed_v18', 'yes');
+        update_option('tema_dw_rules_flushed_v20', 'yes');
     }
 }
 add_action('init', 'tema_dw_rewrite_rules');
@@ -174,6 +182,7 @@ add_filter('query_vars', 'tema_dw_query_vars');
 function tema_dw_template_include($template) {
     $dw_type = get_query_var('dw_type');
     
+    // ROUTING UTAMA KE FILE PAGE-DASHBOARD.PHP
     if ($dw_type == 'dashboard_router') {
         $dashboard_file = get_template_directory() . '/page-dashboard.php';
         if (file_exists($dashboard_file)) {
@@ -201,6 +210,7 @@ add_filter('template_include', 'tema_dw_template_include');
  */
 function dw_load_region_scripts() {
     $type = get_query_var('dw_type');
+    // Load script region hanya di halaman dashboard utama
     if ( $type == 'dashboard_router') {
         if( file_exists( get_template_directory() . '/assets/js/dw-region.js' ) ) {
             wp_enqueue_script( 'dw-region-js', get_template_directory_uri() . '/assets/js/dw-region.js', array('jquery'), '1.2', true );
@@ -212,10 +222,11 @@ add_action( 'wp_enqueue_scripts', 'dw_load_region_scripts' );
 
 /**
  * ==============================================================================
- * 5. AJAX HANDLERS: CART SYSTEM
+ * 5. AJAX HANDLERS: ALL MODULES (COMPLETE)
  * ==============================================================================
  */
 
+// --- CART ---
 add_action('wp_ajax_dw_add_to_cart', 'dw_handle_add_to_cart');
 add_action('wp_ajax_nopriv_dw_add_to_cart', 'dw_handle_add_to_cart');
 function dw_handle_add_to_cart() {
@@ -273,12 +284,7 @@ function dw_handle_remove_cart_item() {
     wp_send_json_success([ 'grand_total_fmt' => tema_dw_format_rupiah($totals->grand_total ?? 0), 'total_items' => intval($totals->total_items ?? 0) ]);
 }
 
-/**
- * ==============================================================================
- * 6. AJAX HANDLERS: MERCHANT DASHBOARD (TOKO)
- * ==============================================================================
- */
-
+// --- MERCHANT ---
 add_action('wp_ajax_dw_merchant_stats', 'dw_ajax_merchant_stats');
 function dw_ajax_merchant_stats() {
     check_ajax_referer('dw_cart_nonce', 'security');
@@ -371,13 +377,7 @@ function dw_ajax_merchant_get_profile() {
     check_ajax_referer('dw_cart_nonce', 'security');
     global $wpdb;
     $p = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}dw_pedagang WHERE id = %d", dw_get_merchant_id()));
-    wp_send_json_success([ 
-        'nama_toko' => $p->nama_toko, 
-        'deskripsi_toko' => $p->alamat_lengkap, 
-        'no_rekening' => $p->no_rekening, 
-        'nama_bank' => $p->nama_bank, 
-        'atas_nama_rekening' => $p->atas_nama_rekening 
-    ]);
+    wp_send_json_success([ 'nama_toko' => $p->nama_toko, 'deskripsi_toko' => $p->alamat_lengkap, 'no_rekening' => $p->no_rekening, 'nama_bank' => $p->nama_bank, 'atas_nama_rekening' => $p->atas_nama_rekening ]);
 }
 
 add_action('wp_ajax_dw_merchant_save_profile', 'dw_ajax_merchant_save_profile');
@@ -395,12 +395,7 @@ function dw_ajax_merchant_save_profile() {
     wp_send_json_success();
 }
 
-/**
- * ==============================================================================
- * 7. AJAX HANDLERS: DESA DASHBOARD
- * ==============================================================================
- */
-
+// --- DESA ---
 add_action('wp_ajax_dw_desa_stats', 'dw_ajax_desa_stats');
 function dw_ajax_desa_stats() {
     check_ajax_referer('dw_cart_nonce', 'security');
@@ -482,12 +477,7 @@ function dw_ajax_desa_save_profile() {
     wp_send_json_success();
 }
 
-/**
- * ==============================================================================
- * 8. REGION HANDLERS (WILAYAH)
- * ==============================================================================
- */
-
+// --- REGIONS ---
 add_action('wp_ajax_dw_get_provinces', 'dw_ajax_get_provinces');
 add_action('wp_ajax_nopriv_dw_get_provinces', 'dw_ajax_get_provinces');
 function dw_ajax_get_provinces() {
@@ -505,12 +495,7 @@ function dw_ajax_get_regencies() {
     wp_send_json_success($results);
 }
 
-/**
- * ==============================================================================
- * 9. WISHLIST & PROGRESSIVE WEB APP (PWA)
- * ==============================================================================
- */
-
+// --- WISHLIST ---
 add_action('wp_ajax_dw_toggle_wishlist', 'dw_handle_toggle_wishlist');
 add_action('wp_ajax_nopriv_dw_toggle_wishlist', 'dw_handle_toggle_wishlist');
 function dw_handle_toggle_wishlist() {
@@ -530,6 +515,12 @@ function dw_handle_toggle_wishlist() {
         wp_send_json_success(['status' => 'added']);
     }
 }
+
+/**
+ * ==============================================================================
+ * 9. PWA INTEGRATION
+ * ==============================================================================
+ */
 
 function dw_add_pwa_tags() {
     if (get_theme_mod('dw_pwa_enabled', '1') !== '1') return;
@@ -593,7 +584,7 @@ add_action('init', function() {
         header('Content-Type: application/javascript; charset=utf-8');
         header('Service-Worker-Allowed: /'); 
         ?>
-        const CACHE_NAME = 'dw-cache-v20';
+        const CACHE_NAME = 'dw-cache-v21';
         const OFFLINE_URL = '<?php echo home_url('/'); ?>';
         self.addEventListener('install', (event) => { event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll([OFFLINE_URL]))); self.skipWaiting(); });
         self.addEventListener('activate', (event) => { event.waitUntil(caches.keys().then((keys) => Promise.all(keys.map((k) => k !== CACHE_NAME && caches.delete(k))))); self.clients.claim(); });
