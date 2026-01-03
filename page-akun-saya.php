@@ -206,19 +206,33 @@ if ( in_array('pedagang_toko', $roles) ) {
     }
 }
 
-// Set Label Role
-$role_label = 'Member';
-$role_badge_color = 'bg-gray-100 text-gray-600';
-$role_icon = 'fa-user';
+// --- SET LABEL ROLE & WARNA BADGE ---
+// Default (Member Biasa / Subscriber)
+$role_label       = 'Wisatawan'; 
+$role_badge_color = 'bg-gray-100 text-gray-600'; 
+$role_icon        = 'fa-user';
 
+// Cek Role Tertinggi (Prioritas)
 if ( in_array('administrator', $roles) ) {
-    $role_label = 'Administrator'; $role_badge_color = 'bg-red-100 text-red-600'; $role_icon = 'fa-shield-alt';
+    $role_label       = 'Administrator'; 
+    $role_badge_color = 'bg-red-100 text-red-600 border border-red-200'; 
+    $role_icon        = 'fa-shield-alt';
 } elseif ( in_array('verifikator_desa', $roles) ) {
-    $role_label = 'Admin Desa'; $role_badge_color = 'bg-green-100 text-green-600'; $role_icon = 'fa-landmark';
+    $role_label       = 'Admin Desa'; 
+    $role_badge_color = 'bg-blue-100 text-blue-600 border border-blue-200'; 
+    $role_icon        = 'fa-landmark';
 } elseif ( in_array('pedagang_toko', $roles) ) {
-    $role_label = 'Pedagang'; $role_badge_color = 'bg-purple-100 text-purple-600'; $role_icon = 'fa-store';
+    $role_label       = 'Pedagang / UMKM'; 
+    $role_badge_color = 'bg-purple-100 text-purple-600 border border-purple-200'; 
+    $role_icon        = 'fa-store';
 } elseif ( in_array('pengelola_ojek', $roles) ) {
-    $role_label = 'Driver Ojek'; $role_badge_color = 'bg-orange-100 text-orange-600'; $role_icon = 'fa-motorcycle';
+    $role_label       = 'Mitra Ojek'; 
+    $role_badge_color = 'bg-orange-100 text-orange-600 border border-orange-200'; 
+    $role_icon        = 'fa-motorcycle';
+} elseif ( in_array('editor', $roles) || in_array('author', $roles) ) {
+    $role_label       = 'Kontributor'; 
+    $role_badge_color = 'bg-teal-100 text-teal-600 border border-teal-200'; 
+    $role_icon        = 'fa-pen-nib';
 }
 
 get_header();
@@ -270,7 +284,7 @@ get_header();
                         </div>
                         <h2 class="text-lg font-bold text-gray-900 leading-tight"><?php echo esc_html($current_user->display_name); ?></h2>
                         <p class="text-sm text-gray-500 mb-3"><?php echo esc_html($current_user->user_email); ?></p>
-                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest <?php echo $role_badge_color; ?>">
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border border-transparent shadow-sm <?php echo $role_badge_color; ?>">
                             <i class="fas <?php echo $role_icon; ?>"></i> <?php echo $role_label; ?>
                         </span>
                     </div>
