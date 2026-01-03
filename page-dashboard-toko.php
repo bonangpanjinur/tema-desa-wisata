@@ -1,8 +1,7 @@
 <?php
 /**
  * Template Name: Dashboard Toko (Merchant)
- * Description: Dashboard lengkap pedagang. Integrasi Penuh: Variasi & Galeri Produk (Preview), Ongkir Ojek Zona, Paket, Referral, & QR Generator.
- * Status: FINAL MERGED (Original Features Restored + Advanced Order Management + Order Filtering Tabs + UI/UX Enhanced + Auto Quota Deduction)
+ * Description: Dashboard lengkap pedagang. UI/UX Pesanan Ditingkatkan (Search, Counters, Quick Actions).
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -55,12 +54,13 @@ if (!function_exists('dw_get_status_badge')) {
             'menunggu_pembayaran'     => 'bg-yellow-50 text-yellow-700 border-yellow-200 ring-yellow-500/20',
             'pembayaran_dikonfirmasi' => 'bg-emerald-50 text-emerald-700 border-emerald-200 ring-emerald-500/20',
             'pembayaran_gagal'        => 'bg-red-50 text-red-700 border-red-200 ring-red-500/20',
+            'menunggu_konfirmasi'     => 'bg-orange-50 text-orange-700 border-orange-200 ring-orange-500/20',
             'diproses'                => 'bg-blue-50 text-blue-700 border-blue-200 ring-blue-500/20',
             'dikirim_ekspedisi'       => 'bg-purple-50 text-purple-700 border-purple-200 ring-purple-500/20',
             'diantar_ojek'            => 'bg-purple-50 text-purple-700 border-purple-200 ring-purple-500/20',
             'siap_diambil'            => 'bg-indigo-50 text-indigo-700 border-indigo-200 ring-indigo-500/20',
             'selesai'                 => 'bg-green-50 text-green-700 border-green-200 ring-green-500/20',
-            'dibatalkan'              => 'bg-red-50 text-red-700 border-red-200 ring-red-500/20',
+            'dibatalkan'              => 'bg-gray-100 text-gray-500 border-gray-200 ring-gray-500/20',
             'menunggu_driver'         => 'bg-orange-50 text-orange-700 border-orange-200 ring-orange-500/20',
             'penawaran_driver'        => 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200 ring-fuchsia-500/20',
             'nego'                    => 'bg-cyan-50 text-cyan-700 border-cyan-200 ring-cyan-500/20',
@@ -69,15 +69,16 @@ if (!function_exists('dw_get_status_badge')) {
         ];
         
         $labels = [
-            'menunggu_pembayaran'     => 'Belum Dibayar',
+            'menunggu_pembayaran'     => 'Belum Bayar',
             'pembayaran_dikonfirmasi' => 'Sudah Bayar',
             'pembayaran_gagal'        => 'Gagal Bayar',
+            'menunggu_konfirmasi'     => 'Perlu Konfirmasi',
             'diproses'                => 'Diproses',
-            'dikirim_ekspedisi'       => 'Dikirim Ekspedisi',
-            'diantar_ojek'            => 'Diantar Ojek',
+            'dikirim_ekspedisi'       => 'Dikirim Kurir',
+            'diantar_ojek'            => 'Ojek OTW',
             'siap_diambil'            => 'Siap Diambil',
             'selesai'                 => 'Selesai',
-            'dibatalkan'              => 'Dibatalkan',
+            'dibatalkan'              => 'Batal',
             'menunggu_driver'         => 'Cari Driver',
             'penawaran_driver'        => 'Tawaran Masuk',
             'nego'                    => 'Nego Ongkir',
@@ -339,11 +340,11 @@ if ( isset($_POST['dw_action']) && $_POST['dw_action'] == 'save_product' ) {
                 foreach ($var_nama as $k => $nm) {
                     if (!empty($nm)) {
                         $wpdb->insert($table_variasi, [
-                            'id_produk'         => $prod_id,
+                            'id_produk'          => $prod_id,
                             'deskripsi_variasi' => sanitize_text_field($nm),
-                            'harga_variasi'     => floatval($var_harga[$k]),
-                            'stok_variasi'      => intval($var_stok[$k]),
-                            'is_default'        => ($k === 0) ? 1 : 0
+                            'harga_variasi'      => floatval($var_harga[$k]),
+                            'stok_variasi'       => intval($var_stok[$k]),
+                            'is_default'         => ($k === 0) ? 1 : 0
                         ]);
                     }
                 }
@@ -416,7 +417,7 @@ if ($produk_list) {
     }
 }
 
-// --- Fetch Order, Paket, Histori ---
+// --- Fetch Order & Pre-calculate Counts ---
 $order_query = "
     SELECT sub.*, 
            t.kode_unik, t.bukti_pembayaran, t.status_transaksi as global_status, 
@@ -427,6 +428,32 @@ $order_query = "
     ORDER BY sub.created_at DESC
 ";
 $order_list = $wpdb->get_results($wpdb->prepare($order_query, $pedagang->id));
+
+// Calculate counts for tabs
+$order_counts = [
+    'all' => count($order_list),
+    'belum_bayar' => 0,
+    'perlu_dikirim' => 0,
+    'dikirim' => 0,
+    'selesai' => 0,
+    'dibatalkan' => 0
+];
+
+foreach ($order_list as $o) {
+    $pay_status = $o->global_status;
+    $order_status = $o->status_pesanan;
+    
+    if ($pay_status == 'menunggu_pembayaran') { $order_counts['belum_bayar']++; } 
+    elseif (in_array($order_status, ['dibatalkan', 'pembayaran_gagal'])) { $order_counts['dibatalkan']++; } 
+    elseif ($order_status == 'selesai') { $order_counts['selesai']++; } 
+    elseif (in_array($order_status, ['dikirim_ekspedisi', 'diantar_ojek', 'dalam_perjalanan', 'siap_diambil'])) { $order_counts['dikirim']++; } 
+    elseif (in_array($order_status, ['menunggu_konfirmasi', 'diproses', 'menunggu_driver', 'penawaran_driver', 'nego', 'menunggu_penjemputan'])) { $order_counts['perlu_dikirim']++; }
+    
+    // Fetch limited item summary per order for quick view
+    $o->items = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_items WHERE id_sub_transaksi = %d", $o->id));
+    $o->total_items = count($o->items);
+    $o->first_item_name = !empty($o->items) ? $o->items[0]->nama_produk : 'Produk';
+}
 
 $pakets = $wpdb->get_results("SELECT * FROM $table_paket WHERE status = 'aktif' AND target_role = 'pedagang' ORDER BY harga ASC");
 $histori_paket = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_pembelian WHERE id_pedagang = %d ORDER BY created_at DESC LIMIT 10", $pedagang->id));
@@ -500,10 +527,16 @@ get_header();
     
     /* Modern Order Tabs */
     .order-tab-btn { 
-        @apply px-5 py-2.5 text-sm font-medium text-gray-500 rounded-full transition-all duration-200 hover:bg-gray-100 hover:text-gray-800 whitespace-nowrap border border-transparent; 
+        @apply px-4 py-2.5 text-xs font-bold text-gray-500 rounded-full transition-all duration-200 hover:bg-gray-100 hover:text-gray-800 whitespace-nowrap border border-transparent flex items-center gap-2; 
     }
     .order-tab-btn.active { 
         @apply bg-gray-900 text-white shadow-md transform scale-105; 
+    }
+    .badge-count {
+        @apply px-1.5 py-0.5 rounded-md text-[10px] bg-gray-200 text-gray-600 transition-colors;
+    }
+    .order-tab-btn.active .badge-count {
+        @apply bg-gray-700 text-white;
     }
     
     /* Card Hover Effect */
@@ -688,24 +721,44 @@ get_header();
              </div>
         </div>
 
-        <!-- VIEW 3: PESANAN MASUK (FILTERED TABS) -->
+        <!-- VIEW 3: PESANAN MASUK (FILTERED TABS ENHANCED) -->
         <div id="view-pesanan" class="tab-content hidden">
-            <div class="mb-6">
-                <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Pesanan Masuk</h1>
-                <p class="text-sm text-gray-500 mt-1">Kelola transaksi, verifikasi pembayaran, dan update resi.</p>
+            <div class="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Pesanan Masuk</h1>
+                    <p class="text-sm text-gray-500 mt-1">Kelola transaksi, verifikasi pembayaran, dan update resi.</p>
+                </div>
+                
+                <!-- SEARCH BAR -->
+                <div class="relative w-full md:w-64">
+                    <i class="fas fa-search absolute left-3 top-3 text-gray-400 text-sm"></i>
+                    <input type="text" id="search-orders" placeholder="Cari pesanan / nama..." class="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-gray-200 outline-none transition" onkeyup="filterOrders(currentTab)">
+                </div>
             </div>
             
             <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                 
-                <!-- MODERN TABS -->
+                <!-- MODERN TABS WITH COUNTERS -->
                 <div class="border-b border-gray-100 bg-white p-2 sticky top-0 z-10 overflow-x-auto no-scrollbar">
                     <div class="flex space-x-2 min-w-max" id="order-tabs">
-                        <button onclick="filterOrders('all')" class="order-tab-btn active" data-tab="all">Semua</button>
-                        <button onclick="filterOrders('belum_bayar')" class="order-tab-btn" data-tab="belum_bayar">Belum Bayar</button>
-                        <button onclick="filterOrders('perlu_dikirim')" class="order-tab-btn" data-tab="perlu_dikirim">Perlu Dikirim</button>
-                        <button onclick="filterOrders('dikirim')" class="order-tab-btn" data-tab="dikirim">Dikirim</button>
-                        <button onclick="filterOrders('selesai')" class="order-tab-btn" data-tab="selesai">Selesai</button>
-                        <button onclick="filterOrders('dibatalkan')" class="order-tab-btn" data-tab="dibatalkan">Dibatalkan</button>
+                        <button onclick="filterOrders('all')" class="order-tab-btn active" data-tab="all">
+                            Semua <span class="badge-count"><?php echo $order_counts['all']; ?></span>
+                        </button>
+                        <button onclick="filterOrders('belum_bayar')" class="order-tab-btn" data-tab="belum_bayar">
+                            Belum Bayar <span class="badge-count"><?php echo $order_counts['belum_bayar']; ?></span>
+                        </button>
+                        <button onclick="filterOrders('perlu_dikirim')" class="order-tab-btn" data-tab="perlu_dikirim">
+                            Perlu Dikirim <span class="badge-count bg-orange-100 text-orange-700"><?php echo $order_counts['perlu_dikirim']; ?></span>
+                        </button>
+                        <button onclick="filterOrders('dikirim')" class="order-tab-btn" data-tab="dikirim">
+                            Dikirim <span class="badge-count"><?php echo $order_counts['dikirim']; ?></span>
+                        </button>
+                        <button onclick="filterOrders('selesai')" class="order-tab-btn" data-tab="selesai">
+                            Selesai <span class="badge-count bg-green-100 text-green-700"><?php echo $order_counts['selesai']; ?></span>
+                        </button>
+                        <button onclick="filterOrders('dibatalkan')" class="order-tab-btn" data-tab="dibatalkan">
+                            Dibatalkan <span class="badge-count bg-red-100 text-red-700"><?php echo $order_counts['dibatalkan']; ?></span>
+                        </button>
                     </div>
                 </div>
 
@@ -716,20 +769,17 @@ get_header();
                             <tr class="text-gray-500 uppercase text-[11px] tracking-wider font-semibold">
                                 <th class="py-4 px-6">Info Transaksi</th>
                                 <th class="py-4 px-6">Pelanggan</th>
+                                <th class="py-4 px-6">Produk</th>
                                 <th class="py-4 px-6">Total & Status</th>
-                                <th class="py-4 px-6">Bukti Bayar</th>
                                 <th class="py-4 px-6 text-right">Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
                             <?php foreach($order_list as $o): 
-                                $items = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_items WHERE id_sub_transaksi = %d", $o->id));
-                                $o->items = $items; 
-                                
                                 $pay_status = $o->global_status;
                                 $order_status = $o->status_pesanan;
 
-                                // Logic Kategori
+                                // Logic Kategori Filter
                                 $filter_cat = 'all';
                                 if ($pay_status == 'menunggu_pembayaran') { $filter_cat = 'belum_bayar'; } 
                                 elseif (in_array($order_status, ['dibatalkan', 'pembayaran_gagal'])) { $filter_cat = 'dibatalkan'; } 
@@ -737,20 +787,37 @@ get_header();
                                 elseif (in_array($order_status, ['dikirim_ekspedisi', 'diantar_ojek', 'dalam_perjalanan', 'siap_diambil'])) { $filter_cat = 'dikirim'; } 
                                 elseif (in_array($order_status, ['menunggu_konfirmasi', 'diproses', 'menunggu_driver', 'penawaran_driver', 'nego', 'menunggu_penjemputan'])) { $filter_cat = 'perlu_dikirim'; }
                             ?>
-                            <tr class="hover:bg-gray-50 transition-colors duration-150 group order-row" data-category="<?php echo $filter_cat; ?>">
+                            <tr class="hover:bg-gray-50 transition-colors duration-150 group order-row" data-category="<?php echo $filter_cat; ?>" data-search="<?php echo strtolower($o->kode_unik . ' ' . $o->nama_penerima); ?>">
+                                <!-- COL 1: ID & DATE -->
                                 <td class="py-4 px-6 align-top whitespace-nowrap">
                                     <div class="flex items-center gap-2 mb-1">
                                         <span class="font-mono text-xs font-bold bg-gray-100 text-gray-700 px-2 py-0.5 rounded border border-gray-200"><?php echo esc_html($o->kode_unik); ?></span>
                                     </div>
                                     <div class="text-[11px] text-gray-400 font-medium"><?php echo date('d M Y, H:i', strtotime($o->created_at)); ?></div>
-                                    <div class="text-[10px] text-gray-400 mt-0.5">Order ID: #<?php echo $o->id; ?></div>
                                 </td>
+                                
+                                <!-- COL 2: CUSTOMER -->
                                 <td class="py-4 px-6 align-top">
                                     <div class="font-bold text-gray-900 text-sm"><?php echo esc_html($o->nama_penerima); ?></div>
                                     <div class="text-xs text-gray-500 flex items-center gap-1 mt-1 font-medium bg-green-50 text-green-700 px-2 py-0.5 rounded w-fit">
                                         <i class="fab fa-whatsapp"></i> <?php echo esc_html($o->no_hp); ?>
                                     </div>
                                 </td>
+
+                                <!-- COL 3: PRODUCT SUMMARY -->
+                                <td class="py-4 px-6 align-top">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400">
+                                            <i class="fas fa-shopping-bag"></i>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs font-bold text-gray-800 line-clamp-1"><?php echo esc_html($o->first_item_name); ?></p>
+                                            <p class="text-[10px] text-gray-500"><?php echo $o->total_items > 1 ? '+'.($o->total_items-1).' item lainnya' : '1 item total'; ?></p>
+                                        </div>
+                                    </div>
+                                </td>
+
+                                <!-- COL 4: STATUS & TOTAL -->
                                 <td class="py-4 px-6 align-top whitespace-nowrap">
                                     <div class="font-bold text-gray-900 text-base mb-2">Rp <?php echo number_format($o->total_pesanan_toko, 0, ',', '.'); ?></div>
                                     <div class="flex flex-col gap-1.5 items-start">
@@ -758,22 +825,25 @@ get_header();
                                         <?php echo dw_get_status_badge($order_status); ?>
                                     </div>
                                 </td>
-                                <td class="py-4 px-6 align-top">
-                                    <?php if(!empty($o->bukti_pembayaran)): ?>
-                                        <div class="relative group w-12 h-12 cursor-pointer rounded-lg overflow-hidden border border-gray-200 shadow-sm" onclick="openLightbox('<?php echo esc_url($o->bukti_pembayaran); ?>')">
-                                            <img src="<?php echo esc_url($o->bukti_pembayaran); ?>" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110">
-                                            <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <i class="fas fa-search-plus text-white text-xs"></i>
-                                            </div>
-                                        </div>
-                                    <?php else: ?>
-                                        <span class="text-xs text-gray-400 italic bg-gray-50 px-2 py-1 rounded">Belum ada</span>
-                                    <?php endif; ?>
-                                </td>
+
+                                <!-- COL 5: ACTIONS (QUICK & DETAIL) -->
                                 <td class="py-4 px-6 text-right align-middle">
-                                    <button onclick='openOrderDetail(<?php echo htmlspecialchars(json_encode($o), ENT_QUOTES, 'UTF-8'); ?>)' class="bg-white border border-gray-200 hover:border-gray-300 text-gray-700 hover:text-primary hover:bg-gray-50 px-4 py-2 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-2 ml-auto">
-                                        <i class="fas fa-eye"></i> Detail
-                                    </button>
+                                    <div class="flex items-center justify-end gap-2">
+                                        <!-- QUICK ACTION BUTTONS -->
+                                        <?php if($pay_status == 'menunggu_pembayaran' || $order_status == 'menunggu_konfirmasi'): ?>
+                                            <button onclick='openOrderDetail(<?php echo htmlspecialchars(json_encode($o), ENT_QUOTES, 'UTF-8'); ?>)' class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-all">
+                                                Verifikasi
+                                            </button>
+                                        <?php elseif($order_status == 'diproses'): ?>
+                                            <button onclick='openOrderDetail(<?php echo htmlspecialchars(json_encode($o), ENT_QUOTES, 'UTF-8'); ?>)' class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-all">
+                                                <i class="fas fa-truck mr-1"></i> Kirim
+                                            </button>
+                                        <?php endif; ?>
+
+                                        <button onclick='openOrderDetail(<?php echo htmlspecialchars(json_encode($o), ENT_QUOTES, 'UTF-8'); ?>)' class="bg-white border border-gray-200 hover:border-gray-300 text-gray-700 hover:bg-gray-50 w-8 h-8 rounded-lg flex items-center justify-center transition-all shadow-sm" title="Lihat Detail">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
@@ -781,9 +851,9 @@ get_header();
                             <!-- EMPTY STATE ROW -->
                             <tr id="empty-order-state" class="hidden">
                                 <td colspan="5" class="py-16 text-center">
-                                    <div class="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-300 border border-gray-100"><i class="fas fa-clipboard-check text-3xl"></i></div>
-                                    <h3 class="text-gray-900 font-bold text-lg">Tidak ada pesanan</h3>
-                                    <p class="text-gray-500 text-sm mt-1">Tidak ada pesanan ditemukan untuk kategori ini.</p>
+                                    <div class="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-300 border border-gray-100"><i class="fas fa-search text-3xl"></i></div>
+                                    <h3 class="text-gray-900 font-bold text-lg">Tidak ada pesanan ditemukan</h3>
+                                    <p class="text-gray-500 text-sm mt-1">Coba ubah kata kunci pencarian atau filter Anda.</p>
                                 </td>
                             </tr>
                         </tbody>
@@ -1333,6 +1403,9 @@ get_header();
         }
     }
 
+    // Default tab
+    let currentTab = 'all';
+
     function switchTab(tabName) {
         $('.tab-content').removeClass('active'); 
         
@@ -1370,15 +1443,23 @@ get_header();
     }
     function openLightbox(src) { $('#lightbox-img').attr('src', src); $('#lightbox-modal').removeClass('hidden'); }
 
-    // --- ORDER FILTERING ---
+    // --- ORDER FILTERING & SEARCH ---
     function filterOrders(category) {
+        currentTab = category;
         $('.order-tab-btn').removeClass('active');
         $(`.order-tab-btn[data-tab="${category}"]`).addClass('active');
 
+        const searchQuery = $('#search-orders').val().toLowerCase();
         let visibleCount = 0;
+
         $('.order-row').each(function() {
             const rowCat = $(this).data('category');
-            if (category === 'all' || rowCat === category) {
+            const rowSearch = $(this).data('search');
+            
+            const matchCategory = (category === 'all' || rowCat === category);
+            const matchSearch = rowSearch.includes(searchQuery);
+
+            if (matchCategory && matchSearch) {
                 $(this).removeClass('hidden');
                 visibleCount++;
             } else {
