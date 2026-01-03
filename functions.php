@@ -5,7 +5,7 @@
  */
 
 if (!defined('ABSPATH')) {
-    exit; // Exit if accessed directly
+    exit; // Keluar jika diakses langsung
 }
 
 /**
@@ -46,17 +46,13 @@ function tema_dw_scripts() {
 
     wp_enqueue_style('google-fonts', 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap', array(), null);
     wp_enqueue_style('font-awesome', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css', array(), '6.4.0');
-    
-    // Dashicons needed for frontend dashboards
     wp_enqueue_style( 'dashicons' );
-
     wp_enqueue_style('tema-dw-style', get_stylesheet_uri());
     
     if (file_exists(get_template_directory() . '/assets/css/main.css')) {
         wp_enqueue_style('tema-dw-main-css', get_template_directory_uri() . '/assets/css/main.css', array(), filemtime(get_template_directory() . '/assets/css/main.css'));
     }
 
-    // Main JS
     wp_enqueue_script('tema-dw-main', get_template_directory_uri() . '/assets/js/main.js', array('jquery'), '1.0.8', true);
 
     wp_localize_script('tema-dw-main', 'dw_ajax', array(
@@ -91,26 +87,23 @@ function dw_get_merchant_id() {
     return $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}dw_pedagang WHERE id_user = %d", $user_id));
 }
 
-// Helper: Get Desa ID
 function dw_get_desa_id() {
     global $wpdb;
     $user_id = get_current_user_id();
     return $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}dw_desa WHERE id_user_desa = %d", $user_id));
 }
 
-// Helper: Redirect Login Custom (Updated for Verifikator)
 function tema_dw_login_redirect($url, $request, $user) {
     if ($user && is_object($user) && is_a($user, 'WP_User')) {
-        if (in_array('administrator', $user->roles) || 
-            in_array('editor_desa', $user->roles) || 
-            in_array('pedagang', $user->roles) || 
-            in_array('dw_ojek', $user->roles) ||
-            in_array('verifikator_umkm', $user->roles)
-        ) {
-            return home_url('/dashboard');
-        } else {
-            return home_url('/akun-saya');
+        $roles = (array) $user->roles;
+        $dashboard_roles = array('administrator', 'editor_desa', 'admin_desa', 'pedagang', 'dw_ojek', 'verifikator_umkm');
+        
+        foreach ($dashboard_roles as $role) {
+            if (in_array($role, $roles)) {
+                return home_url('/dashboard');
+            }
         }
+        return home_url('/akun-saya');
     }
     return $url;
 }
@@ -119,21 +112,14 @@ add_filter('login_redirect', 'tema_dw_login_redirect', 10, 3);
 add_filter( 'get_avatar_url', 'dw_custom_avatar_url', 10, 3 );
 function dw_custom_avatar_url( $url, $id_or_email, $args ) {
     $user_id = 0;
-    if ( is_numeric( $id_or_email ) ) {
-        $user_id = $id_or_email;
-    } elseif ( is_string( $id_or_email ) && ( $user = get_user_by( 'email', $id_or_email ) ) ) {
-        $user_id = $user->ID;
-    } elseif ( is_object( $id_or_email ) && ! empty( $id_or_email->user_id ) ) {
-        $user_id = $id_or_email->user_id;
-    } elseif ( $id_or_email instanceof WP_User ) {
-        $user_id = $id_or_email->ID;
-    }
+    if ( is_numeric( $id_or_email ) ) { $user_id = $id_or_email; }
+    elseif ( is_string( $id_or_email ) && ( $user = get_user_by( 'email', $id_or_email ) ) ) { $user_id = $user->ID; }
+    elseif ( is_object( $id_or_email ) && ! empty( $id_or_email->user_id ) ) { $user_id = $id_or_email->user_id; }
+    elseif ( $id_or_email instanceof WP_User ) { $user_id = $id_or_email->ID; }
 
     if ( $user_id ) {
         $custom_avatar = get_user_meta( $user_id, 'dw_custom_avatar_url', true );
-        if ( $custom_avatar ) {
-            return $custom_avatar;
-        }
+        if ( $custom_avatar ) return $custom_avatar;
     }
     return $url;
 }
@@ -154,7 +140,7 @@ add_action('init', 'tema_dw_start_session');
 
 /**
  * ==============================================================================
- * 3. ROUTING & REWRITE RULES (SMART DASHBOARD)
+ * 3. ROUTING & REWRITE RULES
  * ==============================================================================
  */
 
@@ -164,27 +150,17 @@ function tema_dw_rewrite_rules() {
     add_rewrite_rule('^toko/([^/]*)/?', 'index.php?dw_type=profil_toko&dw_slug_toko=$matches[1]', 'top');
     add_rewrite_rule('^desa/([^/]*)/?', 'index.php?dw_type=profil_desa&dw_slug_desa=$matches[1]', 'top');
     add_rewrite_rule('^dashboard/?$', 'index.php?dw_type=dashboard_router', 'top');
-    
-    add_rewrite_rule('^dashboard-toko/?$', 'index.php?dw_type=dashboard_toko', 'top');
-    add_rewrite_rule('^dashboard-desa/?$', 'index.php?dw_type=dashboard_desa', 'top');
-    add_rewrite_rule('^dashboard-ojek/?$', 'index.php?dw_type=dashboard_ojek', 'top');
-    add_rewrite_rule('^dashboard-verifikator/?$', 'index.php?dw_type=dashboard_verifikator', 'top'); 
     add_rewrite_rule('^akun-saya/?$', 'index.php?dw_type=akun_saya', 'top');
-    
     add_rewrite_rule('^keranjang/?$', 'index.php?dw_type=cart', 'top');
     add_rewrite_rule('^checkout/?$', 'index.php?dw_type=checkout', 'top');
     add_rewrite_rule('^pembayaran/?$', 'index.php?dw_type=pembayaran', 'top');
     
-    if (get_option('tema_dw_rules_flushed_v16') !== 'yes') {
+    if (get_option('tema_dw_rules_flushed_v18') !== 'yes') {
         flush_rewrite_rules();
-        update_option('tema_dw_rules_flushed_v16', 'yes');
+        update_option('tema_dw_rules_flushed_v18', 'yes');
     }
 }
 add_action('init', 'tema_dw_rewrite_rules');
-
-add_action('after_switch_theme', function() {
-    delete_option('tema_dw_rules_flushed_v16');
-});
 
 function tema_dw_query_vars($vars) {
     $vars[] = 'dw_type';
@@ -199,16 +175,10 @@ function tema_dw_template_include($template) {
     $dw_type = get_query_var('dw_type');
     
     if ($dw_type == 'dashboard_router') {
-        if (!is_user_logged_in()) {
-            return get_template_directory() . '/page-login.php';
+        $dashboard_file = get_template_directory() . '/page-dashboard.php';
+        if (file_exists($dashboard_file)) {
+            return $dashboard_file;
         }
-        $user = wp_get_current_user();
-        $roles = (array) $user->roles;
-        if (in_array('admin_desa', $roles) || in_array('administrator', $roles)) return get_template_directory() . '/page-dashboard-desa.php';
-        if (in_array('pedagang', $roles)) return get_template_directory() . '/page-dashboard-toko.php';
-        if (in_array('dw_ojek', $roles)) return get_template_directory() . '/page-dashboard-ojek.php';
-        if (in_array('verifikator_umkm', $roles)) return get_template_directory() . '/page-dashboard-verifikator.php';
-        return get_template_directory() . '/page-dashboard.php';
     }
 
     if ($dw_type == 'wisata') return get_template_directory() . '/single-dw_wisata.php';
@@ -231,7 +201,7 @@ add_filter('template_include', 'tema_dw_template_include');
  */
 function dw_load_region_scripts() {
     $type = get_query_var('dw_type');
-    if ( $type == 'dashboard_router' || $type == 'dashboard_toko' || $type == 'dashboard_desa' || $type == 'dashboard_verifikator') {
+    if ( $type == 'dashboard_router') {
         if( file_exists( get_template_directory() . '/assets/js/dw-region.js' ) ) {
             wp_enqueue_script( 'dw-region-js', get_template_directory_uri() . '/assets/js/dw-region.js', array('jquery'), '1.2', true );
             wp_localize_script( 'dw-region-js', 'dwRegionVars', array( 'ajax_url' => admin_url( 'admin-ajax.php' ) ));
@@ -246,7 +216,6 @@ add_action( 'wp_enqueue_scripts', 'dw_load_region_scripts' );
  * ==============================================================================
  */
 
-// Add to Cart
 add_action('wp_ajax_dw_add_to_cart', 'dw_handle_add_to_cart');
 add_action('wp_ajax_nopriv_dw_add_to_cart', 'dw_handle_add_to_cart');
 function dw_handle_add_to_cart() {
@@ -275,7 +244,6 @@ function dw_handle_add_to_cart() {
     wp_send_json_success(['message' => 'Berhasil ditambahkan', 'cart_count' => (int)$total_items]);
 }
 
-// Update Qty
 add_action('wp_ajax_dw_update_cart_qty', 'dw_handle_update_cart_qty');
 add_action('wp_ajax_nopriv_dw_update_cart_qty', 'dw_handle_update_cart_qty');
 function dw_handle_update_cart_qty() {
@@ -292,7 +260,6 @@ function dw_handle_update_cart_qty() {
     wp_send_json_success([ 'new_qty' => $qty, 'grand_total_fmt' => tema_dw_format_rupiah($totals->grand_total ?? 0), 'total_items' => intval($totals->total_items ?? 0) ]);
 }
 
-// Remove Item
 add_action('wp_ajax_dw_remove_cart_item', 'dw_handle_remove_cart_item');
 add_action('wp_ajax_nopriv_dw_remove_cart_item', 'dw_handle_remove_cart_item');
 function dw_handle_remove_cart_item() {
@@ -339,12 +306,8 @@ function dw_ajax_merchant_save_product() {
     global $wpdb;
     $pid = dw_get_merchant_id();
     $id = isset($_POST['id']) ? intval($_POST['id']) : 0;
+    if (empty($_POST['nama_produk']) || empty($_POST['harga'])) wp_send_json_error(['message' => 'Lengkapi data']);
     
-    // Validasi input
-    if (empty($_POST['nama_produk']) || empty($_POST['harga'])) {
-        wp_send_json_error(['message' => 'Nama produk dan harga wajib diisi']);
-    }
-
     $data = [
         'id_pedagang' => $pid,
         'nama_produk' => sanitize_text_field($_POST['nama_produk']),
@@ -354,12 +317,10 @@ function dw_ajax_merchant_save_product() {
         'deskripsi' => wp_kses_post($_POST['deskripsi']),
         'updated_at' => current_time('mysql')
     ];
-
     if ($id == 0) {
         $data['slug'] = sanitize_title($_POST['nama_produk']) . '-' . time();
         $data['created_at'] = current_time('mysql');
     }
-
     if (!empty($_FILES['foto_utama']['name'])) {
         require_once(ABSPATH . 'wp-admin/includes/image.php');
         require_once(ABSPATH . 'wp-admin/includes/file.php');
@@ -367,13 +328,9 @@ function dw_ajax_merchant_save_product() {
         $att_id = media_handle_upload('foto_utama', 0);
         if (!is_wp_error($att_id)) $data['foto_utama'] = wp_get_attachment_url($att_id);
     }
-
-    if ($id > 0) { 
-        $wpdb->update("{$wpdb->prefix}dw_produk", $data, ['id' => $id, 'id_pedagang' => $pid]); 
-    } else { 
-        $wpdb->insert("{$wpdb->prefix}dw_produk", $data); 
-    }
-    wp_send_json_success(['message' => 'Produk berhasil disimpan']);
+    if ($id > 0) { $wpdb->update("{$wpdb->prefix}dw_produk", $data, ['id' => $id, 'id_pedagang' => $pid]); }
+    else { $wpdb->insert("{$wpdb->prefix}dw_produk", $data); }
+    wp_send_json_success(['message' => 'Tersimpan']);
 }
 
 add_action('wp_ajax_dw_merchant_delete_product', 'dw_ajax_merchant_delete_product');
@@ -470,7 +427,6 @@ function dw_ajax_desa_save_wisata() {
     global $wpdb;
     $desa_id = dw_get_desa_id();
     $id = isset($_POST['id']) ? intval($_POST['id']) : 0;
-    
     $data = [
         'id_desa' => $desa_id,
         'nama_wisata' => sanitize_text_field($_POST['nama_wisata']),
@@ -480,12 +436,10 @@ function dw_ajax_desa_save_wisata() {
         'jam_buka' => sanitize_text_field($_POST['jam_buka']),
         'updated_at' => current_time('mysql')
     ];
-
     if ($id == 0) {
         $data['slug'] = sanitize_title($_POST['nama_wisata']) . '-' . time();
         $data['created_at'] = current_time('mysql');
     }
-
     if (!empty($_FILES['foto_utama']['name'])) {
         require_once(ABSPATH . 'wp-admin/includes/image.php');
         require_once(ABSPATH . 'wp-admin/includes/file.php');
@@ -493,13 +447,9 @@ function dw_ajax_desa_save_wisata() {
         $att_id = media_handle_upload('foto_utama', 0);
         if (!is_wp_error($att_id)) $data['foto_utama'] = wp_get_attachment_url($att_id);
     }
-
-    if ($id > 0) { 
-        $wpdb->update("{$wpdb->prefix}dw_wisata", $data, ['id' => $id, 'id_desa' => $desa_id]); 
-    } else { 
-        $wpdb->insert("{$wpdb->prefix}dw_wisata", $data); 
-    }
-    wp_send_json_success(['message' => 'Wisata berhasil disimpan']);
+    if ($id > 0) { $wpdb->update("{$wpdb->prefix}dw_wisata", $data, ['id' => $id, 'id_desa' => $desa_id]); }
+    else { $wpdb->insert("{$wpdb->prefix}dw_wisata", $data); }
+    wp_send_json_success(['message' => 'Wisata Tersimpan']);
 }
 
 add_action('wp_ajax_dw_desa_delete_wisata', 'dw_ajax_desa_delete_wisata');
@@ -515,12 +465,7 @@ function dw_ajax_desa_get_profile() {
     check_ajax_referer('dw_cart_nonce', 'security');
     global $wpdb;
     $p = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}dw_desa WHERE id = %d", dw_get_desa_id()));
-    wp_send_json_success([ 
-        'nama_desa' => $p->nama_desa, 
-        'deskripsi' => $p->deskripsi, 
-        'provinsi' => $p->provinsi, 
-        'kabupaten' => $p->kabupaten 
-    ]);
+    wp_send_json_success([ 'nama_desa' => $p->nama_desa, 'deskripsi' => $p->deskripsi, 'provinsi' => $p->provinsi, 'kabupaten' => $p->kabupaten ]);
 }
 
 add_action('wp_ajax_dw_desa_save_profile', 'dw_ajax_desa_save_profile');
@@ -539,7 +484,30 @@ function dw_ajax_desa_save_profile() {
 
 /**
  * ==============================================================================
- * 8. WISHLIST & PROGRESSIVE WEB APP (PWA)
+ * 8. REGION HANDLERS (WILAYAH)
+ * ==============================================================================
+ */
+
+add_action('wp_ajax_dw_get_provinces', 'dw_ajax_get_provinces');
+add_action('wp_ajax_nopriv_dw_get_provinces', 'dw_ajax_get_provinces');
+function dw_ajax_get_provinces() {
+    global $wpdb;
+    $results = $wpdb->get_results("SELECT id, nama FROM {$wpdb->prefix}dw_provinsi ORDER BY nama ASC");
+    wp_send_json_success($results);
+}
+
+add_action('wp_ajax_dw_get_regencies', 'dw_ajax_get_regencies');
+add_action('wp_ajax_nopriv_dw_get_regencies', 'dw_ajax_get_regencies');
+function dw_ajax_get_regencies() {
+    global $wpdb;
+    $prov_id = intval($_GET['province_id']);
+    $results = $wpdb->get_results($wpdb->prepare("SELECT id, nama FROM {$wpdb->prefix}dw_kabupaten WHERE id_provinsi = %d ORDER BY nama ASC", $prov_id));
+    wp_send_json_success($results);
+}
+
+/**
+ * ==============================================================================
+ * 9. WISHLIST & PROGRESSIVE WEB APP (PWA)
  * ==============================================================================
  */
 
@@ -563,9 +531,6 @@ function dw_handle_toggle_wishlist() {
     }
 }
 
-/**
- * PWA Integrasi
- */
 function dw_add_pwa_tags() {
     if (get_theme_mod('dw_pwa_enabled', '1') !== '1') return;
     $manifest_url = add_query_arg('dw-manifest', '1', home_url('/'));
@@ -584,8 +549,8 @@ function dw_add_pwa_tags() {
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
                 navigator.serviceWorker.register('<?php echo esc_url($sw_url); ?>', { scope: '/' })
-                .then(function(reg) { console.log('DW PWA: Registered'); })
-                .catch(function(err) { console.log('DW PWA: Failed', err); });
+                .then(function(reg) { console.log('PWA Registered'); })
+                .catch(function(err) { console.log('PWA Error', err); });
             });
         }
     </script>
@@ -594,17 +559,17 @@ function dw_add_pwa_tags() {
 add_action('wp_head', 'dw_add_pwa_tags');
 
 function dw_pwa_customize_register( $wp_customize ) {
-    $wp_customize->add_section( 'dw_pwa_section', array( 'title' => __( 'Pengaturan PWA', 'dw-desa-wisata' ), 'priority' => 160 ));
+    $wp_customize->add_section( 'dw_pwa_section', array( 'title' => 'Pengaturan PWA', 'priority' => 160 ));
     $wp_customize->add_setting( 'dw_pwa_enabled', array( 'default' => '1' ) );
-    $wp_customize->add_control( 'dw_pwa_enabled', array( 'label' => __( 'Aktifkan PWA', 'dw-desa-wisata' ), 'section' => 'dw_pwa_section', 'type' => 'checkbox' ));
+    $wp_customize->add_control( 'dw_pwa_enabled', array( 'label' => 'Aktifkan PWA', 'section' => 'dw_pwa_section', 'type' => 'checkbox' ));
     $wp_customize->add_setting( 'dw_pwa_name', array( 'default' => get_bloginfo('name') ) );
-    $wp_customize->add_control( 'dw_pwa_name', array( 'label' => __( 'Nama Aplikasi', 'dw-desa-wisata' ), 'section' => 'dw_pwa_section', 'type' => 'text' ));
+    $wp_customize->add_control( 'dw_pwa_name', array( 'label' => 'Nama Aplikasi', 'section' => 'dw_pwa_section', 'type' => 'text' ));
     $wp_customize->add_setting( 'dw_pwa_short_name', array( 'default' => get_bloginfo('name') ) );
-    $wp_customize->add_control( 'dw_pwa_short_name', array( 'label' => __( 'Nama Pendek', 'dw-desa-wisata' ), 'section' => 'dw_pwa_section', 'type' => 'text' ));
+    $wp_customize->add_control( 'dw_pwa_short_name', array( 'label' => 'Nama Pendek', 'section' => 'dw_pwa_section', 'type' => 'text' ));
     $wp_customize->add_setting( 'dw_pwa_theme_color', array( 'default' => '#16a34a' ) );
-    $wp_customize->add_control( new WP_Customize_Color_Control( $wp_customize, 'dw_pwa_theme_color', array( 'label' => __( 'Warna Toolbar', 'dw-desa-wisata' ), 'section' => 'dw_pwa_section' )));
+    $wp_customize->add_control( new WP_Customize_Color_Control( $wp_customize, 'dw_pwa_theme_color', array( 'label' => 'Warna Tema', 'section' => 'dw_pwa_section' )));
     $wp_customize->add_setting( 'dw_pwa_bg_color', array( 'default' => '#ffffff' ) );
-    $wp_customize->add_control( new WP_Customize_Color_Control( $wp_customize, 'dw_pwa_bg_color', array( 'label' => __( 'Warna Splash Screen', 'dw-desa-wisata' ), 'section' => 'dw_pwa_section' )));
+    $wp_customize->add_control( new WP_Customize_Color_Control( $wp_customize, 'dw_pwa_bg_color', array( 'label' => 'Warna Splash Screen', 'section' => 'dw_pwa_section' )));
 }
 add_action( 'customize_register', 'dw_pwa_customize_register' );
 
@@ -628,7 +593,7 @@ add_action('init', function() {
         header('Content-Type: application/javascript; charset=utf-8');
         header('Service-Worker-Allowed: /'); 
         ?>
-        const CACHE_NAME = 'dw-cache-v18';
+        const CACHE_NAME = 'dw-cache-v20';
         const OFFLINE_URL = '<?php echo home_url('/'); ?>';
         self.addEventListener('install', (event) => { event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll([OFFLINE_URL]))); self.skipWaiting(); });
         self.addEventListener('activate', (event) => { event.waitUntil(caches.keys().then((keys) => Promise.all(keys.map((k) => k !== CACHE_NAME && caches.delete(k))))); self.clients.claim(); });
