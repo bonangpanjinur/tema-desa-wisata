@@ -1,7 +1,7 @@
 <?php
 /**
- * Template Name: Halaman Akun Saya Custom
- * Description: Dashboard user lengkap. Sinkronisasi Foto Profil & Data ke Tabel Custom + Riwayat Pesanan Langsung + Modal Detail.
+ * Template Name: Akun Saya (All Roles)
+ * Description: Halaman profil terpusat untuk semua user. Menampilkan menu dashboard khusus berdasarkan role.
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -24,7 +24,7 @@ $roles        = (array) $current_user->roles;
 $msg          = '';
 $msg_type     = '';
 
-// --- HELPER: FORMAT STATUS BADGE (Peningkatan UI/UX dengan Warna & Ikon Spesifik) ---
+// --- HELPER: FORMAT STATUS BADGE ---
 if (!function_exists('dw_get_status_badge')) {
     function dw_get_status_badge($status) {
         $status_config = [
@@ -83,16 +83,12 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
                     $phone = sanitize_text_field($_POST['billing_phone']);
                     update_user_meta($user_id, 'billing_phone', $phone);
 
-                    if ( in_array('pedagang', $roles) ) {
+                    // Sinkronisasi data ke tabel custom berdasarkan Role Baru
+                    if ( in_array('pedagang_toko', $roles) ) {
                         $wpdb->update($wpdb->prefix . 'dw_pedagang', ['nomor_wa' => $phone], ['id_user' => $user_id]);
-                    } elseif ( in_array('verifikator_umkm', $roles) ) { 
-                        $wpdb->update($wpdb->prefix . 'dw_verifikator', ['nomor_wa' => $phone], ['id_user' => $user_id]);
-                    } elseif ( !in_array('admin_desa', $roles) && !in_array('administrator', $roles) ) {
-                         $table_pembeli = $wpdb->prefix . 'dw_pembeli';
-                         $cek = $wpdb->get_var($wpdb->prepare("SELECT id FROM $table_pembeli WHERE id_user = %d", $user_id));
-                         if($cek) {
-                             $wpdb->update($table_pembeli, ['no_hp' => $phone], ['id_user' => $user_id]);
-                         }
+                    } elseif ( in_array('verifikator_desa', $roles) ) { 
+                        // Jika ada tabel verifikator/admin desa
+                        // $wpdb->update($wpdb->prefix . 'dw_desa', ['kontak' => $phone], ['id_user_desa' => $user_id]);
                     }
                     
                     if ( ! empty($_FILES['profile_pic']['name']) ) {
@@ -104,18 +100,10 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
                             $foto_url = $movefile['url']; 
                             update_user_meta($user_id, 'dw_custom_avatar_url', $foto_url);
 
-                            if ( in_array('pedagang', $roles) ) {
+                            if ( in_array('pedagang_toko', $roles) ) {
                                 $wpdb->update($wpdb->prefix . 'dw_pedagang', ['foto_admin' => $foto_url], ['id_user' => $user_id]);
-                            } elseif ( in_array('admin_desa', $roles) ) {
+                            } elseif ( in_array('verifikator_desa', $roles) ) {
                                 $wpdb->update($wpdb->prefix . 'dw_desa', ['foto_admin' => $foto_url], ['id_user_desa' => $user_id]);
-                            } elseif ( in_array('verifikator_umkm', $roles) ) { 
-                                $wpdb->update($wpdb->prefix . 'dw_verifikator', ['foto_profil' => $foto_url], ['id_user' => $user_id]);
-                            } else {
-                                $table_pembeli = $wpdb->prefix . 'dw_pembeli';
-                                $cek_pembeli = $wpdb->get_var($wpdb->prepare("SELECT id FROM $table_pembeli WHERE id_user = %d", $user_id));
-                                if ($cek_pembeli) {
-                                    $wpdb->update($table_pembeli, ['foto_profil' => $foto_url], ['id_user' => $user_id]);
-                                }
                             }
                         } else {
                             $msg = 'Gagal upload foto: ' . $movefile['error'];
@@ -174,34 +162,18 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
                 'updated_at'       => current_time('mysql')
             ];
 
-            if ( in_array('pedagang', $roles) ) {
+            // Sinkronisasi Alamat ke Tabel Role
+            if ( in_array('pedagang_toko', $roles) ) {
                 $wpdb->update($wpdb->prefix . 'dw_pedagang', $data_wilayah, ['id_user' => $user_id]);
-            } elseif ( in_array('admin_desa', $roles) ) {
+            } elseif ( in_array('verifikator_desa', $roles) ) {
                 $data_desa = $data_wilayah;
                 $data_desa['provinsi']  = $data_wilayah['provinsi_nama']; unset($data_desa['provinsi_nama']);
                 $data_desa['kabupaten'] = $data_wilayah['kabupaten_nama']; unset($data_desa['kabupaten_nama']);
                 $data_desa['kecamatan'] = $data_wilayah['kecamatan_nama']; unset($data_desa['kecamatan_nama']);
                 $data_desa['kelurahan'] = $data_wilayah['kelurahan_nama']; unset($data_desa['kelurahan_nama']);
                 $wpdb->update($wpdb->prefix . 'dw_desa', $data_desa, ['id_user_desa' => $user_id]);
-            } elseif ( in_array('verifikator_umkm', $roles) ) { 
-                $data_verif = $data_wilayah;
-                $data_verif['provinsi']  = $data_wilayah['provinsi_nama']; unset($data_verif['provinsi_nama']);
-                $data_verif['kabupaten'] = $data_wilayah['kabupaten_nama']; unset($data_verif['kabupaten_nama']);
-                $data_verif['kecamatan'] = $data_wilayah['kecamatan_nama']; unset($data_verif['kecamatan_nama']);
-                $data_verif['kelurahan'] = $data_wilayah['kelurahan_nama']; unset($data_verif['kelurahan_nama']);
-                $wpdb->update($wpdb->prefix . 'dw_verifikator', $data_verif, ['id_user' => $user_id]);
-            } else {
-                $table_pembeli = $wpdb->prefix . 'dw_pembeli';
-                $cek_pembeli = $wpdb->get_var($wpdb->prepare("SELECT id FROM $table_pembeli WHERE id_user = %d", $user_id));
-                if ( $cek_pembeli ) {
-                    $data_pembeli = $data_wilayah;
-                    $data_pembeli['provinsi']  = $data_wilayah['provinsi_nama']; unset($data_pembeli['provinsi_nama']);
-                    $data_pembeli['kabupaten'] = $data_wilayah['kabupaten_nama']; unset($data_pembeli['kabupaten_nama']);
-                    $data_pembeli['kecamatan'] = $data_wilayah['kecamatan_nama']; unset($data_pembeli['kecamatan_nama']);
-                    $data_pembeli['kelurahan'] = $data_wilayah['kelurahan_nama']; unset($data_pembeli['kelurahan_nama']);
-                    $wpdb->update($table_pembeli, $data_pembeli, ['id_user' => $user_id]);
-                }
             }
+
             $msg = 'Alamat pengiriman berhasil disimpan.';
             $msg_type = 'success';
         }
@@ -225,58 +197,34 @@ $saved_kota_name = get_user_meta($user_id, 'billing_city', true);
 $saved_kec_name  = get_user_meta($user_id, 'billing_kecamatan', true);
 $saved_kel_name  = get_user_meta($user_id, 'billing_kelurahan', true);
 
-// Override Data jika Role Khusus
-if ( in_array('pedagang', $roles) ) {
+// Override Data jika Role Khusus (Ambil data dari tabel role jika meta user kosong)
+if ( in_array('pedagang_toko', $roles) ) {
     $pedagang_data = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}dw_pedagang WHERE id_user = %d", $user_id));
     if ($pedagang_data) {
-        $user_address    = $pedagang_data->alamat_lengkap;
-        $saved_prov_id   = $pedagang_data->api_provinsi_id;
-        $saved_kota_id   = $pedagang_data->api_kabupaten_id;
-        $saved_kec_id    = $pedagang_data->api_kecamatan_id;
-        $saved_kel_id    = $pedagang_data->api_kelurahan_id;
-        $saved_prov_name = $pedagang_data->provinsi_nama;
-        $saved_kota_name = $pedagang_data->kabupaten_nama;
-        $saved_kec_name  = $pedagang_data->kecamatan_nama;
-        $saved_kel_name  = $pedagang_data->kelurahan_nama;
-        if (!empty($pedagang_data->kode_pos)) $user_postcode = $pedagang_data->kode_pos;
-        if(empty($user_phone)) $user_phone = $pedagang_data->nomor_wa;
-        if(empty($custom_avatar) && !empty($pedagang_data->foto_admin)) $display_avatar = $pedagang_data->foto_admin;
-    }
-} elseif ( in_array('admin_desa', $roles) ) {
-    $desa_data = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}dw_desa WHERE id_user_desa = %d", $user_id));
-    if ($desa_data) {
-        $user_address    = $desa_data->alamat_lengkap;
-        $saved_prov_id   = $desa_data->api_provinsi_id;
-        $saved_kota_id   = $desa_data->api_kabupaten_id;
-        $saved_kec_id    = $desa_data->api_kecamatan_id;
-        $saved_kel_id    = $desa_data->api_kelurahan_id;
-        $saved_prov_name = $desa_data->provinsi;
-        $saved_kota_name = $desa_data->kabupaten;
-        $saved_kec_name  = $desa_data->kecamatan;
-        $saved_kel_name  = $desa_data->kelurahan;
-        if (!empty($desa_data->kode_pos)) $user_postcode = $desa_data->kode_pos;
-        if(empty($custom_avatar) && !empty($desa_data->foto_admin)) $display_avatar = $desa_data->foto_admin;
+        if(empty($user_address)) $user_address = $pedagang_data->alamat_lengkap;
+        // Prioritaskan data user meta agar bisa beda alamat toko & rumah, tapi bisa di-fallback
     }
 }
 
+// Set Label Role
 $role_label = 'Member';
 $role_badge_color = 'bg-gray-100 text-gray-600';
 $role_icon = 'fa-user';
 
-if ( in_array('administrator', $roles) || in_array('admin_kabupaten', $roles) ) {
+if ( in_array('administrator', $roles) ) {
     $role_label = 'Administrator'; $role_badge_color = 'bg-red-100 text-red-600'; $role_icon = 'fa-shield-alt';
-} elseif ( in_array('admin_desa', $roles) ) {
+} elseif ( in_array('verifikator_desa', $roles) ) {
     $role_label = 'Admin Desa'; $role_badge_color = 'bg-green-100 text-green-600'; $role_icon = 'fa-landmark';
-} elseif ( in_array('pedagang', $roles) ) {
-    $role_label = 'Mitra UMKM'; $role_badge_color = 'bg-purple-100 text-purple-600'; $role_icon = 'fa-store';
+} elseif ( in_array('pedagang_toko', $roles) ) {
+    $role_label = 'Pedagang'; $role_badge_color = 'bg-purple-100 text-purple-600'; $role_icon = 'fa-store';
+} elseif ( in_array('pengelola_ojek', $roles) ) {
+    $role_label = 'Driver Ojek'; $role_badge_color = 'bg-orange-100 text-orange-600'; $role_icon = 'fa-motorcycle';
 }
 
 get_header();
 ?>
 
-<!-- Tailwind CSS & Font Awesome -->
-<script src="https://cdn.tailwindcss.com"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<!-- Tailwind CSS & Font Awesome (Fallback jika header tidak memuat) -->
 <style>
     .tab-content { display: none; animation: fadeIn 0.4s ease-out; }
     .tab-content.active { display: block; }
@@ -287,22 +235,10 @@ get_header();
     .form-input { transition: all 0.2s; }
     .form-input:focus { border-color: #16a34a; box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15); }
     
-    .dw-modal { 
-        transition: opacity 0.3s ease-in-out;
-        opacity: 0;
-        pointer-events: none;
-    }
-    .dw-modal.open {
-        opacity: 1;
-        pointer-events: auto;
-    }
-    .dw-modal-content {
-        transform: scale(0.95);
-        transition: transform 0.3s ease-in-out;
-    }
-    .dw-modal.open .dw-modal-content {
-        transform: scale(1);
-    }
+    .dw-modal { transition: opacity 0.3s ease-in-out; opacity: 0; pointer-events: none; }
+    .dw-modal.open { opacity: 1; pointer-events: auto; }
+    .dw-modal-content { transform: scale(0.95); transition: transform 0.3s ease-in-out; }
+    .dw-modal.open .dw-modal-content { transform: scale(1); }
     .custom-scrollbar::-webkit-scrollbar { width: 4px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
     .custom-scrollbar::-webkit-scrollbar-thumb { background: #d1d1d1; border-radius: 10px; }
@@ -323,7 +259,7 @@ get_header();
             <!-- LEFT SIDEBAR -->
             <aside class="w-full lg:w-1/4 flex-shrink-0">
                 <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden mb-6 relative group">
-                    <div class="h-24 bg-primary relative">
+                    <div class="h-24 bg-green-600 relative">
                         <div class="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-20 transition"></div>
                     </div>
                     <div class="px-6 pb-6 text-center relative">
@@ -367,14 +303,16 @@ get_header();
             <!-- RIGHT CONTENT -->
             <main class="w-full lg:w-3/4">
                 
-                <!-- 1. DASHBOARD -->
+                <!-- 1. DASHBOARD OVERVIEW -->
                 <div id="tab-dashboard" class="tab-content active">
                     <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-8 mb-6">
                         <h1 class="text-2xl font-bold text-gray-800 mb-2 font-black italic">Selamat Datang!</h1>
-                        <p class="text-gray-500 mb-8">Ini adalah dashboard akun Anda. Anda dapat melihat aktivitas terbaru dan mengelola informasi akun Anda di sini.</p>
+                        <p class="text-gray-500 mb-8">Ini adalah pusat kontrol akun Anda. Akses riwayat belanja dan dashboard pengelolaan Anda di sini.</p>
                         
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <?php if ( in_array('pedagang', $roles) || in_array('administrator', $roles) ) : ?>
+                            
+                            <!-- SHORTCUT KHUSUS ROLE -->
+                            <?php if ( in_array('pedagang_toko', $roles) || in_array('administrator', $roles) ) : ?>
                             <a href="<?php echo home_url('/dashboard-toko'); ?>" class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-600 to-emerald-700 text-white p-6 shadow-lg transform hover:-translate-y-1 transition duration-300 group">
                                 <div class="absolute right-0 top-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10 group-hover:scale-110 transition"></div>
                                 <div class="relative z-10">
@@ -385,7 +323,7 @@ get_header();
                             </a>
                             <?php endif; ?>
 
-                            <?php if ( in_array('admin_desa', $roles) || in_array('administrator', $roles) ) : ?>
+                            <?php if ( in_array('verifikator_desa', $roles) || in_array('administrator', $roles) ) : ?>
                             <a href="<?php echo home_url('/dashboard-desa'); ?>" class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-600 text-white p-6 shadow-lg transform hover:-translate-y-1 transition duration-300 group">
                                 <div class="absolute right-0 top-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10 group-hover:scale-110 transition"></div>
                                 <div class="relative z-10">
@@ -396,6 +334,18 @@ get_header();
                             </a>
                             <?php endif; ?>
 
+                            <?php if ( in_array('pengelola_ojek', $roles) || in_array('administrator', $roles) ) : ?>
+                            <a href="<?php echo home_url('/dashboard-ojek'); ?>" class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 text-white p-6 shadow-lg transform hover:-translate-y-1 transition duration-300 group">
+                                <div class="absolute right-0 top-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10 group-hover:scale-110 transition"></div>
+                                <div class="relative z-10">
+                                    <div class="w-12 h-12 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center mb-4"><i class="fas fa-motorcycle text-2xl"></i></div>
+                                    <h3 class="text-xl font-bold mb-1">Dashboard Ojek</h3>
+                                    <p class="text-orange-100 text-sm">Kelola pesanan ojek dan tarif.</p>
+                                </div>
+                            </a>
+                            <?php endif; ?>
+
+                            <!-- SHORTCUT UMUM PEMBELI -->
                             <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100 hover:border-gray-200 transition group cursor-pointer" onclick="document.querySelector('button[onclick*=\'orders\']').click()">
                                 <div class="flex items-center gap-4">
                                     <div class="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center text-green-600 group-hover:text-green-700"><i class="fas fa-shopping-bag text-xl"></i></div>
@@ -410,7 +360,7 @@ get_header();
                     </div>
                 </div>
 
-                <!-- 2. TAB PESANAN (Improved UI/UX & Dynamic Badges) -->
+                <!-- 2. TAB PESANAN (UNTUK SEMUA ROLE YG MEMBELI) -->
                 <div id="tab-orders" class="tab-content">
                     <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden min-h-[500px]">
                         <div class="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
@@ -420,6 +370,7 @@ get_header();
 
                         <div class="p-6 space-y-4">
                             <?php
+                            // Ambil transaksi dimana user ini adalah PEMBELI
                             $transactions = $wpdb->get_results($wpdb->prepare(
                                 "SELECT * FROM {$wpdb->prefix}dw_transaksi WHERE id_pembeli = %d ORDER BY created_at DESC", 
                                 $user_id
@@ -430,14 +381,13 @@ get_header();
                                     <?php foreach ($transactions as $trx): 
                                         $tgl = date_i18n('d M Y, H:i', strtotime($trx->created_at));
                                         
-                                        // Ambil Sub Transaksi & Items untuk payload modal detail
+                                        // Ambil Detail untuk Modal
                                         $sub_orders = $wpdb->get_results($wpdb->prepare("SELECT * FROM {$wpdb->prefix}dw_transaksi_sub WHERE id_transaksi = %d", $trx->id));
                                         $payload_subs = [];
                                         foreach($sub_orders as $sub) {
                                             $items = $wpdb->get_results($wpdb->prepare("SELECT * FROM {$wpdb->prefix}dw_transaksi_items WHERE id_sub_transaksi = %d", $sub->id));
                                             $payload_subs[] = ['data' => $sub, 'items' => $items];
                                         }
-
                                         $json_data = json_encode(['master' => $trx, 'subs' => $payload_subs]);
                                     ?>
                                     <div class="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all group">
@@ -594,9 +544,7 @@ get_header();
     </div>
 </div>
 
-<!-- ==============================================================================
-     MODAL DETAIL PESANAN (Improved UI/UX & Realtime Details)
-     ============================================================================== -->
+<!-- MODAL DETAIL PESANAN -->
 <div id="trx-modal" class="dw-modal fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md hidden p-4 sm:p-6">
     <div class="dw-modal-content bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden relative flex flex-col max-h-[95vh] sm:max-h-[90vh]">
         <!-- Header -->
@@ -612,7 +560,6 @@ get_header();
         
         <!-- Body -->
         <div class="p-6 sm:p-10 overflow-y-auto custom-scrollbar flex-grow space-y-10">
-            <!-- Global Info Grid -->
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 sm:mb-12">
                 <div class="p-4 bg-gray-50 rounded-2xl border border-gray-100">
                     <p class="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Status Bayar</p>
@@ -628,12 +575,8 @@ get_header();
                 </div>
             </div>
 
-            <!-- List Sub Order (Store Sections) -->
-            <div class="space-y-10" id="modal-subs-container">
-                <!-- Items injected by JS -->
-            </div>
+            <div class="space-y-10" id="modal-subs-container"></div>
 
-            <!-- Bukti Pembayaran Section -->
             <div id="modal-bukti-section" class="hidden mt-10 pt-8 border-t border-dashed border-gray-200 text-center">
                 <h4 class="text-xs font-black text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-3">
                     Lampiran Bukti Transfer <span class="h-px bg-gray-100 flex-grow"></span>
@@ -643,7 +586,6 @@ get_header();
                 </div>
             </div>
 
-            <!-- Shipping Info Snapshot -->
             <div class="mt-10 pt-8 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-10">
                 <div>
                     <h4 class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3">Penerima</h4>
@@ -676,7 +618,7 @@ get_header();
         $('#tab-' + tabId).addClass('active');
         $('.nav-link').removeClass('active');
         $(btn).addClass('active');
-        history.pushState(null, null, '#' + tabId);
+        // Simple hash logic
     }
 
     function previewImage(input) {
@@ -687,7 +629,7 @@ get_header();
         }
     }
 
-    // --- MODAL LOGIC UPGRADED ---
+    // MODAL LOGIC
     function openDetailTrx(payload) {
         const master = payload.master;
         const subs = payload.subs;
@@ -700,10 +642,8 @@ get_header();
         document.getElementById('modal-no-hp').innerText = master.no_hp;
         document.getElementById('modal-alamat').innerText = `${master.alamat_lengkap}, ${master.kelurahan}, ${master.kecamatan}, ${master.kabupaten}, ${master.provinsi} ${master.kode_pos}`;
         
-        // Update Invoice Link
         document.getElementById('modal-invoice-btn').href = '<?php echo home_url('/pembayaran?id='); ?>' + master.kode_unik + '&invoice=1';
 
-        // Bukti Bayar Section
         const buktiSec = document.getElementById('modal-bukti-section');
         const buktiImg = document.getElementById('modal-bukti-img');
         if (master.bukti_pembayaran) {
@@ -713,7 +653,6 @@ get_header();
             buktiSec.classList.add('hidden');
         }
 
-        // Subs Container
         const container = document.getElementById('modal-subs-container');
         container.innerHTML = '';
 
@@ -734,7 +673,6 @@ get_header();
                 `;
             });
 
-            // Delivery Icon logic
             let deliveryIcon = '<i class="fas fa-truck text-blue-600"></i>';
             if(row.data.metode_pengiriman.toLowerCase().includes('ojek')) deliveryIcon = '<i class="fas fa-motorcycle text-teal-600"></i>';
             if(row.data.metode_pengiriman.toLowerCase().includes('ambil')) deliveryIcon = '<i class="fas fa-store-alt text-amber-600"></i>';
@@ -787,7 +725,7 @@ get_header();
         return `<span class="px-3 py-1 rounded-lg text-[8px] font-black border tracking-tighter flex items-center ${res.c}"><i class="fas ${res.i} mr-1.5"></i>${res.l}</span>`;
     }
 
-    // --- REGION API ---
+    // REGION API
     jQuery(document).ready(function($) {
         var els = { prov: $('#dw_provinsi'), kota: $('#dw_kota'), kec: $('#dw_kecamatan'), kel: $('#dw_kelurahan') };
         var data = $('#region-data').data();
@@ -821,6 +759,10 @@ get_header();
         els.kota.change(function(){ setH(); loadR('dw_fetch_districts', $(this).val(), els.kec, null); els.kel.html('').prop('disabled',true); });
         els.kec.change(function(){ loadR('dw_fetch_villages', $(this).val(), els.kel, null); });
         els.kel.change(setH);
+        
+        // Tab switching from URL hash
+        var hash = window.location.hash.replace('#','');
+        if(hash && $('#tab-'+hash).length) switchTab(hash, $('button[onclick*="'+hash+'"]'));
     });
 </script>
 

@@ -42,15 +42,15 @@ function dw_load_smart_template( $file_name ) {
 // =========================================================
 
 // 1. Dashboard Admin Desa / Editor / Administrator
-if ( in_array( 'administrator', $roles ) || in_array( 'editor_desa', $roles ) || in_array( 'admin_desa', $roles ) ) {
+if ( in_array( 'administrator', $roles ) || in_array( 'editor_desa', $roles ) || in_array( 'admin_desa', $roles ) || in_array( 'verifikator_desa', $roles ) ) {
     dw_load_smart_template( 'page-dashboard-desa.php' );
 
 // 2. Dashboard Pedagang (Merchant)
-} elseif ( in_array( 'pedagang', $roles ) ) {
+} elseif ( in_array( 'pedagang', $roles ) || in_array( 'pedagang_toko', $roles ) ) {
     dw_load_smart_template( 'page-dashboard-toko.php' );
 
 // 3. Dashboard Ojek
-} elseif ( in_array( 'dw_ojek', $roles ) ) {
+} elseif ( in_array( 'dw_ojek', $roles ) || in_array( 'pengelola_ojek', $roles ) ) {
     dw_load_smart_template( 'page-dashboard-ojek.php' );
 
 // 4. Dashboard Verifikator UMKM
