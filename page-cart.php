@@ -289,6 +289,7 @@ if ($cart_items) {
     // --- LOGIC JS CART ---
     document.addEventListener('DOMContentLoaded', function() {
         const $ = jQuery;
+        let updateTimer; // Timer untuk debounce
         
         // --- 0. MODAL LOGIC ---
         const modal = document.getElementById('confirm-modal');
@@ -340,7 +341,7 @@ if ($cart_items) {
 
         cancelBtn.addEventListener('click', hideModal);
         
-        // --- 1. UPDATE QTY ---
+        // --- 1. UPDATE QTY (Debounced AJAX) ---
         window.updateCartQty = function(cartId, change) {
             const input = document.getElementById(`qty-${cartId}`);
             let newQty = parseInt(input.value) + change;
@@ -352,28 +353,43 @@ if ($cart_items) {
                 return;
             }
 
+            // 1. Optimistic UI Update (Update tampilan dulu)
             input.value = newQty;
             const checkbox = document.querySelector(`input[value="${cartId}"]`);
             if(checkbox) checkbox.dataset.qty = newQty;
             recalculateTotal(); 
 
-            $.ajax({
-                url: dwCartConfig.ajaxUrl,
-                type: 'POST',
-                data: {
-                    action: 'dw_update_cart_qty',
-                    cart_id: cartId,
-                    qty: newQty,
-                    nonce: dwCartConfig.nonce
-                },
-                success: function(res) {
-                    if(!res.success) {
-                        showToast(res.data.message, 'error');
-                        input.value = newQty - change; 
+            // 2. Debounce AJAX call (Mencegah spam request ke server)
+            clearTimeout(updateTimer);
+            updateTimer = setTimeout(() => {
+                $.ajax({
+                    url: dwCartConfig.ajaxUrl,
+                    type: 'POST',
+                    data: {
+                        action: 'dw_update_cart_qty',
+                        cart_id: cartId,
+                        qty: newQty,
+                        nonce: dwCartConfig.nonce
+                    },
+                    success: function(res) {
+                        if(res.success) {
+                            // Opsional: Tampilkan indikator kecil "Disimpan"
+                            // console.log('Qty updated on server');
+                        } else {
+                            showToast(res.data.message, 'error');
+                            // Revert jika gagal
+                            input.value = newQty - change; 
+                            if(checkbox) checkbox.dataset.qty = newQty - change;
+                            recalculateTotal();
+                        }
+                    },
+                    error: function() {
+                        showToast('Gagal terhubung ke server', 'error');
+                        input.value = newQty - change; // Revert
                         recalculateTotal();
                     }
-                }
-            });
+                });
+            }, 500); // Tunggu 500ms setelah klik terakhir sebelum kirim ke server
         };
 
         // --- 2. DELETE SINGLE ITEM (FIXED) ---
