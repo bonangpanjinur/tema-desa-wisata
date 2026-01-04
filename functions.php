@@ -713,7 +713,62 @@ function dw_pwa_customize_register( $wp_customize ) {
     $wp_customize->add_control( new WP_Customize_Color_Control( $wp_customize, 'dw_pwa_bg_color', array( 'label' => 'Warna Splash Screen', 'section' => 'dw_pwa_section' )));
 }
 add_action( 'customize_register', 'dw_pwa_customize_register' );
+/**
+ * AJAX Handler untuk cek pesanan baru di Dashboard Toko
+ */
+add_action('wp_ajax_check_new_orders', 'dw_check_new_orders_handler');
+function dw_check_new_orders_handler() {
+    global $wpdb;
+    
+    $pedagang_id = intval($_POST['pedagang_id']);
+    $last_order_id = intval($_POST['last_order_id']);
+    
+    if (!$pedagang_id) {
+        wp_send_json_error('Invalid Pedagang ID');
+    }
 
+    $table_transaksi     = $wpdb->prefix . 'dw_transaksi';
+    $table_transaksi_sub = $wpdb->prefix . 'dw_transaksi_sub';
+
+    // 1. Ambil pesanan baru (ID > ID terakhir yang ada di browser)
+    $new_orders = $wpdb->get_results($wpdb->prepare("
+        SELECT sub.*, 
+               t.kode_unik, t.bukti_pembayaran, t.status_transaksi as global_status, 
+               t.nama_penerima, t.no_hp, t.alamat_lengkap AS alamat_kirim
+        FROM $table_transaksi_sub sub
+        JOIN $table_transaksi t ON sub.id_transaksi = t.id
+        WHERE sub.id_pedagang = %d AND sub.id > %d
+        ORDER BY sub.id DESC
+    ", $pedagang_id, $last_order_id));
+
+    // 2. Ambil hitungan terbaru untuk semua kategori (untuk update counter tab)
+    $all_orders = $wpdb->get_results($wpdb->prepare("
+        SELECT sub.status_pesanan, t.status_transaksi as global_status
+        FROM $table_transaksi_sub sub
+        JOIN $table_transaksi t ON sub.id_transaksi = t.id
+        WHERE sub.id_pedagang = %d
+    ", $pedagang_id));
+
+    $counts = ['all' => 0, 'belum_bayar' => 0, 'perlu_dikirim' => 0, 'dikirim' => 0, 'selesai' => 0, 'dibatalkan' => 0];
+
+    foreach ($all_orders as $o) {
+        $counts['all']++;
+        $pay_status = $o->global_status;
+        $order_status = $o->status_pesanan;
+
+        if ($pay_status == 'menunggu_pembayaran') { $counts['belum_bayar']++; } 
+        elseif (in_array($order_status, ['dibatalkan', 'pembayaran_gagal'])) { $counts['dibatalkan']++; } 
+        elseif ($order_status == 'selesai') { $counts['selesai']++; } 
+        elseif (in_array($order_status, ['dikirim_ekspedisi', 'diantar_ojek', 'dalam_perjalanan', 'siap_diambil'])) { $counts['dikirim']++; } 
+        elseif (in_array($order_status, ['menunggu_konfirmasi', 'diproses', 'menunggu_driver', 'penawaran_driver', 'nego', 'menunggu_penjemputan'])) { $counts['perlu_dikirim']++; }
+    }
+
+    wp_send_json_success([
+        'new_orders' => $new_orders,
+        'counts'     => $counts,
+        'latest_id'  => !empty($new_orders) ? $new_orders[0]->id : $last_order_id
+    ]);
+}
 add_action('init', function() {
     if (isset($_GET['dw-manifest'])) {
         header('Content-Type: application/json; charset=utf-8');

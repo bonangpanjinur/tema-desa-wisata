@@ -1616,6 +1616,121 @@ get_header();
     }
     function printQRList() { const c=$('#qr-result-container').html(), w=window.open('','','height=700,width=900'); w.document.write('<html><head><title>QR Meja</title><link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"></head><body class="p-8"><div class="mb-4 text-center"><h1 class="text-2xl font-bold">QR Code Meja</h1><p><?php echo esc_js($pedagang->nama_toko); ?></p></div>'+c+'</body></html>'); w.document.close(); setTimeout(()=>w.print(),500); }
     function copyToClipboard(t) { navigator.clipboard.writeText(t).then(()=>alert('Disalin!')).catch(()=>alert('Gagal salin')); }
+
+//notifikasi pesanan
+
+// --- REAL-TIME ORDER NOTIFICATION LOGIC ---
+let lastOrderId = <?php echo !empty($order_list) ? $order_list[0]->id : 0; ?>;
+const pedagangId = <?php echo $pedagang->id; ?>;
+const notificationSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3' );
+
+function checkNewOrders() {
+    $.ajax({
+        url: ajaxurl,
+        type: 'POST',
+        data: {
+            action: 'check_new_orders',
+            pedagang_id: pedagangId,
+            last_order_id: lastOrderId
+        },
+        success: function(response) {
+            if (response.success) {
+                const data = response.data;
+                if (data.new_orders.length > 0) {
+                    // Mainkan suara & update ID terakhir
+                    notificationSound.play().catch(e => console.log("Interaksi user diperlukan untuk suara"));
+                    lastOrderId = data.latest_id;
+                    
+                    // Render baris baru
+                    data.new_orders.forEach(order => renderNewOrderRow(order));
+                }
+                // Update angka di tab
+                updateOrderCounters(data.counts);
+            }
+        }
+    });
+}
+
+function renderNewOrderRow(o) {
+    let filter_cat = 'all';
+    if (o.global_status == 'menunggu_pembayaran') { filter_cat = 'belum_bayar'; } 
+    else if (['dibatalkan', 'pembayaran_gagal'].includes(o.status_pesanan)) { filter_cat = 'dibatalkan'; } 
+    else if (o.status_pesanan == 'selesai') { filter_cat = 'selesai'; } 
+    else if (['dikirim_ekspedisi', 'diantar_ojek', 'dalam_perjalanan', 'siap_diambil'].includes(o.status_pesanan)) { filter_cat = 'dikirim'; } 
+    else if (['menunggu_konfirmasi', 'diproses', 'menunggu_driver', 'penawaran_driver', 'nego', 'menunggu_penjemputan'].includes(o.status_pesanan)) { filter_cat = 'perlu_dikirim'; }
+
+    const fmt = new Intl.NumberFormat('id-ID');
+    const date = new Date(o.created_at);
+    const formattedDate = date.getDate() + ' ' + date.toLocaleString('id-ID', { month: 'short' }) + ' ' + date.getFullYear() + ', ' + date.getHours().toString().padStart(2, '0') + ':' + date.getMinutes().toString().padStart(2, '0');
+
+    const badgeGlobal = getStatusBadgeJS(o.global_status);
+    const badgeOrder = getStatusBadgeJS(o.status_pesanan);
+
+    const newRow = `
+        <tr class="hover:bg-gray-50 transition-colors duration-150 group order-row animate-pulse bg-blue-50" data-category="${filter_cat}" data-search="${(o.kode_unik + ' ' + o.nama_penerima).toLowerCase()}">
+            <td class="py-4 px-6 align-top whitespace-nowrap">
+                <div class="flex items-center gap-2 mb-1">
+                    <span class="font-mono text-xs font-bold bg-gray-100 text-gray-700 px-2 py-0.5 rounded border border-gray-200">${o.kode_unik}</span>
+                </div>
+                <div class="text-[11px] text-gray-400 font-medium">${formattedDate}</div>
+            </td>
+            <td class="py-4 px-6 align-top">
+                <div class="font-bold text-gray-900 text-sm">${o.nama_penerima}</div>
+                <div class="text-xs text-gray-500 flex items-center gap-1 mt-1 font-medium bg-green-50 text-green-700 px-2 py-0.5 rounded w-fit">
+                    <i class="fab fa-whatsapp"></i> ${o.no_hp}
+                </div>
+            </td>
+            <td class="py-4 px-6 align-top">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400">
+                        <i class="fas fa-shopping-bag"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs font-bold text-gray-800 line-clamp-1">${o.first_item_name || 'Produk'}</p>
+                        <p class="text-[10px] text-gray-500">${o.total_items > 1 ? '+' + (o.total_items - 1) + ' item lainnya' : '1 item total'}</p>
+                    </div>
+                </div>
+            </td>
+            <td class="py-4 px-6 align-top whitespace-nowrap">
+                <div class="font-bold text-gray-900 text-base mb-2">Rp ${fmt.format(o.total_pesanan_toko)}</div>
+                <div class="flex flex-col gap-1.5 items-start">
+                    ${badgeGlobal}
+                    ${badgeOrder}
+                </div>
+            </td>
+            <td class="py-4 px-6 text-right align-middle">
+                <div class="flex items-center justify-end gap-2">
+                    <button onclick='openOrderDetail(${JSON.stringify(o)})' class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-all">
+                        Detail
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `;
+
+    $('#order-table tbody').prepend(newRow);
+    setTimeout(() => $('.order-row').removeClass('animate-pulse bg-blue-50'), 5000);
+    filterOrders(currentTab);
+}
+
+function updateOrderCounters(counts) {
+    Object.keys(counts).forEach(cat => {
+        $(`.order-tab-btn[data-tab="${cat}"] .badge-count`).text(counts[cat]);
+    });
+}
+
+function getStatusBadgeJS(status) {
+    const labels = { 'menunggu_pembayaran': 'Belum Bayar', 'pembayaran_dikonfirmasi': 'Sudah Bayar', 'pembayaran_gagal': 'Gagal Bayar', 'menunggu_konfirmasi': 'Perlu Konfirmasi', 'diproses': 'Diproses', 'dikirim_ekspedisi': 'Dikirim Kurir', 'diantar_ojek': 'Ojek OTW', 'siap_diambil': 'Siap Diambil', 'selesai': 'Selesai', 'dibatalkan': 'Batal', 'menunggu_driver': 'Cari Driver', 'penawaran_driver': 'Tawaran Masuk', 'nego': 'Nego Ongkir', 'menunggu_penjemputan': 'Menunggu Jemput', 'dalam_perjalanan': 'Driver OTW' };
+    const colors = { 'menunggu_pembayaran': 'bg-yellow-50 text-yellow-700 border-yellow-200', 'pembayaran_dikonfirmasi': 'bg-emerald-50 text-emerald-700 border-emerald-200', 'selesai': 'bg-green-50 text-green-700 border-green-200', 'dibatalkan': 'bg-gray-100 text-gray-500 border-gray-200' };
+    const c = colors[status] || 'bg-blue-50 text-blue-700 border-blue-200';
+    const l = labels[status] || status;
+    return `<span class='px-2.5 py-1 rounded-full text-[10px] font-semibold border inline-flex items-center gap-1 ${c}'>${l}</span>`;
+}
+
+// Cek setiap 30 detik
+setInterval(checkNewOrders, 30000);
+
+
 </script>
 
 <?php get_footer(); ?>
