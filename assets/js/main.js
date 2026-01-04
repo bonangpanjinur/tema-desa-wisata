@@ -76,13 +76,14 @@ jQuery(document).ready(function($) {
             success: function(response) {
                 btn.removeClass('loading opacity-50');
                 if (response.success) {
-                    if (response.data.action === 'added') {
+                    const data = response.data;
+                    if (data.action === 'added') {
                         icon.removeClass('far').addClass('fas text-red-500');
                         if (typeof Swal !== 'undefined') {
                             Swal.fire({
                                 icon: 'success',
                                 title: 'Berhasil',
-                                text: response.data.message,
+                                text: data.message,
                                 timer: 1500,
                                 showConfirmButton: false
                             });
@@ -93,17 +94,18 @@ jQuery(document).ready(function($) {
                     
                     const countEl = btn.find('.fav-count');
                     if (countEl.length) {
-                        countEl.text(response.data.count);
+                        countEl.text(data.count);
                     }
                 } else {
+                    const errorMsg = response.data ? response.data.message : 'Gagal memproses favorit';
                     if (typeof Swal !== 'undefined') {
                         Swal.fire({
                             icon: 'error',
                             title: 'Oops...',
-                            text: response.data.message
+                            text: errorMsg
                         });
                     } else {
-                        alert(response.data.message);
+                        alert(errorMsg);
                     }
                 }
             },

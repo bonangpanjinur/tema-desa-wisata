@@ -13,7 +13,7 @@ get_header();
 
 global $wpdb;
 $user_id = get_current_user_id();
-$table_wishlist = $wpdb->prefix . 'dw_wishlist';
+$table_wishlist = $wpdb->prefix . 'dw_favorites';
 $table_wisata   = $wpdb->prefix . 'dw_wisata';
 $table_desa     = $wpdb->prefix . 'dw_desa';
 
@@ -21,9 +21,9 @@ $table_desa     = $wpdb->prefix . 'dw_desa';
 $wishlist_items = $wpdb->get_results($wpdb->prepare("
     SELECT w.*, d.nama_desa, d.kabupaten, wl.id as wishlist_id 
     FROM $table_wishlist wl
-    JOIN $table_wisata w ON wl.item_id = w.id
+    JOIN $table_wisata w ON wl.object_id = w.id
     LEFT JOIN $table_desa d ON w.id_desa = d.id
-    WHERE wl.user_id = %d AND wl.item_type = 'wisata'
+    WHERE wl.user_id = %d AND wl.object_type = 'wisata'
     ORDER BY wl.created_at DESC
 ", $user_id));
 
@@ -141,9 +141,9 @@ function removeWishlist(id) {
     if(!confirm('Hapus wisata ini dari favorit?')) return;
 
     jQuery.post(dw_ajax.ajax_url, {
-        action: 'dw_toggle_wishlist',
-        item_id: id,
-        item_type: 'wisata'
+        action: 'dw_toggle_favorite',
+        object_id: id,
+        type: 'wisata'
     }, function(response) {
         if(response.success) {
             // Hapus elemen card dari DOM dengan animasi
