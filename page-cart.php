@@ -100,7 +100,7 @@ if ($cart_items) {
 
                     <!-- LOOP TOKO -->
                     <?php foreach ($grouped_items as $toko_id => $group) : ?>
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden cart-store-group transition-all duration-300" id="store-group-<?php echo $toko_id; ?>">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden cart-store-group transition-all duration-500 ease-in-out" id="store-group-<?php echo $toko_id; ?>">
                         
                         <!-- Header Toko -->
                         <div class="bg-gray-50/50 px-6 py-3 border-b border-gray-100 flex items-center gap-3">
@@ -121,7 +121,7 @@ if ($cart_items) {
                                 $foto_url = !empty($item->foto_varian) ? $item->foto_varian : (!empty($item->foto_utama) ? $item->foto_utama : 'https://via.placeholder.com/150');
                                 $is_out_of_stock = $item->final_stock <= 0;
                             ?>
-                            <div class="p-4 sm:p-6 flex gap-4 relative group transition-colors hover:bg-gray-50/80 cart-item-row" id="cart-item-<?php echo $item->cart_id; ?>">
+                            <div class="p-4 sm:p-6 flex gap-4 relative group transition-all duration-300 hover:bg-gray-50/80 cart-item-row" id="cart-item-<?php echo $item->cart_id; ?>">
                                 
                                 <!-- Checkbox Item -->
                                 <div class="flex items-center">
@@ -276,8 +276,10 @@ if ($cart_items) {
     </div>
 </div>
 
+<!-- INLINE SCRIPT HANDLER -->
+<!-- Catatan: ajax-cart.js tidak perlu di-enqueue lagi disini jika sudah di functions.php -->
 <script>
-    // Config dari PHP ke JS
+    // Config dari PHP ke JS (PENTING)
     const dwCartConfig = {
         ajaxUrl: '<?php echo admin_url('admin-ajax.php'); ?>',
         nonce: '<?php echo wp_create_nonce("dw_cart_action"); ?>',
@@ -302,7 +304,6 @@ if ($cart_items) {
             confirmCallback = callback;
             
             modal.classList.remove('hidden');
-            // Timeout kecil untuk memicu transisi CSS
             setTimeout(() => {
                 backdrop.classList.remove('opacity-0');
                 panel.classList.remove('opacity-0', 'translate-y-4', 'sm:translate-y-0', 'sm:scale-95');
@@ -318,17 +319,15 @@ if ($cart_items) {
             setTimeout(() => {
                 modal.classList.add('hidden');
                 confirmCallback = null;
-            }, 300); // Sesuai durasi transisi CSS
+            }, 300); 
         }
 
         confirmBtn.addEventListener('click', () => {
             if (confirmCallback) {
-                // Tampilkan loading di tombol modal
                 const originalText = confirmBtn.innerText;
                 confirmBtn.innerText = 'Memproses...';
                 confirmBtn.disabled = true;
                 
-                // Jalankan callback, lalu tutup modal
                 confirmCallback().then(() => {
                     hideModal();
                     confirmBtn.innerText = originalText;
@@ -353,14 +352,11 @@ if ($cart_items) {
                 return;
             }
 
-            // UI Optimistic Update
             input.value = newQty;
-            // Update data attribute di checkbox
             const checkbox = document.querySelector(`input[value="${cartId}"]`);
             if(checkbox) checkbox.dataset.qty = newQty;
-            recalculateTotal(); // Update total harga langsung
+            recalculateTotal(); 
 
-            // AJAX Call
             $.ajax({
                 url: dwCartConfig.ajaxUrl,
                 type: 'POST',
@@ -373,14 +369,14 @@ if ($cart_items) {
                 success: function(res) {
                     if(!res.success) {
                         showToast(res.data.message, 'error');
-                        input.value = newQty - change; // Revert
+                        input.value = newQty - change; 
                         recalculateTotal();
                     }
                 }
             });
         };
 
-        // --- 2. DELETE SINGLE ITEM (Updated with Modal) ---
+        // --- 2. DELETE SINGLE ITEM (FIXED) ---
         window.deleteCartItem = function(cartId) {
             showConfirmModal('Apakah Anda yakin ingin menghapus item ini dari keranjang?', async function() {
                 return new Promise((resolve) => {
@@ -394,14 +390,17 @@ if ($cart_items) {
                         },
                         success: function(res) {
                             if(res.success) {
-                                $(`#cart-item-${cartId}`).fadeOut(300, function() { 
-                                    $(this).remove();
+                                // Manual Remove Logic yang lebih kuat
+                                const $itemRow = $(`#cart-item-${cartId}`);
+                                $itemRow.css('opacity', '0').css('transform', 'scale(0.9)');
+                                setTimeout(() => {
+                                    $itemRow.remove();
                                     checkEmptyState();
                                     recalculateTotal();
-                                });
-                                showToast('Item dihapus');
+                                    showToast('Item dihapus');
+                                }, 300);
                             } else {
-                                showToast('Gagal menghapus item', 'error');
+                                showToast(res.data.message || 'Gagal menghapus item', 'error');
                             }
                             resolve();
                         },
@@ -414,29 +413,28 @@ if ($cart_items) {
             });
         };
 
-        // --- 3. BULK DELETE (Updated with Modal) ---
+        // --- 3. BULK DELETE ---
         const btnBulkDelete = document.getElementById('btn-bulk-delete');
         if(btnBulkDelete) {
             btnBulkDelete.addEventListener('click', function() {
                 const checkedIds = Array.from(document.querySelectorAll('.check-item:checked')).map(cb => cb.value);
                 if(checkedIds.length === 0) return;
 
-                showConfirmModal(`Hapus ${checkedIds.length} item terpilih? Tindakan ini tidak dapat dibatalkan.`, async function() {
+                showConfirmModal(`Hapus ${checkedIds.length} item terpilih?`, async function() {
                     return new Promise((resolve) => {
-                        let completed = 0;
                         let errors = 0;
-                        
-                        // Gunakan Promise.all untuk menangani banyak request paralel
                         const deletePromises = checkedIds.map(id => {
                             return $.ajax({
                                 url: dwCartConfig.ajaxUrl,
                                 type: 'POST',
                                 data: { action: 'dw_remove_cart_item', cart_id: id, nonce: dwCartConfig.nonce }
-                            }).then(() => {
-                                $(`#cart-item-${id}`).remove();
-                            }).catch(() => {
-                                errors++;
-                            });
+                            }).then((res) => {
+                                if(res.success) {
+                                    $(`#cart-item-${id}`).remove();
+                                } else {
+                                    errors++;
+                                }
+                            }).catch(() => { errors++; });
                         });
 
                         Promise.all(deletePromises).then(() => {
@@ -455,7 +453,6 @@ if ($cart_items) {
         }
 
         // --- 4. CHECKBOX LOGIC ---
-        // Check All
         $('#check-all').on('change', function() {
             const isChecked = $(this).is(':checked');
             $('.check-item:not(:disabled), .check-store').prop('checked', isChecked);
@@ -463,26 +460,21 @@ if ($cart_items) {
             toggleBulkDeleteBtn();
         });
 
-        // Check Store Group
         $('.check-store').on('change', function() {
             const targetClass = $(this).data('target');
             const isChecked = $(this).is(':checked');
             $(`.${targetClass}:not(:disabled)`).prop('checked', isChecked);
-            
             updateCheckAllStatus();
             recalculateTotal();
             toggleBulkDeleteBtn();
         });
 
-        // Check Individual Item
         $('.check-item').on('change', function() {
             const storeId = $(this).data('store');
             const storeCheckbox = $(`.check-store[data-target="store-${storeId}"]`);
-            
             const allStoreItems = $(`.check-item.store-${storeId}:not(:disabled)`);
             const checkedStoreItems = $(`.check-item.store-${storeId}:checked`);
             storeCheckbox.prop('checked', allStoreItems.length === checkedStoreItems.length);
-
             updateCheckAllStatus();
             recalculateTotal();
             toggleBulkDeleteBtn();
