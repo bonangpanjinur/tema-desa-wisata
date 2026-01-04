@@ -97,17 +97,16 @@
                     </div>
                     <span class="text-[10px] font-medium mt-1 leading-none text-gray-500 <?php echo is_post_type_archive('dw_produk') ? 'text-primary font-bold' : ''; ?>">Produk</span>
                 </a>
-            </div>
-
-            <!-- 4. Favorit -->
-            <a href="<?php echo home_url('/favorit'); ?>" class="flex flex-col items-center justify-center h-full w-full group <?php echo is_page('favorit') ? 'text-primary' : 'text-gray-400 hover:text-gray-600'; ?>">
+            <            <!-- 4. Favorit -->
+            <?php 
+            $fav_link = is_user_logged_in() ? home_url('/akun-saya?tab=favorites') : home_url('/login');
+            ?>
+            <a href="<?php echo $fav_link; ?>" class="flex flex-col items-center justify-center h-full w-full group <?php echo (isset($_GET['tab']) && $_GET['tab'] == 'favorites') ? 'text-primary' : 'text-gray-400 hover:text-gray-600'; ?>">
                 <div class="mb-0.5">
                     <i class="fas fa-heart text-lg transition-transform group-active:scale-90"></i>
                 </div>
                 <span class="text-[10px] font-medium leading-none">Favorit</span>
-            </a>
-
-            <!-- 5. Akun -->
+            </a>- 5. Akun -->
             <?php 
             $akun_link = is_user_logged_in() ? home_url('/akun-saya') : home_url('/login');
             $is_akun_active = is_page('akun-saya') || is_page('login') || is_page('dashboard-desa') || is_page('dashboard-toko');

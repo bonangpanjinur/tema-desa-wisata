@@ -214,12 +214,31 @@ $related_products = $wpdb->get_results($wpdb->prepare(
                                 <i class="fas fa-cart-plus"></i> <span>Masuk Keranjang</span>
                             </button>
                             
-                            <!-- PENTING: ID 'buy-now' dan data-id agar dibaca JS -->
-                            <button type="button" id="buy-now" data-id="<?php echo $id_produk; ?>" class="w-full bg-white border border-green-600 text-green-600 font-bold py-3 px-4 rounded-xl hover:bg-green-50 transition-all flex items-center justify-center gap-2">
-                                <i class="fas fa-shopping-bag"></i> <span>Beli Langsung</span>
+   	                            <!-- PENTING: ID 'buy-now' dan data-id agar dibaca JS -->
+                            <button type="button" id="buy-now" data-id="<?php echo $id_produk; ?>" class="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-orange-500/20 transition-all flex items-center justify-center gap-2">
+                                <span>Beli Sekarang</span>
+                            </button>
+
+                            <!-- Favorite Button -->
+                            <?php 
+                            $is_fav = false;
+                            if (is_user_logged_in()) {
+                                if (!class_exists('DW_Favorites')) {
+                                    require_once WP_PLUGIN_DIR . '/desa-wisata-core/includes/class-dw-favorites.php';
+                                }
+                                $fav_obj = new DW_Favorites();
+                                $is_fav = $fav_obj->is_favorited(get_current_user_id(), $id_produk, 'produk');
+                            }
+                            ?>
+                            <button type="button" 
+                                    class="js-toggle-favorite w-full border-2 border-gray-200 hover:border-red-500 hover:text-red-500 text-gray-600 font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2"
+                                    data-id="<?php echo $id_produk; ?>"
+                                    data-type="produk">
+                                <i class="<?php echo $is_fav ? 'fas text-red-500' : 'far'; ?> fa-heart"></i>
+                                <span>Favoritkan</span>
                             </button>
                         </div>
-                    </form>
+                    </form>m>
                     <?php else: ?>
                         <div class="bg-red-50 border border-red-100 rounded-xl p-4 text-center">
                             <i class="fas fa-box-open text-red-400 text-2xl mb-2"></i>

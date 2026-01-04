@@ -29,10 +29,29 @@ if (stripos($kategori, 'alam') !== false) $badge_bg = 'bg-green-100 text-green-6
 
     <!-- Gambar -->
     <div class="relative h-48 overflow-hidden">
-        <img src="<?php echo $image_url; ?>" alt="<?php echo $judul; ?>" class="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500">
-        <span class="absolute top-3 right-3 <?php echo $badge_bg; ?> text-[10px] font-bold px-2 py-1 rounded-full uppercase z-20">
+        <img src="<?php echo $image_url; ?>" alt="<?php echo $judul; ?>" class="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-        <span class="absolute top-3 left-3 <?php echo $badge_bg; ?> text-[10px] font-bold px-2 py-1 rounded-full uppercase z-20">
             <?php echo $kategori; ?>
         </span>
+
+        <!-- Favorite Button -->
+        <div class="absolute top-3 right-3 z-20">
+            <?php 
+            $is_fav = false;
+            if (is_user_logged_in()) {
+                if (!class_exists('DW_Favorites')) {
+                    require_once WP_PLUGIN_DIR . '/desa-wisata-core/includes/class-dw-favorites.php';
+                }
+                $fav_obj = new DW_Favorites();
+                $is_fav = $fav_obj->is_favorited(get_current_user_id(), $wisata->id, 'wisata');
+            }
+            ?>
+            <button type="button" 
+                    class="js-toggle-favorite w-8 h-8 rounded-full bg-white/90 backdrop-blur flex items-center justify-center shadow-sm hover:bg-white transition-all"
+                    data-id="<?php echo $wisata->id; ?>"
+                    data-type="wisata">
+                <i class="<?php echo $is_fav ? 'fas text-red-500' : 'far'; ?> fa-heart text-xs"></i>
+            </button>
+        </div>
     </div>
 
     <!-- Konten -->

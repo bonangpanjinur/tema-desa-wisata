@@ -50,7 +50,72 @@ jQuery(document).ready(function($) {
     });
 
     /* =========================================
-       2. FITUR KERANJANG BELANJA (AJAX / DATABASE)
+       2. FITUR FAVORIT (WISHLIST)
+       ========================================= */
+    $(document).on('click', '.js-toggle-favorite', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const btn = $(this);
+        const objectId = btn.data('id');
+        const type = btn.data('type') || 'produk';
+        const icon = btn.find('i');
+
+        if (btn.hasClass('loading')) return;
+
+        btn.addClass('loading opacity-50');
+        
+        $.ajax({
+            url: AJAX_URL,
+            type: 'POST',
+            data: {
+                action: 'dw_toggle_favorite',
+                object_id: objectId,
+                type: type
+            },
+            success: function(response) {
+                btn.removeClass('loading opacity-50');
+                if (response.success) {
+                    if (response.data.action === 'added') {
+                        icon.removeClass('far').addClass('fas text-red-500');
+                        if (typeof Swal !== 'undefined') {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Berhasil',
+                                text: response.data.message,
+                                timer: 1500,
+                                showConfirmButton: false
+                            });
+                        }
+                    } else {
+                        icon.removeClass('fas text-red-500').addClass('far');
+                    }
+                    
+                    const countEl = btn.find('.fav-count');
+                    if (countEl.length) {
+                        countEl.text(response.data.count);
+                    }
+                } else {
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Oops...',
+                            text: response.data.message
+                        });
+                    } else {
+                        alert(response.data.message);
+                    }
+                }
+            },
+            error: function() {
+                btn.removeClass('loading opacity-50');
+                alert('Terjadi kesalahan. Silakan coba lagi.');
+            }
+        });
+    });
+
+    /* =========================================
+       3. FITUR KERANJANG BELANJA (AJAX / DATABASE)
        Digunakan di: Single Produk, Card Produk, Halaman Cart
        ========================================= */
 

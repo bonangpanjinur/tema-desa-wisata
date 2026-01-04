@@ -362,11 +362,12 @@ get_header();
                 <nav class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden py-2">
                     <button onclick="switchTab('dashboard', this)" class="nav-link active w-full text-left px-6 py-3.5 flex items-center gap-3 text-sm text-gray-600">
                         <i class="fas fa-home w-5 text-center text-lg opacity-70"></i> Dashboard
-                    </button>
-                    <button onclick="switchTab('orders', this)" class="nav-link w-full text-left px-6 py-3.5 flex items-center gap-3 text-sm text-gray-600">
+                    </button>	                    <button onclick="switchTab('orders', this)" class="nav-link w-full text-left px-6 py-3.5 flex items-center gap-3 text-sm text-gray-600">
                         <i class="fas fa-shopping-bag w-5 text-center text-lg opacity-70"></i> Pesanan Saya
                     </button>
-                    <button onclick="switchTab('address', this)" class="nav-link w-full text-left px-6 py-3.5 flex items-center gap-3 text-sm text-gray-600">
+                    <button onclick="switchTab('favorites', this)" class="nav-link w-full text-left px-6 py-3.5 flex items-center gap-3 text-sm text-gray-600">
+                        <i class="fas fa-heart w-5 text-center text-lg opacity-70"></i> Favorit Saya
+                    </button>             <button onclick="switchTab('address', this)" class="nav-link w-full text-left px-6 py-3.5 flex items-center gap-3 text-sm text-gray-600">
                         <i class="fas fa-map-marker-alt w-5 text-center text-lg opacity-70"></i> Alamat Pengiriman
                     </button>
                     <button onclick="switchTab('account', this)" class="nav-link w-full text-left px-6 py-3.5 flex items-center gap-3 text-sm text-gray-600">
@@ -500,11 +501,72 @@ get_header();
                             </div>
                         <?php endif; ?>
                     </div>
+                </div>                <!-- 2.5. TAB FAVORIT -->
+                <div id="tab-favorites" class="tab-content">
+                    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-8">
+                        <h2 class="text-xl font-bold text-gray-800 mb-8">Favorit Saya</h2>
+                        
+                        <?php
+                        if (!class_exists('DW_Favorites')) {
+                            require_once WP_PLUGIN_DIR . '/desa-wisata-core/includes/class-dw-favorites.php';
+                        }
+                        $fav_obj = new DW_Favorites();
+                        $fav_produk_ids = $fav_obj->get_user_favorites($user_id, 'produk');
+                        $fav_wisata_ids = $fav_obj->get_user_favorites($user_id, 'wisata');
+                        ?>
+
+                        <div class="space-y-10">
+                            <!-- Wisata Favorit -->
+                            <div>
+                                <h3 class="text-sm font-black text-green-600 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                    <i class="fas fa-palmtree"></i> Wisata Favorit
+                                </h3>
+                                <?php if ($fav_wisata_ids) : ?>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <?php 
+                                        foreach ($fav_wisata_ids as $wid) {
+                                            $w_data = $wpdb->get_row($wpdb->prepare("SELECT w.*, d.nama_desa FROM {$wpdb->prefix}dw_wisata w LEFT JOIN {$wpdb->prefix}dw_desa d ON w.id_desa = d.id WHERE w.id = %d", $wid));
+                                            if ($w_data) {
+                                                get_template_part('template-parts/card-wisata', null, ['data' => $w_data]);
+                                            }
+                                        }
+                                        ?>
+                                    </div>
+                                <?php else : ?>
+                                    <div class="p-10 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                                        <p class="text-gray-400 text-sm">Belum ada wisata favorit.</p>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+
+                            <!-- Produk Favorit -->
+                            <div>
+                                <h3 class="text-sm font-black text-blue-600 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                    <i class="fas fa-shopping-basket"></i> Produk Favorit
+                                </h3>
+                                <?php if ($fav_produk_ids) : ?>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <?php 
+                                        foreach ($fav_produk_ids as $pid) {
+                                            $p_data = $wpdb->get_row($wpdb->prepare("SELECT p.*, t.nama_toko FROM {$wpdb->prefix}dw_produk p LEFT JOIN {$wpdb->prefix}dw_pedagang t ON p.id_pedagang = t.id WHERE p.id = %d", $pid));
+                                            if ($p_data) {
+                                                get_template_part('template-parts/card-produk', null, ['data' => $p_data]);
+                                            }
+                                        }
+                                        ?>
+                                    </div>
+                                <?php else : ?>
+                                    <div class="p-10 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                                        <p class="text-gray-400 text-sm">Belum ada produk favorit.</p>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- 3. ADDRESS TAB -->
-                <div id="tab-address" class="tab-content">
-                    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-8">
+                <div id="tab-address" class="tab-content">                   <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-8">
                         <h2 class="text-xl font-bold text-gray-800 mb-8">Alamat Pengiriman</h2>
                         <form method="post" action="">
                             <?php wp_nonce_field('dw_save_address', 'dw_address_nonce'); ?>
@@ -730,11 +792,18 @@ get_header();
         };
         const cls = config[status] || 'bg-gray-50 text-gray-600 border-gray-200';
         return `<span class="px-2 py-1 rounded-full text-[8px] font-black border uppercase ${cls}">${status.replace('_', ' ')}</span>`;
-    }
+    }	    // --- TAB SWITCHING FROM URL ---
+        jQuery(document).ready(function($) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const tab = urlParams.get('tab');
+            if (tab) {
+                const tabBtn = document.querySelector(`button[onclick*="'${tab}'"]`);
+                if (tabBtn) switchTab(tab, tabBtn);
+            }
+        });
 
-    // --- REGION API (AJAX HANDLING) ---
-    jQuery(document).ready(function($) {
-        var els = { prov: $('#dw_provinsi'), kota: $('#dw_kota'), kec: $('#dw_kecamatan'), kel: $('#dw_kelurahan') };
+	    // --- REGION API (AJAX HANDLING) ---
+	    jQuery(document).ready(function($) {      var els = { prov: $('#dw_provinsi'), kota: $('#dw_kota'), kec: $('#dw_kecamatan'), kel: $('#dw_kelurahan') };
         var data = $('#region-data').data();
 
         function loadR(act, pid, el, sel, cb) {
