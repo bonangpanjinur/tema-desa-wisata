@@ -1,3 +1,4 @@
+<?php if ( ! defined( "ABSPATH" ) ) { exit; } ?>
 <?php get_header(); ?>
 
 <div class="min-h-[70vh] flex items-center justify-center bg-gray-50">

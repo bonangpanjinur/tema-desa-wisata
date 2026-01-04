@@ -205,23 +205,24 @@
 }
 /* --- MOBILE NAVIGATION & FLOATING CART --- */
 
-/* Pastikan container navigasi rata */
+/* Container Navigasi Bawah */
 .mobile-bottom-nav {
     display: flex;
     justify-content: space-around;
     align-items: center;
-    background: #ffffff;
-    border-top: 1px solid #f1f5f9;
-    height: 75px;
+    background: rgba(255, 255, 255, 0.98); /* Sedikit transparan */
+    backdrop-filter: blur(10px);
+    border-top: 1px solid #eee;
+    height: 65px;
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
     z-index: 999;
-    padding-bottom: env(safe-area-inset-bottom);
-    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.05);
+    padding-bottom: env(safe-area-inset-bottom); /* Aman untuk iPhone X+ */
 }
 
+/* Item Navigasi */
 .mobile-bottom-nav a {
     flex: 1;
     display: flex;
@@ -229,97 +230,82 @@
     align-items: center;
     justify-content: center;
     text-decoration: none;
-    color: #64748b; /* Slightly darker grey */
-    font-size: 12px;
-    font-weight: 600;
+    color: #9CA3AF; /* Abu-abu soft */
+    font-size: 10px;
+    font-weight: 500;
     background: transparent !important;
     border: none !important;
     height: 100%;
-    transition: all 0.2s ease;
 }
 
+/* Ikon */
 .mobile-bottom-nav a i {
-    font-size: 26px; /* Larger icons like in image */
-    margin-bottom: 6px;
-    transition: all 0.2s ease;
+    font-size: 22px;
+    margin-bottom: 4px;
+    transition: transform 0.2s ease, color 0.3s ease;
 }
 
-.mobile-bottom-nav a.active {
-    color: var(--primary);
+/* State Aktif */
+.mobile-bottom-nav a.active,
+.mobile-bottom-nav a:hover {
+    color: #2F5D62; /* Warna Tema Utama (Sage Green/Deep Teal) */
 }
-
 .mobile-bottom-nav a.active i {
-    color: var(--primary);
-}
-
-.mobile-bottom-nav a:active i {
-    transform: scale(0.9);
+    transform: translateY(-2px);
 }
 
 @media (max-width: 768px) {
-    /* Sembunyikan keranjang di header mobile */
-    .header-actions {
-        display: none !important;
+    /* Sembunyikan keranjang & menu lain di header */
+    .header-actions,
+    .site-header-cart,
+    .cart-contents,
+    .menu-toggle { 
+        display: none !important; 
     }
 
-    /* Pastikan logo berada di tengah */
+    /* Pusatkan Logo */
+    .site-header .branding,
     .site-branding {
         width: 100%;
         text-align: center;
         display: flex;
         justify-content: center;
+        align-items: center;
+        height: 60px; /* Tinggi fix header */
     }
 }
 
 /* Floating Cart Button */
 .floating-cart-btn {
     position: fixed;
-    bottom: 95px;
-    right: 25px;
-    width: 60px;
-    height: 60px;
-    background-color: var(--primary);
+    /* Opsi Posisi: Kanan Bawah (di atas nav) atau Kanan Atas */
+    bottom: 80px; 
+    right: 20px;
+    width: 56px;
+    height: 56px;
+    background-color: #2F5D62; /* Warna Utama */
+    color: #fff;
     border-radius: 50%;
-    box-shadow: 0 8px 20px rgba(0, 186, 97, 0.3);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 9999;
+    z-index: 998;
+    transition: transform 0.2s;
     text-decoration: none;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    border: 2px solid #ffffff;
 }
-
-.floating-cart-btn i {
-    font-size: 22px;
-    color: #ffffff;
-}
-
-/* Badge Hitungan */
+.floating-cart-btn:hover { transform: scale(1.1); color: #fff; }
+.floating-cart-btn i { font-size: 20px; }
 .floating-cart-btn .cart-count {
     position: absolute;
-    top: -2px;
-    right: -2px;
-    background-color: #ef4444;
+    top: -2px; right: -2px;
+    background: #EF4444; /* Merah Alert */
     color: white;
-    font-size: 10px;
-    font-weight: 800;
-    width: 20px;
-    height: 20px;
+    font-size: 10px; font-weight: bold;
+    width: 20px; height: 20px;
     border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 2px solid #ffffff;
+    display: flex; align-items: center; justify-content: center;
+    border: 2px solid #fff;
 }
-
-.floating-cart-btn:hover {
-    transform: scale(1.1);
-}
-
-/* Tampilkan hanya di mobile */
-@media (min-width: 769px) {
-    .floating-cart-btn {
-        display: none;
-    }
-}
+/* Sembunyikan di Desktop jika perlu */
+@media (min-width: 769px) { .floating-cart-btn { display: none; } }

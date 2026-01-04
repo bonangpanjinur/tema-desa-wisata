@@ -1,3 +1,4 @@
+<?php if ( ! defined( "ABSPATH" ) ) { exit; } ?>
 <?php
 /**
  * Functions and definitions
@@ -110,6 +111,29 @@ function tema_dw_scripts_optimized() {
     }
 }
 add_action('wp_enqueue_scripts', 'tema_dw_scripts_optimized');
+
+/**
+ * Optimasi Performa: Defer JavaScript
+ */
+function dw_defer_scripts( $tag, $handle, $src ) {
+    // Daftar script yang aman di-defer
+    $defer_scripts = array( 'tema-dw-main', 'font-awesome', 'tema-dw-filter', 'dw-ajax-cart' );
+    if ( in_array( $handle, $defer_scripts ) ) {
+        return '<script src="' . $src . '" defer="defer"></script>' . "\n";
+    }
+    return $tag;
+}
+add_filter( 'script_loader_tag', 'dw_defer_scripts', 10, 3 );
+
+/**
+ * Optimasi Performa: Hapus Aset Bawaan Tak Terpakai
+ */
+add_action( 'wp_enqueue_scripts', function() {
+    wp_dequeue_style( 'wp-block-library' );
+    wp_dequeue_style( 'wp-block-library-theme' );
+    remove_action( 'wp_head', 'print_emoji_detection_script', 7 );
+    remove_action( 'wp_print_styles', 'print_emoji_styles' );
+}, 100 );
 
 
 /**

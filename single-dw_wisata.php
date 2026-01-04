@@ -1,3 +1,4 @@
+<?php if ( ! defined( "ABSPATH" ) ) { exit; } ?>
 <?php
 /**
  * Template Name: Single Wisata (Ultimate Refined Responsive)

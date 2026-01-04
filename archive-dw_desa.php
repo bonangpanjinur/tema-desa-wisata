@@ -1,3 +1,4 @@
+<?php if ( ! defined( "ABSPATH" ) ) { exit; } ?>
 <?php
 /**
  * Template Name: Archive Desa (Custom Table)

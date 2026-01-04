@@ -1,3 +1,4 @@
+<?php if ( ! defined( "ABSPATH" ) ) { exit; } ?>
 <?php
 /**
  * Template part for displaying Wisata Card
@@ -32,8 +33,8 @@ if (stripos($kategori, 'alam') !== false) $badge_bg = 'bg-green-100 text-green-6
         <?php 
         // Gunakan thumbnail jika ID tersedia, jika tidak gunakan URL langsung
         if (isset($wisata->id_post) && has_post_thumbnail($wisata->id_post)) {
-            echo get_the_post_thumbnail($wisata->id_post, 'dw-card-thumb', array(
-                'class' => 'w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500',
+            echo get_the_post_thumbnail($wisata->id_post, 'medium_large', array(
+                'class' => 'w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500 img-fluid rounded',
                 'loading' => 'lazy',
                 'alt' => $judul
             ));

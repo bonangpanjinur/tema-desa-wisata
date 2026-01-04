@@ -1,3 +1,4 @@
+<?php if ( ! defined( "ABSPATH" ) ) { exit; } ?>
 function tema_dw_scripts_optimized() {
     // 1. Tailwind CSS - Tetap di header karena krusial untuk layout awal
     wp_enqueue_script('tailwindcss', 'https://cdn.tailwindcss.com', array(), '3.4.0', false);

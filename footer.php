@@ -1,3 +1,4 @@
+<?php if ( ! defined( "ABSPATH" ) ) { exit; } ?>
 <!-- Main Footer (Desktop Focused, Simplified on Mobile) -->
     <footer class="bg-gray-900 text-gray-300 pt-16 pb-24 md:pb-8 border-t-4 border-primary mt-auto hidden md:block">
         <div class="container mx-auto px-4">
@@ -78,7 +79,7 @@
         </a>
 
         <a href="<?php echo home_url('/produk'); ?>" class="<?php echo is_post_type_archive('dw_produk') || is_singular('dw_produk') ? 'active' : ''; ?>">
-            <i class="fas fa-shopping-basket"></i>
+            <i class="fas fa-shopping-bag"></i>
             <span>Produk</span>
         </a>
 
@@ -118,11 +119,9 @@
     $cart_count = intval($cart_count);
     ?>
     <a href="<?php echo home_url('/keranjang'); ?>" class="floating-cart-btn">
-        <span class="cart-icon">
-            <i class="fas fa-shopping-bag"></i>
-        </span>
+        <i class="fas fa-shopping-bag"></i>
         <?php if ( $cart_count > 0 ) : ?>
-            <span class="cart-count"><?php echo $cart_count > 9 ? '9+' : $cart_count; ?></span>
+            <span class="cart-count"><?php echo $cart_count; ?></span>
         <?php endif; ?>
     </a>
 

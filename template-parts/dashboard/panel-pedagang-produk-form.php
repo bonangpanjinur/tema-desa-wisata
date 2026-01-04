@@ -1,3 +1,4 @@
+<?php if ( ! defined( "ABSPATH" ) ) { exit; } ?>
 <?php
 $is_edit = (isset($_GET['action']) && $_GET['action'] == 'edit');
 $produk_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
@@ -36,6 +37,7 @@ if ($is_edit && $produk_id > 0) {
 </div>
 
 <form id="form-produk-pedagang" class="needs-validation" novalidate>
+    <?php wp_nonce_field( 'simpan_produk_action', 'produk_nonce' ); ?>
     <input type="hidden" name="produk_id" value="<?php echo esc_attr($produk_id); ?>">
     <input type="hidden" name="action_type" value="<?php echo $is_edit ? 'update' : 'create'; ?>">
 
