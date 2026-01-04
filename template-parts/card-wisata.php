@@ -29,7 +29,24 @@ if (stripos($kategori, 'alam') !== false) $badge_bg = 'bg-green-100 text-green-6
 
     <!-- Gambar -->
     <div class="relative h-48 overflow-hidden">
-        <img src="<?php echo $image_url; ?>" alt="<?php echo $judul; ?>" class="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-        <span class="absolute top-3 left-3 <?php echo $badge_bg; ?> text-[10px] font-bold px-2 py-1 rounded-full uppercase z-20">
+        <?php 
+        // Gunakan thumbnail jika ID tersedia, jika tidak gunakan URL langsung
+        if (isset($wisata->id_post) && has_post_thumbnail($wisata->id_post)) {
+            echo get_the_post_thumbnail($wisata->id_post, 'dw-card-thumb', array(
+                'class' => 'w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500',
+                'loading' => 'lazy',
+                'alt' => $judul
+            ));
+        } else {
+            ?>
+            <img src="<?php echo $image_url; ?>" 
+                 alt="<?php echo $judul; ?>" 
+                 class="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500"
+                 loading="lazy">
+            <?php
+        }
+        ?>
+        <span class="absolute top-3 left-3 <?php echo $badge_bg; ?> text-[10px] font-bold px-2 py-1 rounded-full uppercase z-20">
             <?php echo $kategori; ?>
         </span>
 
