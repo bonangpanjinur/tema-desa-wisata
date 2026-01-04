@@ -346,7 +346,7 @@ if ($cart_items) {
         window.updateCartQty = function(cartId, change) {
             const input = document.getElementById(`qty-${cartId}`);
             
-            // Ambil nilai saat ini dari input, bukan dari atribut value HTML lama
+            // Ambil nilai saat ini dari input
             let currentVal = parseInt(input.value) || 0;
             let newQty = currentVal + change;
             
@@ -361,18 +361,18 @@ if ($cart_items) {
                 newQty = max;
             }
 
-            // 1. Optimistic UI Update (Update tampilan langsung)
+            // 1. Optimistic UI Update
             input.value = newQty;
             const checkbox = document.querySelector(`input[value="${cartId}"]`);
             if(checkbox) checkbox.dataset.qty = newQty;
             
-            // Tambahkan efek visual "Saving..."
+            // Efek visual loading
             const container = input.closest('.flex');
             if(container) container.classList.add('opacity-50');
 
             recalculateTotal(); 
 
-            // 2. Debounce AJAX call per Item ID
+            // 2. Debounce AJAX call
             if(updateTimers[cartId]) clearTimeout(updateTimers[cartId]);
 
             updateTimers[cartId] = setTimeout(() => {
@@ -389,10 +389,13 @@ if ($cart_items) {
                         if(container) container.classList.remove('opacity-50');
                         
                         if(res.success) {
-                            // Opsional: console.log('Saved');
+                            // SINKRONISASI BADGE HEADER DI SINI
+                            if(res.data.total_items !== undefined) {
+                                $('.cart-count').text(res.data.total_items).removeClass('hidden');
+                            }
                         } else {
                             showToast(res.data.message, 'error');
-                            // Revert visual jika gagal
+                            // Revert
                             input.value = currentVal; 
                             if(checkbox) checkbox.dataset.qty = currentVal;
                             recalculateTotal();
@@ -406,13 +409,12 @@ if ($cart_items) {
                         recalculateTotal();
                     }
                 });
-            }, 600); // 600ms debounce
+            }, 600); 
         };
 
-        // Event listener untuk input manual (typing)
+        // Event listener untuk input manual
         $('.input-qty').on('change', function() {
             const id = $(this).data('id');
-            // Panggil update dengan change = 0 untuk trigger validasi & save
             updateCartQty(id, 0); 
         });
 
@@ -430,6 +432,12 @@ if ($cart_items) {
                         },
                         success: function(res) {
                             if(res.success) {
+                                // SINKRONISASI BADGE HEADER
+                                if(res.data.total_items !== undefined) {
+                                    $('.cart-count').text(res.data.total_items);
+                                    if(res.data.total_items == 0) $('.cart-count').addClass('hidden');
+                                }
+
                                 const $itemRow = $(`#cart-item-${cartId}`);
                                 $itemRow.css('transition', 'all 0.3s ease').css('opacity', '0').css('transform', 'scale(0.9)');
                                 setTimeout(() => {
@@ -469,6 +477,10 @@ if ($cart_items) {
                                 data: { action: 'dw_remove_cart_item', cart_id: id, nonce: dwCartConfig.nonce }
                             }).then((res) => {
                                 if(res.success) {
+                                    // Update Badge (meski partial, nanti di-reload)
+                                    if(res.data.total_items !== undefined) {
+                                        $('.cart-count').text(res.data.total_items);
+                                    }
                                     $(`#cart-item-${id}`).remove();
                                 } else {
                                     errors++;
