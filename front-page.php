@@ -15,6 +15,7 @@
                 $banners = [];
                 // Cek tabel & ambil data
                 if($wpdb->get_var("SHOW TABLES LIKE '$table_banner'") == $table_banner) {
+                    // Optimasi: Gunakan cache jika memungkinkan (manual via transient jika di server asli)
                     $banners = $wpdb->get_results("SELECT * FROM $table_banner WHERE status = 'aktif' ORDER BY prioritas ASC");
                 }
 
@@ -189,6 +190,7 @@
                 
                 $list_wisata = [];
                 if($wpdb->get_var("SHOW TABLES LIKE '$table_wisata'") == $table_wisata) {
+                    // Optimasi: Tambahkan SQL_NO_CACHE jika data jarang berubah atau gunakan WP_Query jika CPT
                     $list_wisata = $wpdb->get_results($query_wisata);
                 }
 

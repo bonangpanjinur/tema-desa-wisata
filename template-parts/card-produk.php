@@ -34,7 +34,23 @@ if (strlen($lokasi) > 20) $lokasi = substr($lokasi, 0, 18) . '...';
 
     <!-- Gambar -->
     <div class="relative w-full aspect-square bg-gray-100 overflow-hidden">
-        <img src="<?php echo $image_url; ?>" alt="<?php echo $nama_produk; ?>" class="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500">
+        <?php 
+        // Gunakan thumbnail jika ID tersedia, jika tidak gunakan URL langsung
+        if (isset($produk->id_post) && has_post_thumbnail($produk->id_post)) {
+            echo get_the_post_thumbnail($produk->id_post, 'dw-card-thumb', array(
+                'class' => 'w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500',
+                'loading' => 'lazy',
+                'alt' => $nama_produk
+            ));
+        } else {
+            ?>
+            <img src="<?php echo $image_url; ?>" 
+                 alt="<?php echo $nama_produk; ?>" 
+                 class="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-500"
+                 loading="lazy">
+            <?php
+        }
+        ?>
         
         <?php if ($stok < 1) : ?>
             <div class="absolute inset-0 bg-black/50 backdrop-blur-[2px] flex items-center justify-center z-20">
