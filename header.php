@@ -43,7 +43,7 @@
         <div class="flex justify-between items-center h-16 md:h-20">
             
             <!-- 1. Logo Area -->
-            <div class="flex-shrink-0 flex items-center">
+            <div class="site-branding flex-shrink-0 flex items-center">
                 <a href="<?php echo home_url(); ?>" class="flex items-center gap-2 group">
                     <?php if (has_custom_logo()) : ?>
                         <?php the_custom_logo(); ?>
@@ -80,7 +80,7 @@
             </nav>
 
             <!-- 3. Actions Area -->
-            <div class="flex items-center gap-3 md:gap-5">
+            <div class="header-actions flex items-center gap-3 md:gap-5">
                 
                 <!-- Keranjang -->
                 <?php 

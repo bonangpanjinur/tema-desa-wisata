@@ -67,59 +67,70 @@
 
     <!-- MOBILE BOTTOM NAVIGATION BAR (App Like Experience) -->
     <!-- Fixed di bawah, hanya muncul di layar < 768px (md) -->
-    <nav class="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-50 md:hidden pb-safe">
-        <div class="grid grid-cols-5 h-[60px] items-end pb-1">
-            
-            <!-- 1. Beranda -->
-            <a href="<?php echo home_url(); ?>" class="flex flex-col items-center justify-center h-full w-full group <?php echo is_front_page() ? 'text-primary' : 'text-gray-400 hover:text-gray-600'; ?>">
-                <div class="mb-0.5 relative">
-                    <i class="fas fa-home text-lg transition-transform group-active:scale-90"></i>
-                    <?php if(is_front_page()): ?>
-                        <span class="absolute -top-1 -right-1 w-1.5 h-1.5 bg-primary rounded-full border border-white"></span>
-                    <?php endif; ?>
-                </div>
-                <span class="text-[10px] font-medium leading-none">Beranda</span>
-            </a>
+    <nav class="mobile-bottom-nav md:hidden pb-safe">
+        <!-- 1. Beranda -->
+        <a href="<?php echo home_url(); ?>" class="<?php echo is_front_page() ? 'active' : ''; ?>">
+            <i class="fas fa-home"></i>
+            <span>Beranda</span>
+        </a>
 
-            <!-- 2. Wisata -->
-            <a href="<?php echo home_url('/wisata'); ?>" class="flex flex-col items-center justify-center h-full w-full group <?php echo is_post_type_archive('dw_wisata') || is_singular('dw_wisata') ? 'text-primary' : 'text-gray-400 hover:text-gray-600'; ?>">
-                <div class="mb-0.5">
-                    <i class="fas fa-map-marked-alt text-lg transition-transform group-active:scale-90"></i>
-                </div>
-                <span class="text-[10px] font-medium leading-none">Wisata</span>
-            </a>
+        <!-- 2. Wisata -->
+        <a href="<?php echo home_url('/wisata'); ?>" class="<?php echo is_post_type_archive('dw_wisata') || is_singular('dw_wisata') ? 'active' : ''; ?>">
+            <i class="fas fa-map-marked-alt"></i>
+            <span>Wisata</span>
+        </a>
 
-            <!-- 3. Produk (Tengah - Menonjol & Rapi) -->
-            <div class="relative h-full flex justify-center items-end">
-                <a href="<?php echo home_url('/produk'); ?>" class="absolute bottom-4 flex flex-col items-center justify-center group">
-                    <div class="w-12 h-12 bg-primary rounded-full shadow-lg shadow-primary/40 text-white flex items-center justify-center transform transition-transform group-active:scale-95 border-4 border-white box-content">
-                        <i class="fas fa-shopping-basket text-lg"></i>
-                    </div>
-                    <span class="text-[10px] font-medium mt-1 leading-none text-gray-500 <?php echo is_post_type_archive('dw_produk') ? 'text-primary font-bold' : ''; ?>">Produk</span>
-                </a>
-            <            <!-- 4. Favorit -->
-            <?php 
-            $fav_link = is_user_logged_in() ? home_url('/akun-saya?tab=favorites') : home_url('/login');
-            ?>
-            <a href="<?php echo $fav_link; ?>" class="flex flex-col items-center justify-center h-full w-full group <?php echo (isset($_GET['tab']) && $_GET['tab'] == 'favorites') ? 'text-primary' : 'text-gray-400 hover:text-gray-600'; ?>">
-                <div class="mb-0.5">
-                    <i class="fas fa-heart text-lg transition-transform group-active:scale-90"></i>
-                </div>
-                <span class="text-[10px] font-medium leading-none">Favorit</span>
-            </a>- 5. Akun -->
-            <?php 
-            $akun_link = is_user_logged_in() ? home_url('/akun-saya') : home_url('/login');
-            $is_akun_active = is_page('akun-saya') || is_page('login') || is_page('dashboard-desa') || is_page('dashboard-toko');
-            ?>
-            <a href="<?php echo $akun_link; ?>" class="flex flex-col items-center justify-center h-full w-full group <?php echo $is_akun_active ? 'text-primary' : 'text-gray-400 hover:text-gray-600'; ?>">
-                <div class="mb-0.5">
-                    <i class="fas fa-user text-lg transition-transform group-active:scale-90"></i>
-                </div>
-                <span class="text-[10px] font-medium leading-none">Akun</span>
-            </a>
+        <!-- 3. Produk -->
+        <a href="<?php echo home_url('/produk'); ?>" class="<?php echo is_post_type_archive('dw_produk') || is_singular('dw_produk') ? 'active' : ''; ?>">
+            <i class="fas fa-shopping-basket"></i>
+            <span>Produk</span>
+        </a>
 
-        </div>
+        <!-- 4. Favorit -->
+        <?php 
+        $fav_link = is_user_logged_in() ? home_url('/akun-saya?tab=favorites') : home_url('/login');
+        $is_fav_active = (isset($_GET['tab']) && $_GET['tab'] == 'favorites');
+        ?>
+        <a href="<?php echo $fav_link; ?>" class="<?php echo $is_fav_active ? 'active' : ''; ?>">
+            <i class="fas fa-heart"></i>
+            <span>Favorit</span>
+        </a>
+
+        <!-- 5. Akun -->
+        <?php 
+        $akun_link = is_user_logged_in() ? home_url('/akun-saya') : home_url('/login');
+        $is_akun_active = is_page('akun-saya') || is_page('login') || is_page('dashboard-desa') || is_page('dashboard-toko');
+        ?>
+        <a href="<?php echo $akun_link; ?>" class="<?php echo $is_akun_active ? 'active' : ''; ?>">
+            <i class="fas fa-user"></i>
+            <span>Akun</span>
+        </a>
     </nav>
+
+    <!-- Floating Cart Button -->
+    <?php 
+    global $wpdb;
+    $cart_count = 0;
+    $table_cart = $wpdb->prefix . 'dw_cart';
+    if($wpdb->get_var("SHOW TABLES LIKE '$table_cart'") == $table_cart) {
+        $user_id = get_current_user_id();
+        $session_id = session_id();
+        if($user_id) {
+            $cart_count = $wpdb->get_var($wpdb->prepare("SELECT SUM(qty) FROM $table_cart WHERE user_id = %d", $user_id));
+        } else {
+            $cart_count = $wpdb->get_var($wpdb->prepare("SELECT SUM(qty) FROM $table_cart WHERE session_id = %s", $session_id));
+        }
+    }
+    $cart_count = intval($cart_count);
+    ?>
+    <a href="<?php echo home_url('/keranjang'); ?>" class="floating-cart-btn">
+        <span class="cart-icon">
+            <i class="fas fa-shopping-cart"></i>
+        </span>
+        <?php if ( $cart_count > 0 ) : ?>
+            <span class="cart-count"><?php echo $cart_count > 9 ? '9+' : $cart_count; ?></span>
+        <?php endif; ?>
+    </a>
 
 <?php wp_footer(); ?>
 </body>

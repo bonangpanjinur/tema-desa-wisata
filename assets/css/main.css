@@ -203,3 +203,119 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
 }
+/* --- MOBILE NAVIGATION & FLOATING CART --- */
+
+/* Pastikan container navigasi rata */
+.mobile-bottom-nav {
+    display: flex;
+    justify-content: space-around; /* Jarak antar item rata */
+    align-items: center;
+    background: #fff;
+    border-top: 1px solid #eee;
+    height: 60px; /* Tinggi konsisten */
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 999;
+}
+
+/* Reset style untuk item navigasi agar seragam */
+.mobile-bottom-nav a {
+    flex: 1; /* Lebar sama rata */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    color: #666; /* Warna ikon default */
+    font-size: 10px; /* Ukuran font label */
+    background: transparent !important; /* Hapus background khusus */
+    border: none !important; /* Hapus border khusus */
+    height: 100%;
+    padding: 5px 0;
+}
+
+/* Style ikon */
+.mobile-bottom-nav a i, 
+.mobile-bottom-nav a svg {
+    font-size: 20px; /* Ukuran ikon seragam */
+    margin-bottom: 2px;
+    color: #333; /* Warna ikon */
+}
+
+/* State aktif */
+.mobile-bottom-nav a.active,
+.mobile-bottom-nav a:hover {
+    color: #00BA61; /* Menggunakan --primary */
+}
+.mobile-bottom-nav a.active i {
+    color: #00BA61;
+}
+
+@media (max-width: 768px) {
+    /* Sembunyikan keranjang di header mobile */
+    .header-actions {
+        display: none !important;
+    }
+
+    /* Pastikan logo berada di tengah */
+    .site-branding {
+        width: 100%;
+        text-align: center;
+        display: flex;
+        justify-content: center;
+    }
+}
+
+/* Floating Cart Button */
+.floating-cart-btn {
+    position: fixed;
+    top: 20px;     /* Jarak dari atas */
+    right: 20px;   /* Jarak dari kanan */
+    width: 50px;
+    height: 50px;
+    background-color: #ffffff; /* Warna background tombol */
+    border-radius: 50%;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999; /* Pastikan di atas elemen lain */
+    text-decoration: none;
+    transition: transform 0.2s;
+}
+
+.floating-cart-btn i {
+    font-size: 20px;
+    color: #333; /* Warna ikon */
+}
+
+/* Badge Hitungan */
+.floating-cart-btn .cart-count {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background-color: #ff0000; /* Warna badge merah */
+    color: white;
+    font-size: 11px;
+    font-weight: bold;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #fff;
+}
+
+.floating-cart-btn:hover {
+    transform: scale(1.1);
+}
+
+/* Tampilkan hanya di mobile */
+@media (min-width: 769px) {
+    .floating-cart-btn {
+        display: none;
+    }
+}
