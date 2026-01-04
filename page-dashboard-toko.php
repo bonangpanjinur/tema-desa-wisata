@@ -55,6 +55,9 @@ if (!$pedagang) {
     exit;
 }
 
+// Placeholder for YouTube Player
+echo '<div id="yt-player" style="display:none;"></div>';
+
 $msg = '';
 $msg_type = '';
 
@@ -1685,7 +1688,62 @@ get_header();
 // --- REAL-TIME ORDER NOTIFICATION LOGIC ---
 let lastOrderId = <?php echo !empty($order_list) ? $order_list[0]->id : 0; ?>;
 const pedagangId = <?php echo $pedagang->id; ?>;
-const notificationSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3' );
+<?php 
+$yt_link = get_option('dw_order_notification_youtube');
+$is_youtube = false;
+$audio_src = 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3';
+
+if (!empty($yt_link)) {
+    // Extract video ID
+    preg_match('%(?:youtube(?:-nocookie)?\.com/(?:[^/]+/.+/|(?:v|e(?:mbed)?)/|.*[?&]v=)|youtu\.be/)([^"&?/ ]{11})%i', $yt_link, $match);
+    if (isset($match[1])) {
+        $video_id = $match[1];
+        $is_youtube = true;
+    }
+}
+?>
+
+let notificationSound;
+let isYoutube = <?php echo $is_youtube ? 'true' : 'false'; ?>;
+
+if (isYoutube) {
+    // Load YouTube IFrame API
+    var tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    var firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+    var player;
+    window.onYouTubeIframeAPIReady = function() {
+        player = new YT.Player('yt-player', {
+            height: '0',
+            width: '0',
+            videoId: '<?php echo $video_id; ?>',
+            playerVars: {
+                'autoplay': 0,
+                'controls': 0
+            },
+            events: {
+                'onReady': onPlayerReady
+            }
+        });
+    };
+
+    function onPlayerReady(event) {
+        console.log("YouTube Player Ready");
+    }
+} else {
+    notificationSound = new Audio('<?php echo $audio_src; ?>');
+}
+
+function playNotification() {
+    if (isYoutube && player && typeof player.playVideo === 'function') {
+        player.seekTo(0);
+        player.playVideo();
+    } else if (notificationSound) {
+        notificationSound.play().catch(e => console.log("Interaksi user diperlukan untuk suara"));
+    }
+}
 
 function checkNewOrders() {
     $.ajax({
@@ -1701,7 +1759,7 @@ function checkNewOrders() {
                 const data = response.data;
                 if (data.new_orders.length > 0) {
                     // Mainkan suara & update ID terakhir
-                    notificationSound.play().catch(e => console.log("Interaksi user diperlukan untuk suara"));
+                    playNotification();
                     lastOrderId = data.latest_id;
                     
                     // Render baris baru
