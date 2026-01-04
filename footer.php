@@ -72,14 +72,23 @@
             <span>Beranda</span>
         </a>
 
-        <a href="<?php echo home_url('/transaksi'); ?>" class="<?php echo is_page('transaksi') ? 'active' : ''; ?>">
-            <i class="fas fa-receipt"></i>
-            <span>Transaksi</span>
+        <a href="<?php echo home_url('/wisata'); ?>" class="<?php echo is_post_type_archive('dw_wisata') || is_singular('dw_wisata') ? 'active' : ''; ?>">
+            <i class="fas fa-map-marked-alt"></i>
+            <span>Wisata</span>
         </a>
 
         <a href="<?php echo home_url('/produk'); ?>" class="<?php echo is_post_type_archive('dw_produk') || is_singular('dw_produk') ? 'active' : ''; ?>">
-            <i class="fas fa-box"></i>
+            <i class="fas fa-shopping-basket"></i>
             <span>Produk</span>
+        </a>
+
+        <?php 
+        $fav_link = is_user_logged_in() ? home_url('/akun-saya?tab=favorites') : home_url('/login');
+        $is_fav_active = (isset($_GET['tab']) && $_GET['tab'] == 'favorites');
+        ?>
+        <a href="<?php echo $fav_link; ?>" class="<?php echo $is_fav_active ? 'active' : ''; ?>">
+            <i class="fas fa-heart"></i>
+            <span>Favorit</span>
         </a>
 
         <?php 
