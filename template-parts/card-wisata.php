@@ -38,7 +38,7 @@ if (stripos($kategori, 'alam') !== false) $badge_bg = 'bg-green-100 text-green-6
     <!-- Konten -->
     <div class="p-4 flex flex-col flex-grow">
         <div class="text-xs text-gray-500 mb-1 flex items-center gap-1">
-            <i class="fas fa-map-marker-alt text-red-400"></i> <?php echo $desa; ?>
+            <i class="fas fa-map-marker-alt text-red-400"></i> <?php echo esc_html($desa); ?>
         </div>
         
         <h3 class="text-lg font-bold text-gray-800 mb-2 leading-tight line-clamp-2 group-hover:text-primary transition-colors">
@@ -48,7 +48,7 @@ if (stripos($kategori, 'alam') !== false) $badge_bg = 'bg-green-100 text-green-6
         <div class="mt-auto pt-3 border-t border-gray-50 flex items-center justify-between">
             <div>
                 <span class="text-[10px] text-gray-400 block">Harga Tiket</span>
-                <span class="font-bold text-primary"><?php echo $harga; ?></span>
+                <span class="font-bold text-primary"><?php echo esc_html($harga); ?></span>
             </div>
             <?php if ($rating > 0): ?>
             <div class="flex items-center gap-1 text-xs font-bold text-gray-700">

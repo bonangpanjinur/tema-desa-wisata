@@ -4,8 +4,18 @@
  * Description: Panel untuk driver ojek wisata.
  */
 
-if (!is_user_logged_in()) {
-    wp_redirect(home_url('/login'));
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
+if ( ! is_user_logged_in() ) {
+    wp_safe_redirect( wp_login_url( get_permalink() ) );
+    exit;
+}
+
+// Cek capability khusus ojek
+if ( ! current_user_can( 'dw_view_orders' ) && ! current_user_can( 'administrator' ) ) {
+    wp_safe_redirect( home_url() );
     exit;
 }
 get_header(); 

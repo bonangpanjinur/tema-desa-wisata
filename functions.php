@@ -66,7 +66,8 @@ function tema_dw_scripts() {
 
     wp_localize_script('tema-dw-main', 'dw_ajax', array(
         'ajax_url' => admin_url('admin-ajax.php'),
-        'nonce'    => wp_create_nonce('dw_cart_nonce')
+        'nonce'    => wp_create_nonce('dw_cart_nonce'),
+        'ojek_nonce' => wp_create_nonce('dw_ojek_action')
     ));
     
     wp_localize_script('tema-dw-main', 'dwData', array(
@@ -151,6 +152,43 @@ function dw_add_roles() {
     add_role( 'pengelola_ojek', 'Pengelola Ojek', array( 'read' => true ) );
 }
 add_action( 'init', 'dw_add_roles' );
+
+/**
+ * ==============================================================================
+ * 2.5. SECURE AJAX HANDLERS
+ * ==============================================================================
+ */
+
+add_action('wp_ajax_dw_ojek_ambil_order', 'dw_ajax_ojek_ambil_order_secure');
+function dw_ajax_ojek_ambil_order_secure() {
+    // 1. Cek Nonce
+    check_ajax_referer( 'dw_ojek_action', 'security' );
+
+    // 2. Cek Capability (Harus Role Ojek atau punya capability bid)
+    if ( ! current_user_can( 'dw_view_orders' ) && ! current_user_can( 'administrator' ) ) {
+        wp_send_json_error( ['message' => 'Akses ditolak. Anda bukan Ojek resmi.'] );
+    }
+
+    global $wpdb;
+    $trx_id = isset($_POST['order_id']) ? intval($_POST['order_id']) : 0;
+    $user_id = get_current_user_id();
+
+    // 3. Logic: Update status transaksi jadi 'menunggu_penjemputan'
+    $table_trx = $wpdb->prefix . 'dw_transaksi';
+    
+    // Pastikan order masih available (status_transaksi = 'menunggu_driver')
+    $updated = $wpdb->query( $wpdb->prepare( 
+        "UPDATE $table_trx SET status_transaksi = 'menunggu_penjemputan', ojek_data = %s WHERE id = %d AND status_transaksi = 'menunggu_driver'", 
+        json_encode(['driver_id' => $user_id, 'timestamp' => time()]), 
+        $trx_id 
+    ));
+
+    if ( $updated ) {
+        wp_send_json_success( ['message' => 'Order berhasil diambil!'] );
+    } else {
+        wp_send_json_error( ['message' => 'Order sudah diambil driver lain atau tidak valid.'] );
+    }
+}
 
 /**
  * ==============================================================================

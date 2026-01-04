@@ -71,7 +71,7 @@ if (strlen($lokasi) > 20) $lokasi = substr($lokasi, 0, 18) . '...';
         <div class="flex items-end justify-between pt-2 border-t border-gray-50 mt-1">
             <div class="flex flex-col">
                 <span class="text-[10px] text-gray-400">Harga</span>
-                <div class="text-base font-bold text-primary leading-none"><?php echo $harga; ?></div>
+                <div class="text-base font-bold text-primary leading-none"><?php echo esc_html($harga); ?></div>
             </div>
 
             <!-- TOMBOL ADD TO CART (DIPERBAIKI) -->

@@ -39,12 +39,27 @@ jQuery(document).ready(function($) {
         });
     });
 
-    // Handle Ambil Order (Simulasi)
+    // Handle Ambil Order (Secure)
     $('.btn-ambil-order').on('click', function() {
-        const orderId = $(this).data('id');
+        var orderId = $(this).data('id');
         if(confirm('Ambil order #' + orderId + '?')) {
-            alert('Fitur Ambil Order akan dihubungkan ke Plugin Logic (dw_assign_order).');
-            // Di sini nanti panggil AJAX untuk assign order ke user ID
+            $.ajax({
+                url: dw_ajax.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'dw_ojek_ambil_order',
+                    order_id: orderId,
+                    security: dw_ajax.ojek_nonce // Nonce dari wp_localize_script
+                },
+                success: function(res) {
+                    if(res.success) {
+                        alert(res.data.message);
+                        location.reload();
+                    } else {
+                        alert(res.data.message);
+                    }
+                }
+            });
         }
     });
 });

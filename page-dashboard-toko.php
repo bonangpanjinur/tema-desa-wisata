@@ -6,9 +6,20 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
 // 1. Cek Login
 if ( ! is_user_logged_in() ) {
-    wp_redirect( wp_login_url() );
+    wp_safe_redirect( wp_login_url( get_permalink() ) );
+    exit;
+}
+
+// Cek capability khusus pedagang
+if ( ! current_user_can( 'dw_manage_pesanan' ) && ! current_user_can( 'administrator' ) ) {
+    // Redirect user biasa kembali ke home atau halaman akun
+    wp_safe_redirect( home_url('/akun-saya/') );
     exit;
 }
 
