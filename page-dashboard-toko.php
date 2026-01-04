@@ -6,10 +6,6 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-if ( ! defined( 'ABSPATH' ) ) {
-    exit;
-}
-
 // 1. Cek Login
 if ( ! is_user_logged_in() ) {
     wp_safe_redirect( wp_login_url( get_permalink() ) );
@@ -55,7 +51,7 @@ if (!$pedagang) {
     exit;
 }
 
-// Placeholder for YouTube Player
+// Placeholder for YouTube Player (Hidden but required for API)
 echo '<div id="yt-player" style="display:none;"></div>';
 
 $msg = '';
@@ -173,24 +169,28 @@ if ( isset($_POST['dw_action']) && $_POST['dw_action'] == 'save_store_settings' 
         // 2. Alamat & Wilayah
         $update_data['alamat_lengkap'] = sanitize_textarea_field($_POST['alamat_lengkap']);
         $update_data['kode_pos']       = sanitize_text_field($_POST['kode_pos']);
+        $update_data['url_gmaps']      = esc_url_raw($_POST['url_gmaps']);
         
-        // 2.1 Nada Pesanan
+        // 2.1 Nada Pesanan (Custom Order Notification)
         if (isset($_POST['order_notification_type'])) {
-            $update_data['order_notification_type'] = sanitize_text_field($_POST['order_notification_type']);
-            if ($update_data['order_notification_type'] == 'youtube') {
+            $notif_type = sanitize_text_field($_POST['order_notification_type']);
+            $update_data['order_notification_type'] = $notif_type;
+
+            if ($notif_type == 'youtube') {
                 $update_data['order_notification_sound'] = esc_url_raw($_POST['order_notification_youtube']);
-            } elseif ($update_data['order_notification_type'] == 'upload') {
+            } elseif ($notif_type == 'upload') {
+                // Handle file upload
                 if (!empty($_FILES['order_notification_file']['name'])) {
                     $uploaded_file = wp_handle_upload($_FILES['order_notification_file'], ['test_form' => false]);
-                    if (isset($uploaded_file['url'])) {
+                    if (isset($uploaded_file['url']) && !isset($uploaded_file['error'])) {
                         $update_data['order_notification_sound'] = $uploaded_file['url'];
                     }
                 }
             } else {
+                // Default
                 $update_data['order_notification_sound'] = NULL;
             }
         }
-        $update_data['url_gmaps']      = esc_url_raw($_POST['url_gmaps']);
         
         $update_data['provinsi_nama']  = sanitize_text_field($_POST['provinsi_nama']);
         $update_data['kabupaten_nama'] = sanitize_text_field($_POST['kabupaten_nama']);
@@ -283,7 +283,7 @@ if ( isset($_POST['dw_action']) && $_POST['dw_action'] == 'save_store_settings' 
         if(isset($update_data['api_kecamatan_id'])) update_user_meta($current_user_id, 'api_kecamatan_id', $update_data['api_kecamatan_id']);
         if(isset($update_data['api_kelurahan_id'])) update_user_meta($current_user_id, 'api_kelurahan_id', $update_data['api_kelurahan_id']);
 
-        $msg = "Pengaturan toko & ongkir berhasil diperbarui.";
+        $msg = "Pengaturan toko & notifikasi berhasil diperbarui.";
         $msg_type = "success";
         
         // Refresh Data Object
@@ -371,11 +371,11 @@ if ( isset($_POST['dw_action']) && $_POST['dw_action'] == 'save_product' ) {
                 foreach ($var_nama as $k => $nm) {
                     if (!empty($nm)) {
                         $wpdb->insert($table_variasi, [
-                            'id_produk'          => $prod_id,
+                            'id_produk'         => $prod_id,
                             'deskripsi_variasi' => sanitize_text_field($nm),
-                            'harga_variasi'      => floatval($var_harga[$k]),
-                            'stok_variasi'       => intval($var_stok[$k]),
-                            'is_default'         => ($k === 0) ? 1 : 0
+                            'harga_variasi'     => floatval($var_harga[$k]),
+                            'stok_variasi'      => intval($var_stok[$k]),
+                            'is_default'        => ($k === 0) ? 1 : 0
                         ]);
                     }
                 }
@@ -411,7 +411,7 @@ if (isset($_POST['beli_paket']) && isset($_POST['paket_nonce']) && wp_verify_non
                 'harga_paket' => $paket->harga,
                 'jumlah_transaksi' => $paket->jumlah_transaksi,
                 'persentase_komisi_referrer' => 5, // Default percentage
-                'url_bukti_bayar' => $upload['url'],
+                'bukti_pembayaran' => $upload['url'],
                 'status' => 'pending',
                 'created_at' => current_time('mysql')
             ]);
@@ -1025,7 +1025,7 @@ get_header();
                     <thead class="bg-gray-50 text-gray-500 uppercase text-[11px] tracking-wider border-b border-gray-100">
                         <tr><th class="p-4 font-bold">Tanggal</th><th class="p-4 font-bold">Paket</th><th class="p-4 font-bold">Harga</th><th class="p-4 font-bold text-right">Status</th></tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-50">
+                    <tbody class="divide-y divide-gray-5,">
                         <?php if($histori_paket): foreach($histori_paket as $h): 
                             $st_color = ($h->status=='disetujui') ? 'bg-green-100 text-green-700' : (($h->status=='ditolak') ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'); 
                         ?>
@@ -1734,8 +1734,6 @@ get_header();
         $('#group-youtube').toggleClass('hidden', val !== 'youtube');
     });
 
-//notifikasi pesanan
-
 // --- REAL-TIME ORDER NOTIFICATION LOGIC ---
 let lastOrderId = <?php echo !empty($order_list) ? $order_list[0]->id : 0; ?>;
 const pedagangId = <?php echo $pedagang->id; ?>;
@@ -1920,7 +1918,6 @@ function getStatusBadgeJS(status) {
 
 // Cek setiap 30 detik
 setInterval(checkNewOrders, 30000);
-
 
 </script>
 
