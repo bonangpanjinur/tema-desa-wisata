@@ -723,6 +723,8 @@ foreach ($items as $item) {
 
         function calculateShippingAll() {
             let totalOngkir = 0;
+            let hasNonPickup = false; // Flag cek metode selain pickup
+            
             const userKecId = kec.value; 
             const userKelId = kel.value;
 
@@ -734,6 +736,11 @@ foreach ($items as $item) {
                 
                 let cost = 0;
                 let note = 'Gratis';
+
+                // Cek metode pengiriman untuk validasi pembayaran Tunai
+                if(sel.value !== 'pickup' && sel.value !== '') {
+                    hasNonPickup = true;
+                }
 
                 if(sel.value === 'pickup') {
                     cost = 0;
@@ -786,6 +793,50 @@ foreach ($items as $item) {
 
             dispOngkir.innerText = formatRupiah(totalOngkir);
             dispTotal.innerText = formatRupiah(baseTotalBarang + totalOngkir);
+
+            // --- LOGIKA DISABLE TUNAI ---
+            // Cari radio button tunai
+            const radioTunai = document.querySelector('input[name="payment_method"][value="tunai"]');
+            
+            if(radioTunai) {
+                // Cari elemen visual pembungkus radio button
+                // Structure: label > input + div
+                const visualDiv = radioTunai.nextElementSibling; 
+                const parentLabel = radioTunai.closest('label');
+                
+                if(hasNonPickup) {
+                    // Disable Tunai
+                    radioTunai.disabled = true;
+                    
+                    // Jika sebelumnya terpilih, pindahkan ke Transfer
+                    if(radioTunai.checked) {
+                        const radioTransfer = document.querySelector('input[name="payment_method"][value="transfer"]');
+                        if(radioTransfer) radioTransfer.checked = true;
+                    }
+
+                    // Update UI Visual agar terlihat disabled
+                    if(visualDiv) {
+                        visualDiv.classList.add('opacity-50', 'bg-gray-100');
+                        visualDiv.classList.remove('hover:bg-gray-50');
+                    }
+                    if(parentLabel) {
+                        parentLabel.classList.add('cursor-not-allowed');
+                        parentLabel.title = "Metode Tunai hanya tersedia untuk Ambil Sendiri";
+                    }
+                } else {
+                    // Enable Tunai
+                    radioTunai.disabled = false;
+                    
+                    if(visualDiv) {
+                        visualDiv.classList.remove('opacity-50', 'bg-gray-100');
+                        visualDiv.classList.add('hover:bg-gray-50');
+                    }
+                    if(parentLabel) {
+                        parentLabel.classList.remove('cursor-not-allowed');
+                        parentLabel.title = "";
+                    }
+                }
+            }
         }
 
         dropdowns.forEach(s => s.addEventListener('change', calculateShippingAll));
