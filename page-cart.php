@@ -168,16 +168,19 @@ if ($cart_items) {
                                     <!-- Actions: Qty & Delete -->
                                     <div class="flex justify-between items-end mt-3">
                                         <?php if(!$is_out_of_stock): ?>
-                                        <div class="flex items-center border border-gray-300 rounded-lg bg-white h-8 w-28 shadow-sm">
+                                        <div class="flex items-center border border-gray-300 rounded-lg bg-white h-8 w-28 shadow-sm transition-all focus-within:border-green-500 focus-within:ring-1 focus-within:ring-green-500">
                                             <button type="button" class="btn-qty w-8 h-full flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-l-lg transition active:bg-gray-200" onclick="updateCartQty(<?php echo $item->cart_id; ?>, -1)">-</button>
+                                            
+                                            <!-- Tambahkan data-id agar bisa di-trigger event change -->
                                             <input type="number" 
                                                    class="input-qty w-full h-full text-center border-none text-sm font-bold text-gray-800 p-0 focus:ring-0 appearance-none bg-transparent" 
                                                    id="qty-<?php echo $item->cart_id; ?>"
+                                                   data-id="<?php echo $item->cart_id; ?>"
                                                    value="<?php echo $item->qty; ?>" 
                                                    min="1" 
                                                    max="<?php echo $item->final_stock; ?>"
-                                                   readonly
                                             >
+                                            
                                             <button type="button" class="btn-qty w-8 h-full flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-r-lg transition active:bg-gray-200" onclick="updateCartQty(<?php echo $item->cart_id; ?>, 1)">+</button>
                                         </div>
                                         <?php else: ?>
@@ -243,12 +246,9 @@ if ($cart_items) {
 
 <!-- === CONFIRMATION MODAL === -->
 <div id="confirm-modal" class="fixed inset-0 z-[60] hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-    <!-- Backdrop -->
     <div class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0 modal-backdrop"></div>
-
     <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
         <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
-            <!-- Modal Panel -->
             <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-md opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95 modal-panel">
                 <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
                     <div class="sm:flex sm:items-start">
@@ -277,7 +277,6 @@ if ($cart_items) {
 </div>
 
 <!-- INLINE SCRIPT HANDLER -->
-<!-- Catatan: ajax-cart.js tidak perlu di-enqueue lagi disini jika sudah di functions.php -->
 <script>
     // Config dari PHP ke JS (PENTING)
     const dwCartConfig = {
@@ -289,7 +288,9 @@ if ($cart_items) {
     // --- LOGIC JS CART ---
     document.addEventListener('DOMContentLoaded', function() {
         const $ = jQuery;
-        let updateTimer; // Timer untuk debounce
+        
+        // PENTING: Timer harus OBJECT agar bisa debounce per item, bukan global
+        const updateTimers = {}; 
         
         // --- 0. MODAL LOGIC ---
         const modal = document.getElementById('confirm-modal');
@@ -341,27 +342,40 @@ if ($cart_items) {
 
         cancelBtn.addEventListener('click', hideModal);
         
-        // --- 1. UPDATE QTY (Debounced AJAX) ---
+        // --- 1. UPDATE QTY (Debounced AJAX PER ITEM) ---
         window.updateCartQty = function(cartId, change) {
             const input = document.getElementById(`qty-${cartId}`);
-            let newQty = parseInt(input.value) + change;
-            const max = parseInt(input.getAttribute('max'));
+            
+            // Ambil nilai saat ini dari input, bukan dari atribut value HTML lama
+            let currentVal = parseInt(input.value) || 0;
+            let newQty = currentVal + change;
+            
+            // Validasi jika dipanggil dari onchange (change = 0)
+            if(change === 0) newQty = currentVal;
 
-            if (newQty < 1) return;
+            const max = parseInt(input.getAttribute('max')) || 999;
+
+            if (newQty < 1) newQty = 1;
             if (newQty > max) {
-                showToast('Stok maksimal tercapai', 'error');
-                return;
+                showToast('Stok maksimal tercapai (' + max + ')', 'error');
+                newQty = max;
             }
 
-            // 1. Optimistic UI Update (Update tampilan dulu)
+            // 1. Optimistic UI Update (Update tampilan langsung)
             input.value = newQty;
             const checkbox = document.querySelector(`input[value="${cartId}"]`);
             if(checkbox) checkbox.dataset.qty = newQty;
+            
+            // Tambahkan efek visual "Saving..."
+            const container = input.closest('.flex');
+            if(container) container.classList.add('opacity-50');
+
             recalculateTotal(); 
 
-            // 2. Debounce AJAX call (Mencegah spam request ke server)
-            clearTimeout(updateTimer);
-            updateTimer = setTimeout(() => {
+            // 2. Debounce AJAX call per Item ID
+            if(updateTimers[cartId]) clearTimeout(updateTimers[cartId]);
+
+            updateTimers[cartId] = setTimeout(() => {
                 $.ajax({
                     url: dwCartConfig.ajaxUrl,
                     type: 'POST',
@@ -372,27 +386,37 @@ if ($cart_items) {
                         nonce: dwCartConfig.nonce
                     },
                     success: function(res) {
+                        if(container) container.classList.remove('opacity-50');
+                        
                         if(res.success) {
-                            // Opsional: Tampilkan indikator kecil "Disimpan"
-                            // console.log('Qty updated on server');
+                            // Opsional: console.log('Saved');
                         } else {
                             showToast(res.data.message, 'error');
-                            // Revert jika gagal
-                            input.value = newQty - change; 
-                            if(checkbox) checkbox.dataset.qty = newQty - change;
+                            // Revert visual jika gagal
+                            input.value = currentVal; 
+                            if(checkbox) checkbox.dataset.qty = currentVal;
                             recalculateTotal();
                         }
                     },
                     error: function() {
+                        if(container) container.classList.remove('opacity-50');
                         showToast('Gagal terhubung ke server', 'error');
-                        input.value = newQty - change; // Revert
+                        // Revert
+                        input.value = currentVal;
                         recalculateTotal();
                     }
                 });
-            }, 500); // Tunggu 500ms setelah klik terakhir sebelum kirim ke server
+            }, 600); // 600ms debounce
         };
 
-        // --- 2. DELETE SINGLE ITEM (FIXED) ---
+        // Event listener untuk input manual (typing)
+        $('.input-qty').on('change', function() {
+            const id = $(this).data('id');
+            // Panggil update dengan change = 0 untuk trigger validasi & save
+            updateCartQty(id, 0); 
+        });
+
+        // --- 2. DELETE SINGLE ITEM ---
         window.deleteCartItem = function(cartId) {
             showConfirmModal('Apakah Anda yakin ingin menghapus item ini dari keranjang?', async function() {
                 return new Promise((resolve) => {
@@ -406,9 +430,8 @@ if ($cart_items) {
                         },
                         success: function(res) {
                             if(res.success) {
-                                // Manual Remove Logic yang lebih kuat
                                 const $itemRow = $(`#cart-item-${cartId}`);
-                                $itemRow.css('opacity', '0').css('transform', 'scale(0.9)');
+                                $itemRow.css('transition', 'all 0.3s ease').css('opacity', '0').css('transform', 'scale(0.9)');
                                 setTimeout(() => {
                                     $itemRow.remove();
                                     checkEmptyState();
