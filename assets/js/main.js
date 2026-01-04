@@ -11,7 +11,7 @@ jQuery(document).ready(function($) {
        ========================================= */
     
     // Mengambil variabel dari wp_localize_script di functions.php
-    const AJAX_URL = (typeof dw_ajax !== 'undefined') ? dw_ajax.ajax_url : '';
+    const AJAX_URL = (typeof dw_ajax !== 'undefined') ? dw_ajax.ajax_url : ((typeof dwData !== 'undefined') ? dwData.home_url + '/wp-admin/admin-ajax.php' : '');
     const NONCE = (typeof dw_ajax !== 'undefined') ? dw_ajax.nonce : '';
     
     // API Setup untuk Merchant (Opsional jika pakai REST API terpisah)
@@ -75,6 +75,27 @@ jQuery(document).ready(function($) {
             },
             success: function(response) {
                 btn.removeClass('loading opacity-50');
+                
+                if (!response.success && response.data && response.data.message === 'Silakan login terlebih dahulu') {
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            icon: 'info',
+                            title: 'Login Diperlukan',
+                            text: 'Silakan login untuk menyimpan favorit.',
+                            showCancelButton: true,
+                            confirmButtonText: 'Login Sekarang',
+                            cancelButtonText: 'Nanti Saja'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                window.location.href = (typeof dw_ajax !== 'undefined' && dw_ajax.login_url) ? dw_ajax.login_url : '/login';
+                            }
+                        });
+                    } else {
+                        alert('Silakan login untuk menyimpan favorit.');
+                    }
+                    return;
+                }
+
                 if (response.success) {
                     const data = response.data;
                     if (data.action === 'added') {

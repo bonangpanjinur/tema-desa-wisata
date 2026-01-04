@@ -140,7 +140,8 @@ function get_cat_color_fav($cat) {
 function removeWishlist(id) {
     if(!confirm('Hapus wisata ini dari favorit?')) return;
 
-    jQuery.post(dw_ajax.ajax_url, {
+    const ajaxUrl = (typeof dw_ajax !== 'undefined') ? dw_ajax.ajax_url : '/wp-admin/admin-ajax.php';
+    jQuery.post(ajaxUrl, {
         action: 'dw_toggle_favorite',
         object_id: id,
         type: 'wisata'

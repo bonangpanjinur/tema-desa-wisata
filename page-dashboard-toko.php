@@ -173,6 +173,23 @@ if ( isset($_POST['dw_action']) && $_POST['dw_action'] == 'save_store_settings' 
         // 2. Alamat & Wilayah
         $update_data['alamat_lengkap'] = sanitize_textarea_field($_POST['alamat_lengkap']);
         $update_data['kode_pos']       = sanitize_text_field($_POST['kode_pos']);
+        
+        // 2.1 Nada Pesanan
+        if (isset($_POST['order_notification_type'])) {
+            $update_data['order_notification_type'] = sanitize_text_field($_POST['order_notification_type']);
+            if ($update_data['order_notification_type'] == 'youtube') {
+                $update_data['order_notification_sound'] = esc_url_raw($_POST['order_notification_youtube']);
+            } elseif ($update_data['order_notification_type'] == 'upload') {
+                if (!empty($_FILES['order_notification_file']['name'])) {
+                    $uploaded_file = wp_handle_upload($_FILES['order_notification_file'], ['test_form' => false]);
+                    if (isset($uploaded_file['url'])) {
+                        $update_data['order_notification_sound'] = $uploaded_file['url'];
+                    }
+                }
+            } else {
+                $update_data['order_notification_sound'] = NULL;
+            }
+        }
         $update_data['url_gmaps']      = esc_url_raw($_POST['url_gmaps']);
         
         $update_data['provinsi_nama']  = sanitize_text_field($_POST['provinsi_nama']);
@@ -1201,7 +1218,35 @@ get_header();
                                 </div>
                             </div>
 
-                            <div class="sticky bottom-6 z-20 text-right">
+                            <!-- NADA PESANAN -->
+                            <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mt-8">
+                                <h3 class="font-bold text-gray-900 mb-6 border-b border-gray-100 pb-4 flex items-center gap-2 text-sm uppercase tracking-wide"><i class="fas fa-volume-up text-primary"></i> Nada Pesanan Masuk</h3>
+                                <div class="space-y-5">
+                                    <div>
+                                        <label class="text-xs font-bold text-gray-500 uppercase mb-1.5 block">Tipe Nada</label>
+                                        <select name="order_notification_type" id="order_notification_type" class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none">
+                                            <option value="default" <?php selected($pedagang->order_notification_type, 'default'); ?>>Default Sistem</option>
+                                            <option value="upload" <?php selected($pedagang->order_notification_type, 'upload'); ?>>Upload File (MP3/MP4)</option>
+                                            <option value="youtube" <?php selected($pedagang->order_notification_type, 'youtube'); ?>>Link YouTube</option>
+                                        </select>
+                                    </div>
+
+                                    <div id="group-upload" class="<?php echo $pedagang->order_notification_type == 'upload' ? '' : 'hidden'; ?>">
+                                        <label class="text-xs font-bold text-gray-500 uppercase mb-1.5 block">Upload File Audio/Video</label>
+                                        <input type="file" name="order_notification_file" accept="audio/*,video/*" class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none">
+                                        <?php if ($pedagang->order_notification_type == 'upload' && $pedagang->order_notification_sound): ?>
+                                            <p class="text-[10px] text-gray-400 mt-2">File saat ini: <a href="<?php echo esc_url($pedagang->order_notification_sound); ?>" target="_blank" class="text-primary underline">Lihat File</a></p>
+                                        <?php endif; ?>
+                                    </div>
+
+                                    <div id="group-youtube" class="<?php echo $pedagang->order_notification_type == 'youtube' ? '' : 'hidden'; ?>">
+                                        <label class="text-xs font-bold text-gray-500 uppercase mb-1.5 block">Link YouTube</label>
+                                        <input type="text" name="order_notification_youtube" value="<?php echo $pedagang->order_notification_type == 'youtube' ? esc_attr($pedagang->order_notification_sound) : ''; ?>" placeholder="https://www.youtube.com/watch?v=xxxx" class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="sticky bottom-6 z-20 text-right mt-8">
                                 <button type="submit" class="bg-gray-900 text-white font-bold py-4 px-10 rounded-2xl shadow-xl hover:bg-black transition-all transform hover:-translate-y-1 w-full md:w-auto flex items-center justify-center gap-2 ml-auto" id="btn-save-settings">
                                     <i class="fas fa-save"></i> <span>Simpan Perubahan</span>
                                 </button>
@@ -1683,22 +1728,43 @@ get_header();
     function printQRList() { const c=$('#qr-result-container').html(), w=window.open('','','height=700,width=900'); w.document.write('<html><head><title>QR Meja</title><link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"></head><body class="p-8"><div class="mb-4 text-center"><h1 class="text-2xl font-bold">QR Code Meja</h1><p><?php echo esc_js($pedagang->nama_toko); ?></p></div>'+c+'</body></html>'); w.document.close(); setTimeout(()=>w.print(),500); }
     function copyToClipboard(t) { navigator.clipboard.writeText(t).then(()=>alert('Disalin!')).catch(()=>alert('Gagal salin')); }
 
+    $('#order_notification_type').change(function(){
+        const val = $(this).val();
+        $('#group-upload').toggleClass('hidden', val !== 'upload');
+        $('#group-youtube').toggleClass('hidden', val !== 'youtube');
+    });
+
 //notifikasi pesanan
 
 // --- REAL-TIME ORDER NOTIFICATION LOGIC ---
 let lastOrderId = <?php echo !empty($order_list) ? $order_list[0]->id : 0; ?>;
 const pedagangId = <?php echo $pedagang->id; ?>;
 <?php 
-$yt_link = get_option('dw_order_notification_youtube');
-$is_youtube = false;
-$audio_src = 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3';
+// 1. Ambil Pengaturan (Prioritas: Toko > Global)
+$sound_type = $pedagang->order_notification_type ?: 'default';
+$sound_url  = $pedagang->order_notification_sound;
 
-if (!empty($yt_link)) {
-    // Extract video ID
-    preg_match('%(?:youtube(?:-nocookie)?\.com/(?:[^/]+/.+/|(?:v|e(?:mbed)?)/|.*[?&]v=)|youtu\.be/)([^"&?/ ]{11})%i', $yt_link, $match);
+if ($sound_type === 'default' || empty($sound_url)) {
+    $sound_type = get_option('dw_default_order_sound_type', 'default');
+    $sound_url  = get_option('dw_default_order_sound_url');
+}
+
+// Jika masih default atau kosong, gunakan fallback YouTube lama (untuk kompatibilitas)
+if ($sound_type === 'default' && empty($sound_url)) {
+    $sound_url = get_option('dw_order_notification_youtube');
+    if (!empty($sound_url)) $sound_type = 'youtube';
+}
+
+$is_youtube = ($sound_type === 'youtube');
+$audio_src = ($sound_type === 'upload' && !empty($sound_url)) ? $sound_url : 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3';
+
+$video_id = '';
+if ($is_youtube && !empty($sound_url)) {
+    preg_match('%(?:youtube(?:-nocookie)?\.com/(?:[^/]+/.+/|(?:v|e(?:mbed)?)/|.*[?&]v=)|youtu\.be/)([^"&?/ ]{11})%i', $sound_url, $match);
     if (isset($match[1])) {
         $video_id = $match[1];
-        $is_youtube = true;
+    } else {
+        $is_youtube = false; // Fallback jika link youtube tidak valid
     }
 }
 ?>
