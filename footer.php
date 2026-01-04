@@ -66,27 +66,22 @@
     </footer>
 
     <!-- MOBILE BOTTOM NAVIGATION BAR (App Like Experience) -->
-    <!-- Fixed di bawah, hanya muncul di layar < 768px (md) -->
-    <nav class="mobile-bottom-nav md:hidden pb-safe">
-        <!-- 1. Beranda -->
+    <nav class="mobile-bottom-nav md:hidden">
         <a href="<?php echo home_url(); ?>" class="<?php echo is_front_page() ? 'active' : ''; ?>">
             <i class="fas fa-home"></i>
             <span>Beranda</span>
         </a>
 
-        <!-- 2. Wisata -->
         <a href="<?php echo home_url('/wisata'); ?>" class="<?php echo is_post_type_archive('dw_wisata') || is_singular('dw_wisata') ? 'active' : ''; ?>">
             <i class="fas fa-map-marked-alt"></i>
             <span>Wisata</span>
         </a>
 
-        <!-- 3. Produk -->
         <a href="<?php echo home_url('/produk'); ?>" class="<?php echo is_post_type_archive('dw_produk') || is_singular('dw_produk') ? 'active' : ''; ?>">
             <i class="fas fa-shopping-basket"></i>
             <span>Produk</span>
         </a>
 
-        <!-- 4. Favorit -->
         <?php 
         $fav_link = is_user_logged_in() ? home_url('/akun-saya?tab=favorites') : home_url('/login');
         $is_fav_active = (isset($_GET['tab']) && $_GET['tab'] == 'favorites');
@@ -96,7 +91,6 @@
             <span>Favorit</span>
         </a>
 
-        <!-- 5. Akun -->
         <?php 
         $akun_link = is_user_logged_in() ? home_url('/akun-saya') : home_url('/login');
         $is_akun_active = is_page('akun-saya') || is_page('login') || is_page('dashboard-desa') || is_page('dashboard-toko');
