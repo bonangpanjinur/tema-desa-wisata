@@ -7,24 +7,28 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-if ( ! defined( 'ABSPATH' ) ) {
-    exit;
-} // Exit if accessed directly
-
 // 1. Cek Login
 if ( ! is_user_logged_in() ) {
     wp_safe_redirect( wp_login_url( get_permalink() ) );
     exit;
 }
 
-// 2. Cek Hak Akses Spesifik (Lebih aman daripada cek Role)
-// Menggunakan capability 'dw_manage_desa' dari plugin core
-if ( ! current_user_can( 'dw_manage_desa' ) && ! current_user_can( 'administrator' ) ) {
-    wp_die( 'Maaf, Anda tidak memiliki akses ke Dashboard Desa.', 'Akses Ditolak', 403 );
+// 2. Cek Hak Akses (PERBAIKAN: Cek Role Eksplisit + Capability)
+$current_user = wp_get_current_user();
+$roles        = ( array ) $current_user->roles;
+
+// Izinkan jika user adalah 'administrator', 'admin_desa', 'desa', ATAU memiliki kapabilitas 'dw_manage_desa'
+if ( ! in_array( 'administrator', $roles ) && 
+     ! in_array( 'admin_desa', $roles ) && 
+     ! in_array( 'desa', $roles ) && 
+     ! current_user_can( 'dw_manage_desa' ) ) {
+    
+    // Redirect ke halaman akun saya jika akses ditolak (lebih user friendly daripada wp_die)
+    wp_redirect( home_url('/akun-saya/') ); 
+    exit;
 }
 
 $current_user_id = get_current_user_id();
-$current_user    = wp_get_current_user();
 global $wpdb;
 
 // --- CONFIG: TABLE NAMES ---
