@@ -2,7 +2,7 @@
 /**
  * Template Name: Dashboard Desa
  * Description: Panel Frontend Desa Lengkap (Profil, Verifikasi, Wisata, Keuangan, & Referral).
- * Status: FINAL COMPLETE (Referral Card Added)
+ * Status: FINAL COMPLETE (Referral Card Added & Smart Contact Pre-fill)
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -101,10 +101,23 @@ if ( isset($_POST['save_profil_desa']) && check_admin_referer('save_profil_desa_
     }
 
     $update_desa = [
-        'nama_desa'=>sanitize_text_field($_POST['nama_desa']), 'deskripsi'=>wp_kses_post($_POST['deskripsi']), 'alamat_lengkap'=>sanitize_textarea_field($_POST['alamat_lengkap']), 'kode_referral'=>$kode_referral_save,
-        'nama_bank_desa'=>sanitize_text_field($_POST['nama_bank_desa']), 'no_rekening_desa'=>sanitize_text_field($_POST['no_rekening_desa']), 'atas_nama_rekening_desa'=>sanitize_text_field($_POST['atas_nama_rekening_desa']),
-        'api_provinsi_id'=>sanitize_text_field($_POST['api_provinsi_id']), 'api_kabupaten_id'=>sanitize_text_field($_POST['api_kabupaten_id']), 'api_kecamatan_id'=>sanitize_text_field($_POST['api_kecamatan_id']), 'api_kelurahan_id'=>sanitize_text_field($_POST['api_kelurahan_id']),
-        'provinsi'=>$prov_txt, 'kabupaten'=>$kab_txt, 'kecamatan'=>$kec_txt, 'kelurahan'=>$kel_txt, 'updated_at'=>current_time('mysql')
+        'nama_desa'         => sanitize_text_field($_POST['nama_desa']), 
+        'deskripsi'         => wp_kses_post($_POST['deskripsi']), 
+        'alamat_lengkap'    => sanitize_textarea_field($_POST['alamat_lengkap']), 
+        'kode_referral'     => $kode_referral_save,
+        
+        // Simpan Nomor WA
+        'nomor_wa'          => sanitize_text_field($_POST['nomor_wa']),
+        
+        'nama_bank_desa'            => sanitize_text_field($_POST['nama_bank_desa']), 
+        'no_rekening_desa'          => sanitize_text_field($_POST['no_rekening_desa']), 
+        'atas_nama_rekening_desa'   => sanitize_text_field($_POST['atas_nama_rekening_desa']),
+        'api_provinsi_id'           => sanitize_text_field($_POST['api_provinsi_id']), 
+        'api_kabupaten_id'          => sanitize_text_field($_POST['api_kabupaten_id']), 
+        'api_kecamatan_id'          => sanitize_text_field($_POST['api_kecamatan_id']), 
+        'api_kelurahan_id'          => sanitize_text_field($_POST['api_kelurahan_id']),
+        'provinsi' => $prov_txt, 'kabupaten' => $kab_txt, 'kecamatan' => $kec_txt, 'kelurahan' => $kel_txt, 
+        'updated_at' => current_time('mysql')
     ];
     $files_map = ['foto_desa'=>'foto','foto_sampul'=>'foto_sampul','qris_desa'=>'qris_image_url_desa'];
     foreach($files_map as $i=>$c){ if(!empty($_FILES[$i]['name'])){ $u=wp_handle_upload($_FILES[$i],['test_form'=>false]); if(isset($u['url']))$update_desa[$c]=$u['url']; } }
@@ -491,6 +504,17 @@ get_header(); // Memuat Header Website
                                     <div class="text-sm text-red-500 italic">Belum dibuat. Silakan lengkapi wilayah.</div>
                                 <?php endif; ?>
                             </div>
+                            
+                            <!-- [BARU] Info Kontak Desa -->
+                            <div class="bg-gray-50 p-4 rounded-xl border border-gray-100 text-center mb-4">
+                                <p class="text-xs font-bold text-gray-400 uppercase mb-1">WhatsApp Desa</p>
+                                <?php if($desa_data->nomor_wa): ?>
+                                    <div class="text-lg font-bold text-green-600 flex items-center justify-center gap-1"><i class="fab fa-whatsapp"></i> <?php echo esc_html($desa_data->nomor_wa); ?></div>
+                                <?php else: ?>
+                                    <div class="text-sm text-gray-400 italic">Belum diatur</div>
+                                <?php endif; ?>
+                            </div>
+
                         </div>
                         <div class="w-full md:w-2/3 space-y-6">
                             <div class="bg-gray-50 p-6 rounded-xl border border-gray-100"><label class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Deskripsi Desa</label><p class="text-gray-700 leading-relaxed text-sm"><?php echo nl2br(esc_html($desa_data->deskripsi ?: 'Belum ada deskripsi.')); ?></p></div>
@@ -517,6 +541,10 @@ get_header(); // Memuat Header Website
                         </div>
                         <div class="md:col-span-2 space-y-6">
                             <div><label class="block text-sm font-bold text-gray-700 mb-1">Nama Desa</label><input type="text" name="nama_desa" value="<?php echo esc_attr($desa_data->nama_desa); ?>" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"></div>
+                            
+                            <!-- [BARU] Input Nomor WA -->
+                            <div><label class="block text-sm font-bold text-gray-700 mb-1">Nomor WhatsApp (Kontak Desa)</label><input type="text" name="nomor_wa" value="<?php echo esc_attr($desa_data->nomor_wa); ?>" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="08xxxxxxxxxx"></div>
+
                             <div><label class="block text-sm font-bold text-gray-700 mb-1">Foto Sampul</label><input type="file" name="foto_sampul" class="w-full border border-gray-300 rounded-lg p-2 text-sm bg-gray-50"></div>
                             <div><label class="block text-sm font-bold text-gray-700 mb-1">Deskripsi</label><textarea name="deskripsi" rows="4" class="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 outline-none"><?php echo esc_textarea($desa_data->deskripsi); ?></textarea></div>
                         </div>
@@ -553,7 +581,14 @@ get_header(); // Memuat Header Website
                     <div><label class="block text-sm font-bold mb-1">Upload Foto</label><input type="file" name="foto_utama" class="w-full text-sm border rounded p-1"></div>
                     <div class="grid grid-cols-2 gap-4"><div><label class="block text-sm font-bold mb-1">Kategori</label><select name="kategori" id="mw_kategori" class="w-full border rounded px-3 py-2"><?php foreach($kategori_wisata as $k) echo "<option value='$k'>$k</option>"; ?></select></div><div><label class="block text-sm font-bold mb-1">Harga (Rp)</label><input type="number" name="harga_tiket" id="mw_harga" class="w-full border rounded px-3 py-2"></div></div>
                     <div><label class="block text-sm font-bold mb-1">Jam Buka</label><input type="text" name="jam_buka" id="mw_jam" class="w-full border rounded px-3 py-2"></div>
-                    <div><label class="block text-sm font-bold mb-1">Kontak</label><input type="text" name="kontak_pengelola" id="mw_kontak" class="w-full border rounded px-3 py-2"></div>
+                    
+                    <!-- [BARU] Auto-fill Kontak -->
+                    <div>
+                        <label class="block text-sm font-bold mb-1">Kontak Pengelola</label>
+                        <!-- Kita simpan nomor wa desa di data attribute untuk diambil JS -->
+                        <input type="text" name="kontak_pengelola" id="mw_kontak" class="w-full border rounded px-3 py-2" data-default-wa="<?php echo esc_attr($desa_data->nomor_wa); ?>" placeholder="Kosongkan untuk pakai nomor desa">
+                    </div>
+                    
                     <div><label class="block text-sm font-bold mb-1">Deskripsi</label><textarea name="deskripsi" id="mw_deskripsi" rows="3" class="w-full border rounded px-3 py-2"></textarea></div>
                     <div><label class="block text-sm font-bold mb-1">Fasilitas</label><textarea name="fasilitas" id="mw_fasilitas" rows="2" class="w-full border rounded px-3 py-2"></textarea></div>
                     <div><label class="block text-sm font-bold mb-1">Link Maps</label><input type="url" name="lokasi_maps" id="mw_maps" class="w-full border rounded px-3 py-2"></div>
@@ -652,12 +687,25 @@ get_header(); // Memuat Header Website
     // Modal Logic
     const mw = document.getElementById('modal-wisata');
     const mp = document.getElementById('modal-wisata-panel');
+    
     function openWisataModalNew() {
         resetForm();
         if(document.getElementById('mw_title')) document.getElementById('mw_title').innerText = 'Tambah Wisata';
+        
+        // [BARU] Auto-fill Kontak dengan Nomor WA Desa
+        const kontakField = document.getElementById('mw_kontak');
+        if(kontakField) {
+            // Ambil nomor WA desa dari data attribute
+            const defaultWA = kontakField.getAttribute('data-default-wa');
+            if(defaultWA) {
+                kontakField.value = defaultWA;
+            }
+        }
+
         mw.classList.remove('hidden');
         setTimeout(() => mp.classList.remove('translate-x-full'), 10);
     }
+
     function editWisata(index) {
         resetForm();
         var data = wisataData[index];
@@ -671,11 +719,13 @@ get_header(); // Memuat Header Website
             mw.classList.remove('hidden'); setTimeout(() => mp.classList.remove('translate-x-full'), 10);
         }
     }
+    
     function resetForm() {
         const form = document.getElementById('form-wisata'); if(form) form.reset();
         const idField = document.getElementById('mw_id'); if(idField) idField.value = ''; 
         const previewBox = document.getElementById('mw_preview_box'); if(previewBox) previewBox.classList.add('hidden');
     }
+    
     function closeWisataModal() { mp.classList.add('translate-x-full'); setTimeout(() => mw.classList.add('hidden'), 300); }
 
     // Region Logic
@@ -709,38 +759,5 @@ get_header(); // Memuat Header Website
         els.kec.change(function(){ setText(this,'#input_kecamatan_name'); loadR('dw_fetch_villages', $(this).val(), els.desa, null); });
         els.desa.change(function(){ setText(this,'#input_kelurahan_name'); });
     });
-
-    document.addEventListener('DOMContentLoaded', () => { const p = new URLSearchParams(window.location.search); const tab = p.get('tab') || 'ringkasan'; switchTab(tab); });
-
-    // [BARU] Fungsi Copy to Clipboard
-    function copyToClipboard(text) {
-        if (navigator.clipboard && window.isSecureContext) {
-            navigator.clipboard.writeText(text).then(() => {
-                alert('Kode berhasil disalin: ' + text);
-            }).catch(err => {
-                fallbackCopy(text);
-            });
-        } else {
-            fallbackCopy(text);
-        }
-    }
-
-    function fallbackCopy(text) {
-        let textArea = document.createElement("textarea");
-        textArea.value = text;
-        textArea.style.position = "fixed";
-        textArea.style.left = "-9999px";
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        try {
-            document.execCommand('copy');
-            alert('Kode berhasil disalin: ' + text);
-        } catch (err) {
-            alert('Gagal menyalin kode. Silakan salin manual.');
-        }
-        document.body.removeChild(textArea);
-    }
-</script>
-
-<?php get_footer(); ?>
+    </script>
+    <?php

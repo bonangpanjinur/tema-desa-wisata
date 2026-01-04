@@ -16,7 +16,7 @@ $table_desa     = $wpdb->prefix . 'dw_desa';
 
 $sql = $wpdb->prepare(
     "SELECT p.*, 
-            t.nama_toko, t.slug_toko, t.foto_profil as foto_toko, t.alamat_lengkap as alamat_toko,
+            t.id as id_pedagang, t.nama_toko, t.slug_toko, t.foto_profil as foto_toko, t.alamat_lengkap as alamat_toko,
             d.nama_desa, d.slug_desa, d.provinsi, d.kabupaten
     FROM $table_produk p 
     JOIN $table_pedagang t ON p.id_pedagang = t.id 
@@ -38,6 +38,7 @@ if (!$produk) {
 
 // 3. Setup Variabel
 $id_produk    = $produk->id;
+$id_pedagang  = $produk->id_pedagang; // ID Pedagang untuk query related
 $judul        = esc_html($produk->nama_produk);
 $harga        = floatval($produk->harga);
 $harga_fmt    = 'Rp ' . number_format($harga, 0, ',', '.');
@@ -57,6 +58,15 @@ $lokasi_label = !empty($produk->kabupaten) ? $produk->kabupaten : $produk->nama_
 $foto_utama   = !empty($produk->foto_utama) ? esc_url($produk->foto_utama) : 'https://via.placeholder.com/800x800?text=No+Image';
 $galeri_json  = !empty($produk->galeri) ? json_decode($produk->galeri, true) : [];
 $list_foto    = array_merge([$foto_utama], (is_array($galeri_json) ? $galeri_json : []));
+
+// --- 4. QUERY RELATED PRODUCTS (TOKO YANG SAMA) ---
+$related_products = $wpdb->get_results($wpdb->prepare(
+    "SELECT id, nama_produk, slug, foto_utama, harga, rating_avg, terjual 
+     FROM $table_produk 
+     WHERE status = 'aktif' AND id_pedagang = %d AND id != %d 
+     ORDER BY RAND() LIMIT 4",
+    $id_pedagang, $id_produk
+));
 ?>
 <title><?php echo $judul; ?> | <?php echo $nama_toko; ?></title>
 
@@ -226,6 +236,37 @@ $list_foto    = array_merge([$foto_utama], (is_array($galeri_json) ? $galeri_jso
             </div>
 
         </div>
+
+        <!-- 5. RELATED PRODUCTS SECTION -->
+        <?php if ($related_products): ?>
+        <div class="mt-12 pt-8 border-t border-gray-200">
+            <h3 class="text-xl md:text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                <i class="fas fa-store text-green-600"></i> Produk Lain dari <?php echo $nama_toko; ?>
+            </h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <?php foreach ($related_products as $rp): 
+                    $rp_img = !empty($rp->foto_utama) ? $rp->foto_utama : 'https://via.placeholder.com/300';
+                    $rp_harga = 'Rp ' . number_format($rp->harga, 0, ',', '.');
+                ?>
+                <a href="<?php echo home_url('/produk/' . $rp->slug); ?>" class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition group">
+                    <div class="aspect-square bg-gray-100 relative overflow-hidden">
+                        <img src="<?php echo esc_url($rp_img); ?>" alt="<?php echo esc_attr($rp->nama_produk); ?>" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
+                    </div>
+                    <div class="p-4">
+                        <h4 class="font-bold text-gray-800 text-sm mb-1 truncate group-hover:text-green-600 transition"><?php echo esc_html($rp->nama_produk); ?></h4>
+                        <div class="flex items-center justify-between mt-2">
+                            <span class="font-bold text-green-600 text-sm"><?php echo $rp_harga; ?></span>
+                            <span class="text-xs text-gray-400 flex items-center gap-1">
+                                <i class="fas fa-star text-yellow-400"></i> <?php echo number_format($rp->rating_avg, 1); ?>
+                            </span>
+                        </div>
+                    </div>
+                </a>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php endif; ?>
+
     </div>
 </div>
 

@@ -48,9 +48,18 @@ $count_wisata = count($wisata_list);
 $count_umkm = count($pedagang_list);
 $foto_desa = !empty($desa->foto) ? $desa->foto : get_template_directory_uri() . '/assets/img/placeholder-desa.jpg';
 
-// --- PERBAIKAN: GENERATE CURRENT URL UNTUK SHARE ---
-// Mengambil URL lengkap saat ini secara dinamis (termasuk https dan domain)
+// Generate Current URL
 $current_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
+
+// [BARU] Setup Kontak WA
+$nomor_wa = isset($desa->nomor_wa) ? $desa->nomor_wa : '';
+$wa_link = '';
+if ($nomor_wa) {
+    // Format nomor WA (hapus 0 di depan, ganti 62)
+    $wa_clean = preg_replace('/^0/', '62', preg_replace('/[^0-9]/', '', $nomor_wa));
+    $wa_text = urlencode("Halo Admin Desa " . $desa->nama_desa . ", saya ingin bertanya seputar desa wisata ini.");
+    $wa_link = "https://wa.me/{$wa_clean}?text={$wa_text}";
+}
 ?>
 
 <!-- === HERO SECTION === -->
@@ -259,6 +268,23 @@ $current_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https"
                         </div>
                         
                         <div class="p-6 space-y-5">
+                            <!-- [BARU] Tombol WhatsApp -->
+                            <?php if($wa_link): ?>
+                            <div>
+                                <span class="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Hubungi Admin</span>
+                                <a href="<?php echo esc_url($wa_link); ?>" target="_blank" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition shadow-lg shadow-green-200">
+                                    <i class="fab fa-whatsapp text-xl"></i> Chat WhatsApp
+                                </a>
+                            </div>
+                            <?php else: ?>
+                            <div>
+                                <span class="block text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">Hubungi Admin</span>
+                                <button disabled class="w-full bg-gray-100 text-gray-400 font-bold py-3 px-4 rounded-xl cursor-not-allowed text-sm">
+                                    Kontak Belum Tersedia
+                                </button>
+                            </div>
+                            <?php endif; ?>
+
                             <div class="flex gap-3">
                                 <div class="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 shrink-0"><i class="fas fa-map-pin text-sm"></i></div>
                                 <div>
