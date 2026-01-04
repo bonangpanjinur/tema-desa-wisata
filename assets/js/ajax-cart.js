@@ -5,129 +5,134 @@ jQuery(document).ready(function($) {
     var config = (typeof dw_global !== 'undefined') ? dw_global : ((typeof dwCartConfig !== 'undefined') ? dwCartConfig : {});
     
     // Normalisasi variable (ajax_url vs ajaxUrl) agar support kedua sumber config
-    var ajaxUrl = config.ajax_url || config.ajaxUrl;
-    var nonce = config.nonce || config.security; // Support 'nonce' atau 'security' key
+    var ajaxUrl = config.ajax_url || config.ajaxUrl || '/wp-admin/admin-ajax.php';
+    var nonce = config.nonce || config.security || ''; // Support 'nonce' atau 'security' key
 
     if (!ajaxUrl) {
         console.warn('DW Core: AJAX URL config not found. Pastikan wp_localize_script atau inline script dimuat.');
     }
 
     // --- 2. GLOBAL TOAST NOTIFICATION ---
-    // Fungsi notifikasi melayang yang konsisten untuk semua aksi cart
     function showGlobalToast(message, type = 'success') {
-        // Cek apakah elemen toast sudah ada, jika tidak buat baru
-        let $toast = $('#cart-toast'); // ID dari page-cart.php
+        let $toast = $('#global-toast');
         
+        // Buat elemen jika belum ada
         if ($toast.length === 0) {
-            $toast = $('#global-toast'); // ID alternatif
-            if ($toast.length === 0) {
-                 $('body').append(`
-                    <div id="global-toast" class="fixed top-5 right-5 z-[9999] transform transition-all duration-300 translate-y-[-150%] opacity-0">
-                        <div class="bg-gray-800 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-4 border border-gray-700">
-                            <i class="toast-icon fas fa-check-circle text-2xl text-green-400"></i>
-                            <div>
-                                <h4 class="font-bold text-sm text-gray-200 toast-title">Notifikasi</h4>
-                                <p class="toast-message text-sm text-gray-400"></p>
-                            </div>
-                        </div>
+             $('body').append(`
+                <div id="global-toast" class="fixed top-5 right-5 z-[9999] transform transition-all duration-300 translate-y-[-150%] opacity-0">
+                    <div class="bg-white rounded-xl shadow-2xl border-l-4 p-4 flex items-center gap-3 min-w-[300px]">
+                        <div id="toast-icon"></div>
+                        <div class="text-sm font-bold text-gray-700" id="toast-msg"></div>
                     </div>
-                `);
-                $toast = $('#global-toast');
-            }
+                </div>
+            `);
+            $toast = $('#global-toast');
         }
 
-        const $icon = $toast.find('.toast-icon, #toast-icon');
-        const $msg = $toast.find('.toast-message, #toast-message');
-        const $title = $toast.find('.toast-title');
-
-        $msg.text(message);
+        const iconHtml = (type === 'success') 
+            ? '<i class="fas fa-check-circle text-green-500 text-xl"></i>' 
+            : '<i class="fas fa-exclamation-circle text-red-500 text-xl"></i>';
         
-        // Reset state animasi
-        $toast.removeClass('translate-y-[-150%] opacity-0');
-        
-        // Atur Icon & Warna berdasarkan tipe
-        if (type === 'error') {
-            if($title.length) $title.text('Gagal');
-            $icon.attr('class', 'toast-icon fas fa-times-circle text-2xl text-red-500');
-        } else {
-            if($title.length) $title.text('Berhasil');
-            $icon.attr('class', 'toast-icon fas fa-check-circle text-2xl text-green-400');
-        }
+        const borderClass = (type === 'success') ? 'border-green-500' : 'border-red-500';
 
-        // Sembunyikan otomatis setelah 3 detik
+        $toast.find('.bg-white').removeClass('border-green-500 border-red-500').addClass(borderClass);
+        $('#toast-icon').html(iconHtml);
+        $('#toast-msg').text(message);
+
+        // Animate In
+        $toast.removeClass('translate-y-[-150%] opacity-0').addClass('translate-y-0 opacity-100');
+
+        // Auto Hide
         setTimeout(() => {
-            $toast.addClass('translate-y-[-150%] opacity-0');
+            $toast.removeClass('translate-y-0 opacity-100').addClass('translate-y-[-150%] opacity-0');
         }, 3000);
     }
 
     // ============================================================
-    // BAGIAN A: ADD TO CART (Halaman Single Produk)
+    // BAGIAN A: ADD TO CART & BUY NOW (Halaman Single Produk)
     // ============================================================
     
-    $('#form-add-to-cart').on('submit', function(e) {
+    // Fungsi reusable untuk Add to Cart / Beli Langsung
+    function handleCartAction(e, isBuyNow = false) {
         e.preventDefault();
 
-        var $form = $(this);
-        var $button = $form.find('button[type="submit"]');
-        var originalText = $button.html();
+        // Ambil elemen form dan button
+        // Mengutamakan ID baru (#dw-add-to-cart-form), fallback ke selector lama jika perlu
+        var $form = $('#dw-add-to-cart-form');
+        if ($form.length === 0) $form = $('#form-add-to-cart'); 
 
-        // Ambil data input
-        var qty = $form.find('input[name="quantity"]').val();
-        var pid = $form.find('input[name="product_id"]').val();
-        var vid = $form.find('input[name="variation_id"]').val() || 0; 
-        var type = $form.find('input[name="type"]').val() || 'produk';
-
-        // Validasi sederhana
-        if(qty < 1) {
-            showGlobalToast("Jumlah minimal 1", 'error');
+        var $btn  = isBuyNow ? $('#btn-buy-now') : $form.find('button[type="submit"]');
+        
+        // Validasi Login
+        if (!$('body').hasClass('logged-in')) {
+            showGlobalToast('Silakan login untuk berbelanja', 'error');
+            // Opsional: Redirect ke login
+            // window.location.href = '/login'; 
             return;
         }
 
-        // UI Loading
-        $button.prop('disabled', true).html('<i class="fas fa-circle-notch fa-spin"></i> Memproses...');
+        // Loading State
+        $btn.addClass('btn-loading').prop('disabled', true);
+
+        // Siapkan Data
+        var formData = new FormData($form[0]);
+        if(!formData.has('action')) formData.append('action', 'dw_add_to_cart');
+        // Inject nonce jika belum ada di form tapi ada di config
+        if(!formData.has('dw_cart_nonce') && nonce) formData.append('dw_cart_nonce', nonce);
 
         // AJAX Request
         $.ajax({
             url: ajaxUrl,
             type: 'POST',
-            data: {
-                action: 'dw_add_to_cart', 
-                security: nonce, 
-                product_id: pid,
-                variation_id: vid,
-                quantity: qty,
-                type: type
-            },
+            data: formData,
+            processData: false,
+            contentType: false,
             success: function(response) {
-                if (response.success) {
-                    showGlobalToast(response.data.message || 'Produk masuk keranjang!', 'success');
-                    
-                    // Update counter cart di header jika ada
-                    if($('.dw-cart-count').length) {
-                        var $count = $('.dw-cart-count');
-                        $count.text(response.data.cart_count);
-                        // Efek bounce kecil
-                        $count.parent().addClass('animate-bounce');
-                        setTimeout(() => $count.parent().removeClass('animate-bounce'), 1000);
+                var res = (typeof response === 'object') ? response : JSON.parse(response);
+
+                if (res.success) {
+                    if (isBuyNow) {
+                        // Redirect ke checkout jika Beli Langsung
+                        window.location.href = '/checkout'; 
+                    } else {
+                        showGlobalToast(res.data.message || 'Berhasil masuk keranjang!', 'success');
+                        
+                        // Update Badge Keranjang di Header (support class lama dan baru)
+                        if (res.data && res.data.cart_count) {
+                            $('.cart-count, .dw-cart-count').text(res.data.cart_count).removeClass('hidden');
+                            // Efek bounce
+                            $('.cart-count, .dw-cart-count').parent().addClass('animate-bounce');
+                            setTimeout(() => $('.cart-count, .dw-cart-count').parent().removeClass('animate-bounce'), 1000);
+                        }
                     }
                 } else {
-                    showGlobalToast(response.data.message || 'Gagal menambahkan', 'error');
+                    showGlobalToast(res.data || res.data.message || 'Gagal menambahkan produk.', 'error');
                 }
             },
-            error: function() {
-                showGlobalToast('Terjadi kesalahan koneksi server.', 'error');
+            error: function(xhr, status, error) {
+                console.error('AJAX Error:', error);
+                showGlobalToast('Terjadi kesalahan koneksi.', 'error');
             },
             complete: function() {
-                $button.prop('disabled', false).html(originalText);
+                $btn.removeClass('btn-loading').prop('disabled', false);
             }
         });
+    }
+
+    // Event Listener: Submit Form "Masuk Keranjang"
+    $(document).on('submit', '#dw-add-to-cart-form', function(e) {
+        handleCartAction(e, false);
+    });
+
+    // Event Listener: Klik Tombol "Beli Langsung"
+    $(document).on('click', '#btn-buy-now', function(e) {
+        handleCartAction(e, true);
     });
 
     // ============================================================
     // BAGIAN B: ADVANCED CART LOGIC (Halaman Keranjang)
     // ============================================================
     
-    // Cek apakah kita ada di halaman cart (dengan mencari form cart)
     const cartForm = document.getElementById('cart-form');
     
     if (cartForm) {
@@ -138,7 +143,7 @@ jQuery(document).ready(function($) {
         const itemChecks = document.querySelectorAll('.check-item');
         const qtyButtons = document.querySelectorAll('.btn-qty');
         
-        // Summary Elements (Desktop & Mobile)
+        // Summary Elements
         const summaryTotalItem = document.getElementById('summary-total-item');
         const summaryTotalWeight = document.getElementById('summary-total-weight');
         const summaryGrandTotal = document.getElementById('summary-grand-total');
@@ -166,9 +171,7 @@ jQuery(document).ready(function($) {
             let totalPrice = 0;
             let totalWeight = 0;
 
-            // Loop semua item checkbox
             itemChecks.forEach(item => {
-                // Hanya hitung yang dicentang dan tidak disabled (stok habis)
                 if (item.checked && !item.disabled) {
                     const qty = parseInt(item.dataset.qty);
                     const price = parseFloat(item.dataset.price);
@@ -202,9 +205,7 @@ jQuery(document).ready(function($) {
         if(checkAll) {
             checkAll.addEventListener('change', function() {
                 const isChecked = this.checked;
-                // Centang semua toko
                 storeChecks.forEach(el => el.checked = isChecked);
-                // Centang semua item aktif
                 itemChecks.forEach(el => {
                     if(!el.disabled) el.checked = isChecked;
                 });
@@ -215,16 +216,14 @@ jQuery(document).ready(function($) {
         // B. Toggle Select Store (Toko)
         storeChecks.forEach(storeCheck => {
             storeCheck.addEventListener('change', function() {
-                const targetClass = this.dataset.target; // misal: store-5
+                const targetClass = this.dataset.target; 
                 const isChecked = this.checked;
-                
-                // Cari item spesifik milik toko ini
                 const itemsInStore = document.querySelectorAll(`.${targetClass}-item .check-item`);
                 itemsInStore.forEach(item => {
                     if(!item.disabled) item.checked = isChecked;
                 });
                 
-                checkAllStatus(); // Cek status 'Select All' global
+                checkAllStatus(); 
                 recalculateTotal();
             });
         });
@@ -233,22 +232,19 @@ jQuery(document).ready(function($) {
         itemChecks.forEach(item => {
             item.addEventListener('change', function() {
                 const storeId = this.dataset.store;
-                checkStoreStatus(storeId); // Cek status checkbox toko induk
-                checkAllStatus(); // Cek status global
+                checkStoreStatus(storeId); 
+                checkAllStatus(); 
                 recalculateTotal();
             });
         });
 
-        // Helper: Update status checkbox 'Select All'
         function checkAllStatus() {
             if(!checkAll) return;
             const totalItems = Array.from(itemChecks).filter(i => !i.disabled);
             const checkedItems = Array.from(itemChecks).filter(i => i.checked && !i.disabled);
-            // Jika semua item aktif tercentang, maka checkAll true
             checkAll.checked = (totalItems.length > 0 && totalItems.length === checkedItems.length);
         }
 
-        // Helper: Update status checkbox Toko
         function checkStoreStatus(storeId) {
             const storeCheck = document.querySelector(`.check-store[data-target="store-${storeId}"]`);
             if(!storeCheck) return;
@@ -263,21 +259,16 @@ jQuery(document).ready(function($) {
         // --- 3. QUANTITY UPDATE LOGIC (+/- Buttons) ---
         qtyButtons.forEach(btn => {
             btn.addEventListener('click', function() {
-                const action = this.dataset.action; // 'increase' atau 'decrease'
+                const action = this.dataset.action; 
                 const cartId = this.dataset.id;
                 
-                // Cari elemen input terkait tombol ini
                 const input = this.parentElement.querySelector('.input-qty');
-                // Cari checkbox terkait item ini (untuk update dataset)
-                // Logic: Tombol > Wrapper > Div Item > Checkbox
-                // Kita gunakan closest class toko untuk mencari item spesifik agar aman
                 const storeGroup = this.closest('.cart-store-group');
                 const checkbox = this.closest(`div[class*="store-"]`).querySelector('.check-item');
                 
                 let currentQty = parseInt(input.value);
                 const maxStock = parseInt(input.dataset.stock);
 
-                // Logic Tambah/Kurang
                 if (action === 'increase') {
                     if (currentQty >= maxStock) {
                         showGlobalToast('Stok maksimal tercapai', 'error');
@@ -289,13 +280,12 @@ jQuery(document).ready(function($) {
                     currentQty--;
                 }
 
-                // A. Optimistic UI (Update Tampilan Dulu)
+                // Optimistic UI
                 input.value = currentQty;
-                checkbox.dataset.qty = currentQty; // Update data di checkbox agar kalkulasi harga benar
-                recalculateTotal(); // Hitung ulang total harga langsung
+                checkbox.dataset.qty = currentQty;
+                recalculateTotal(); 
 
-                // B. AJAX Debounce (Kirim ke Server Background)
-                // Tunggu 500ms sebelum kirim request, cegah spam request
+                // AJAX Debounce
                 clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(() => {
                     updateServerQty(cartId, currentQty);
@@ -303,7 +293,6 @@ jQuery(document).ready(function($) {
             });
         });
 
-        // Fungsi Update ke Server
         function updateServerQty(cartId, newQty) {
             const formData = new FormData();
             formData.append('action', 'dw_update_cart_qty');
@@ -319,14 +308,12 @@ jQuery(document).ready(function($) {
             .then(data => {
                 if (!data.success) {
                     showGlobalToast(data.data.message || 'Gagal update stok', 'error');
-                    // Opsional: Revert value jika gagal
                 }
             })
             .catch(err => console.error(err));
         }
 
         // --- 4. DELETE ITEM LOGIC ---
-        // Dipasang di window agar bisa dipanggil via onclick="" di HTML PHP
         window.deleteCartItem = function(cartId) {
             if(!confirm("Yakin ingin menghapus produk ini?")) return;
 
@@ -342,7 +329,7 @@ jQuery(document).ready(function($) {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    location.reload(); // Reload agar item hilang bersih dari DOM
+                    location.reload(); 
                 } else {
                     showGlobalToast('Gagal menghapus item', 'error');
                 }
@@ -360,7 +347,6 @@ jQuery(document).ready(function($) {
              
              if(!confirm(`Hapus ${checkedItems.length} produk terpilih?`)) return;
              
-             // TODO: Implementasi endpoint bulk delete di PHP
              alert("Fitur bulk delete akan segera hadir. Silakan hapus per item.");
         };
     }
