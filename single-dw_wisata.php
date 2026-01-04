@@ -197,10 +197,23 @@ if (empty($related_wisata)) {
                 <button onclick="navigator.clipboard.writeText('<?php echo esc_js($current_url); ?>'); alert('Link disalin!')" class="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-white/20 transition" title="Salin Link">
                     <i class="fas fa-share-alt"></i>
                 </button>
-                <button onclick="alert('Disimpan ke Favorit!')" class="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-white/20 transition group/heart" title="Simpan">
-                    <i class="far fa-heart group-hover/heart:text-red-400 transition-colors"></i>
-                </button>
-            </div>
+              <?php 
+                $is_fav = false;
+                if (is_user_logged_in()) {
+                    if (!class_exists('DW_Favorites')) {
+                        require_once WP_PLUGIN_DIR . '/desa-wisata-core/includes/class-dw-favorites.php';
+                    }
+                    $fav_obj = new DW_Favorites();
+                    $is_fav = $fav_obj->is_favorited(get_current_user_id(), $id_wisata, 'wisata');
+                }
+                ?>
+                <button type="button" 
+                        class="js-toggle-favorite w-10 h-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-white/20 transition group/heart" 
+                        data-id="<?php echo $id_wisata; ?>"
+                        data-type="wisata"
+                        title="Simpan">
+                    <i class="<?php echo $is_fav ? 'fas text-red-500' : 'far'; ?> fa-heart group-hover/heart:text-red-400 transition-colors"></i>
+                </button>       </div>
         </div>
 
         <div class="absolute bottom-0 left-0 w-full p-4 md:p-10 z-10">

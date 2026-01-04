@@ -41,13 +41,31 @@ if (strlen($lokasi) > 20) $lokasi = substr($lokasi, 0, 18) . '...';
                 <span class="bg-red-600 text-white text-xs font-bold px-3 py-1.5 rounded-full uppercase">Stok Habis</span>
             </div>
         <?php endif; ?>
-        
-        <div class="absolute top-2 left-2 z-20">
+          <div class="absolute top-2 left-2 z-20">
             <span class="bg-white/90 backdrop-blur text-gray-700 text-[10px] font-bold px-2 py-1 rounded shadow-sm">
                 <?php echo $kategori; ?>
             </span>
         </div>
-    </div>
+
+        <!-- Favorite Button -->
+        <div class="absolute top-2 right-2 z-20">
+            <?php 
+            $is_fav = false;
+            if (is_user_logged_in()) {
+                if (!class_exists('DW_Favorites')) {
+                    require_once WP_PLUGIN_DIR . '/desa-wisata-core/includes/class-dw-favorites.php';
+                }
+                $fav_obj = new DW_Favorites();
+                $is_fav = $fav_obj->is_favorited(get_current_user_id(), $produk->id, 'produk');
+            }
+            ?>
+            <button type="button" 
+                    class="js-toggle-favorite w-8 h-8 rounded-full bg-white/90 backdrop-blur flex items-center justify-center shadow-sm hover:bg-white transition-all"
+                    data-id="<?php echo $produk->id; ?>"
+                    data-type="produk">
+                <i class="<?php echo $is_fav ? 'fas text-red-500' : 'far'; ?> fa-heart text-xs"></i>
+            </button>
+        </div></div>
 
     <!-- Konten -->
     <div class="p-3 flex flex-col flex-grow">
