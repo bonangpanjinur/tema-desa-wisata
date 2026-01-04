@@ -107,7 +107,8 @@ function tema_dw_scripts() {
             'ajax_url'     => admin_url('admin-ajax.php'),
             'nonce'        => wp_create_nonce('dw_cart_action'),
             'cart_url'     => home_url('/keranjang'),
-            'checkout_url' => home_url('/checkout')
+            'checkout_url' => home_url('/checkout'),
+            'login_url'    => home_url('/login')
         ));
     }
 }
