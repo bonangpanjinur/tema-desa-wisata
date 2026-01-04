@@ -521,6 +521,62 @@ get_header();
     }
 </script>
 <style>
+
+/* Modern Order Tabs Improvement */
+.order-tab-btn { 
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #64748b; /* slate-500 */
+    background-color: #f8fafc; /* slate-50 */
+    border: 1px solid #e2e8f0; /* slate-200 */
+    border-radius: 9999px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+}
+
+.order-tab-btn:hover {
+    background-color: #f1f5f9;
+    color: #1e293b;
+    border-color: #cbd5e1;
+}
+
+.order-tab-btn.active { 
+    background-color: #1e293b; /* slate-900 */
+    color: #ffffff;
+    border-color: #1e293b;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transform: translateY(-1px);
+}
+
+.badge-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.5rem;
+    height: 1.25rem;
+    padding: 0 0.375rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    border-radius: 9999px;
+    background-color: #e2e8f0;
+    color: #475569;
+    transition: all 0.2s;
+}
+
+.order-tab-btn.active .badge-count {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+}
+
+/* Warna khusus untuk badge saat tidak aktif agar lebih informatif */
+.order-tab-btn[data-tab="perlu_dikirim"] .badge-count { background-color: #ffedd5; color: #9a3412; }
+.order-tab-btn[data-tab="selesai"] .badge-count { background-color: #dcfce7; color: #166534; }
+.order-tab-btn[data-tab="dibatalkan"] .badge-count { background-color: #fee2e2; color: #991b1b; }
+
     body { font-family: 'Inter', sans-serif; }
     .tab-content { display: none; opacity: 0; transform: translateY(10px); transition: all 0.3s ease-out; }
     .tab-content.active { display: block; opacity: 1; transform: translateY(0); }
@@ -750,28 +806,35 @@ get_header();
             <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                 
                 <!-- MODERN TABS WITH COUNTERS -->
-                <div class="border-b border-gray-100 bg-white p-4 sticky top-0 z-10 overflow-x-auto no-scrollbar">
-                    <div class="flex space-x-2 min-w-max" id="order-tabs">
-                        <button onclick="filterOrders('all')" class="order-tab-btn active" data-tab="all">
-                            Semua <span class="badge-count"><?php echo $order_counts['all']; ?></span>
-                        </button>
-                        <button onclick="filterOrders('belum_bayar')" class="order-tab-btn" data-tab="belum_bayar">
-                            Belum Bayar <span class="badge-count"><?php echo $order_counts['belum_bayar']; ?></span>
-                        </button>
-                        <button onclick="filterOrders('perlu_dikirim')" class="order-tab-btn" data-tab="perlu_dikirim">
-                            Perlu Dikirim <span class="badge-count bg-orange-100 text-orange-700"><?php echo $order_counts['perlu_dikirim']; ?></span>
-                        </button>
-                        <button onclick="filterOrders('dikirim')" class="order-tab-btn" data-tab="dikirim">
-                            Dikirim <span class="badge-count"><?php echo $order_counts['dikirim']; ?></span>
-                        </button>
-                        <button onclick="filterOrders('selesai')" class="order-tab-btn" data-tab="selesai">
-                            Selesai <span class="badge-count bg-green-100 text-green-700"><?php echo $order_counts['selesai']; ?></span>
-                        </button>
-                        <button onclick="filterOrders('dibatalkan')" class="order-tab-btn" data-tab="dibatalkan">
-                            Dibatalkan <span class="badge-count bg-red-100 text-red-700"><?php echo $order_counts['dibatalkan']; ?></span>
-                        </button>
-                    </div>
-                </div>
+                <!-- MODERN TABS WITH COUNTERS -->
+<div class="border-b border-gray-100 bg-white p-5 sticky top-0 z-10 overflow-x-auto no-scrollbar">
+    <div class="flex space-x-3 min-w-max" id="order-tabs">
+        <button onclick="filterOrders('all')" class="order-tab-btn active" data-tab="all">
+            <span>Semua</span>
+            <span class="badge-count"><?php echo $order_counts['all']; ?></span>
+        </button>
+        <button onclick="filterOrders('belum_bayar')" class="order-tab-btn" data-tab="belum_bayar">
+            <span>Belum Bayar</span>
+            <span class="badge-count"><?php echo $order_counts['belum_bayar']; ?></span>
+        </button>
+        <button onclick="filterOrders('perlu_dikirim')" class="order-tab-btn" data-tab="perlu_dikirim">
+            <span>Perlu Dikirim</span>
+            <span class="badge-count"><?php echo $order_counts['perlu_dikirim']; ?></span>
+        </button>
+        <button onclick="filterOrders('dikirim')" class="order-tab-btn" data-tab="dikirim">
+            <span>Dikirim</span>
+            <span class="badge-count"><?php echo $order_counts['dikirim']; ?></span>
+        </button>
+        <button onclick="filterOrders('selesai')" class="order-tab-btn" data-tab="selesai">
+            <span>Selesai</span>
+            <span class="badge-count"><?php echo $order_counts['selesai']; ?></span>
+        </button>
+        <button onclick="filterOrders('dibatalkan')" class="order-tab-btn" data-tab="dibatalkan">
+            <span>Dibatalkan</span>
+            <span class="badge-count"><?php echo $order_counts['dibatalkan']; ?></span>
+        </button>
+    </div>
+</div>
 
                 <?php if($order_list): ?>
                 <div class="overflow-x-auto">
@@ -1714,8 +1777,12 @@ function renderNewOrderRow(o) {
 }
 
 function updateOrderCounters(counts) {
-    Object.keys(counts).forEach(cat => {
-        $(`.order-tab-btn[data-tab="${cat}"] .badge-count`).text(counts[cat]);
+    const categories = ['all', 'belum_bayar', 'perlu_dikirim', 'dikirim', 'selesai', 'dibatalkan'];
+    categories.forEach(cat => {
+        const $badge = $(`.order-tab-btn[data-tab="${cat}"] .badge-count`);
+        if ($badge.length) {
+            $badge.text(counts[cat] || 0);
+        }
     });
 }
 
