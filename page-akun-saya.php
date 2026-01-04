@@ -1,7 +1,7 @@
 <?php
 /**
  * Template Name: Akun Saya (Fixed & Improved)
- * Description: Halaman profil terpusat dengan navigasi cerdas ke dashboard khusus role.
+ * Description: Halaman profil terpusat dengan navigasi cerdas ke dashboard khusus role dan Alamat API.
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -112,6 +112,8 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
                         $wpdb->update($wpdb->prefix . 'dw_pedagang', ['nomor_wa' => $phone], ['id_user' => $user_id]);
                     } elseif ( in_array('admin_desa', $roles) ) { 
                         $wpdb->update($wpdb->prefix . 'dw_desa', ['nomor_wa' => $phone], ['id_user_desa' => $user_id]);
+                    } elseif ( in_array('verifikator_umkm', $roles) ) {
+                        $wpdb->update($wpdb->prefix . 'dw_verifikator', ['nomor_wa' => $phone], ['id_user' => $user_id]);
                     }
                     
                     if ( ! empty($_FILES['profile_pic']['name']) ) {
@@ -126,7 +128,9 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
                             if ( in_array('pedagang', $roles) ) {
                                 $wpdb->update($wpdb->prefix . 'dw_pedagang', ['foto_admin' => $foto_url], ['id_user' => $user_id]);
                             } elseif ( in_array('admin_desa', $roles) ) {
-                                $wpdb->update($wpdb->prefix . 'dw_desa', ['foto' => $foto_url], ['id_user_desa' => $user_id]);
+                                $wpdb->update($wpdb->prefix . 'dw_desa', ['foto_admin' => $foto_url], ['id_user_desa' => $user_id]);
+                            } elseif ( in_array('verifikator_umkm', $roles) ) {
+                                $wpdb->update($wpdb->prefix . 'dw_verifikator', ['foto_profil' => $foto_url], ['id_user' => $user_id]);
                             }
                         } else {
                             $msg = 'Gagal upload foto: ' . $movefile['error'];
@@ -195,6 +199,14 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
                 $data_desa['kecamatan'] = $data_wilayah['kecamatan_nama']; unset($data_desa['kecamatan_nama']);
                 $data_desa['kelurahan'] = $data_wilayah['kelurahan_nama']; unset($data_desa['kelurahan_nama']);
                 $wpdb->update($wpdb->prefix . 'dw_desa', $data_desa, ['id_user_desa' => $user_id]);
+            } elseif ( in_array('verifikator_umkm', $roles) ) {
+                $data_verif = $data_wilayah;
+                // Mapping field names for verifikator table if different, usually same logic
+                $data_verif['provinsi']  = $data_wilayah['provinsi_nama']; unset($data_verif['provinsi_nama']);
+                $data_verif['kabupaten'] = $data_wilayah['kabupaten_nama']; unset($data_verif['kabupaten_nama']);
+                $data_verif['kecamatan'] = $data_wilayah['kecamatan_nama']; unset($data_verif['kecamatan_nama']);
+                $data_verif['kelurahan'] = $data_wilayah['kelurahan_nama']; unset($data_verif['kelurahan_nama']);
+                $wpdb->update($wpdb->prefix . 'dw_verifikator', $data_verif, ['id_user' => $user_id]);
             }
 
             $msg = 'Alamat pengiriman berhasil disimpan.';
@@ -219,6 +231,40 @@ $saved_prov_name = get_user_meta($user_id, 'billing_state', true);
 $saved_kota_name = get_user_meta($user_id, 'billing_city', true);
 $saved_kec_name  = get_user_meta($user_id, 'billing_kecamatan', true);
 $saved_kel_name  = get_user_meta($user_id, 'billing_kelurahan', true);
+
+// Override Data jika Role Khusus (Ambil dari tabel custom jika ada)
+if ( in_array('pedagang', $roles) ) {
+    $pedagang_data = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}dw_pedagang WHERE id_user = %d", $user_id));
+    if ($pedagang_data) {
+        $user_address    = $pedagang_data->alamat_lengkap;
+        $saved_prov_id   = $pedagang_data->api_provinsi_id;
+        $saved_kota_id   = $pedagang_data->api_kabupaten_id;
+        $saved_kec_id    = $pedagang_data->api_kecamatan_id;
+        $saved_kel_id    = $pedagang_data->api_kelurahan_id;
+        $saved_prov_name = $pedagang_data->provinsi_nama;
+        $saved_kota_name = $pedagang_data->kabupaten_nama;
+        $saved_kec_name  = $pedagang_data->kecamatan_nama;
+        $saved_kel_name  = $pedagang_data->kelurahan_nama;
+        if (!empty($pedagang_data->kode_pos)) $user_postcode = $pedagang_data->kode_pos;
+        if(empty($user_phone)) $user_phone = $pedagang_data->nomor_wa;
+        if(empty($custom_avatar) && !empty($pedagang_data->foto_admin)) $display_avatar = $pedagang_data->foto_admin;
+    }
+} elseif ( in_array('admin_desa', $roles) ) {
+    $desa_data = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}dw_desa WHERE id_user_desa = %d", $user_id));
+    if ($desa_data) {
+        $user_address    = $desa_data->alamat_lengkap;
+        $saved_prov_id   = $desa_data->api_provinsi_id;
+        $saved_kota_id   = $desa_data->api_kabupaten_id;
+        $saved_kec_id    = $desa_data->api_kecamatan_id;
+        $saved_kel_id    = $desa_data->api_kelurahan_id;
+        $saved_prov_name = $desa_data->provinsi;
+        $saved_kota_name = $desa_data->kabupaten;
+        $saved_kec_name  = $desa_data->kecamatan;
+        $saved_kel_name  = $desa_data->kelurahan;
+        if (!empty($desa_data->kode_pos)) $user_postcode = $desa_data->kode_pos;
+        if(empty($custom_avatar) && !empty($desa_data->foto_admin)) $display_avatar = $desa_data->foto_admin;
+    }
+}
 
 // --- SET LABEL ROLE & WARNA BADGE ---
 $role_label       = 'Wisatawan'; 
@@ -463,28 +509,42 @@ get_header();
                         <form method="post" action="">
                             <?php wp_nonce_field('dw_save_address', 'dw_address_nonce'); ?>
                             <input type="hidden" name="dw_action" value="update_address">
+                            
+                            <!-- Hidden inputs for names -->
+                            <input type="hidden" name="provinsi_nama" id="input_provinsi_nama" value="<?php echo esc_attr($saved_prov_name); ?>">
+                            <input type="hidden" name="kota_nama" id="input_kota_nama" value="<?php echo esc_attr($saved_kota_name); ?>">
+                            <input type="hidden" name="kecamatan_nama" id="input_kecamatan_nama" value="<?php echo esc_attr($saved_kec_name); ?>">
+                            <input type="hidden" name="kelurahan_nama" id="input_kelurahan_nama" value="<?php echo esc_attr($saved_kel_name); ?>">
+                            
+                            <!-- Data Container for JS -->
+                            <div id="region-data" data-prov="<?php echo esc_attr($saved_prov_id); ?>" data-kota="<?php echo esc_attr($saved_kota_id); ?>" data-kec="<?php echo esc_attr($saved_kec_id); ?>" data-kel="<?php echo esc_attr($saved_kel_id); ?>"></div>
+
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                                 <div>
                                     <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Provinsi</label>
-                                    <select name="api_provinsi_id" id="provinsi" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm outline-none font-bold" data-selected="<?php echo esc_attr($saved_prov_id); ?>"><option value="">Pilih Provinsi</option></select>
-                                    <input type="hidden" name="provinsi_nama" id="provinsi_nama" value="<?php echo esc_attr($saved_prov_name); ?>">
+                                    <select name="api_provinsi_id" id="dw_provinsi" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:bg-white outline-none appearance-none font-bold">
+                                        <option value="">Memuat...</option>
+                                    </select>
                                 </div>
                                 <div>
                                     <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Kota/Kabupaten</label>
-                                    <select name="api_kabupaten_id" id="kota" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm outline-none font-bold" data-selected="<?php echo esc_attr($saved_kota_id); ?>"><option value="">Pilih Kota</option></select>
-                                    <input type="hidden" name="kota_nama" id="kota_nama" value="<?php echo esc_attr($saved_kota_name); ?>">
+                                    <select name="api_kabupaten_id" id="dw_kota" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:bg-white outline-none appearance-none disabled:opacity-50 font-bold" disabled>
+                                        <option value="">Pilih Provinsi Dulu</option>
+                                    </select>
                                 </div>
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                                 <div>
                                     <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Kecamatan</label>
-                                    <select name="api_kecamatan_id" id="kecamatan" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm outline-none font-bold" data-selected="<?php echo esc_attr($saved_kec_id); ?>"><option value="">Pilih Kecamatan</option></select>
-                                    <input type="hidden" name="kecamatan_nama" id="kecamatan_nama" value="<?php echo esc_attr($saved_kec_name); ?>">
+                                    <select name="api_kecamatan_id" id="dw_kecamatan" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:bg-white outline-none appearance-none disabled:opacity-50 font-bold" disabled>
+                                        <option value="">Pilih Kota Dulu</option>
+                                    </select>
                                 </div>
                                 <div>
                                     <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Kelurahan</label>
-                                    <select name="api_kelurahan_id" id="kelurahan" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm outline-none font-bold" data-selected="<?php echo esc_attr($saved_kel_id); ?>"><option value="">Pilih Kelurahan</option></select>
-                                    <input type="hidden" name="kelurahan_nama" id="kelurahan_nama" value="<?php echo esc_attr($saved_kel_name); ?>">
+                                    <select name="api_kelurahan_id" id="dw_kelurahan" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:bg-white outline-none appearance-none disabled:opacity-50 font-bold" disabled>
+                                        <option value="">Pilih Kecamatan Dulu</option>
+                                    </select>
                                 </div>
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
@@ -671,6 +731,64 @@ get_header();
         const cls = config[status] || 'bg-gray-50 text-gray-600 border-gray-200';
         return `<span class="px-2 py-1 rounded-full text-[8px] font-black border uppercase ${cls}">${status.replace('_', ' ')}</span>`;
     }
+
+    // --- REGION API (AJAX HANDLING) ---
+    jQuery(document).ready(function($) {
+        var els = { prov: $('#dw_provinsi'), kota: $('#dw_kota'), kec: $('#dw_kecamatan'), kel: $('#dw_kelurahan') };
+        var data = $('#region-data').data();
+
+        function loadR(act, pid, el, sel, cb) {
+            el.html('<option>Memuat...</option>').prop('disabled', true);
+            $.get(ajaxurl, { action: act, province_id: pid, regency_id: pid, district_id: pid }, function(res){
+                if(res.success) {
+                    var o = '<option value="">-- Pilih --</option>';
+                    $.each(res.data, function(i,v){ 
+                        // Handle variasi nama field id/code dan nama/name dari API
+                        var val = v.id || v.code;
+                        var txt = v.name || v.nama;
+                        o+='<option value="'+val+'" '+(val==sel?'selected':'')+'>'+txt+'</option>'; 
+                    });
+                    el.html(o).prop('disabled', false); 
+                    if(cb) cb();
+                } else {
+                    el.html('<option value="">Gagal memuat</option>');
+                }
+            });
+        }
+        
+        function setH() {
+            $('#input_provinsi_nama').val(els.prov.find('option:selected').text());
+            $('#input_kota_nama').val(els.kota.find('option:selected').text());
+            $('#input_kecamatan_nama').val(els.kec.find('option:selected').text());
+            $('#input_kelurahan_nama').val(els.kel.find('option:selected').text());
+        }
+
+        // Initial Load: Provinsi -> Kota -> Kecamatan -> Kelurahan
+        loadR('dw_fetch_provinces', null, els.prov, data.prov, function(){
+            if(data.prov) loadR('dw_fetch_regencies', data.prov, els.kota, data.kota, function(){
+                if(data.kota) loadR('dw_fetch_districts', data.kota, els.kec, data.kec, function(){
+                    if(data.kec) loadR('dw_fetch_villages', data.kec, els.kel, data.kel, setH);
+                });
+            });
+        });
+
+        // Event Listeners for Chained Dropdowns
+        els.prov.change(function(){ 
+            setH(); 
+            loadR('dw_fetch_regencies', $(this).val(), els.kota, null); 
+            els.kec.html('<option value="">Pilih Kota Dulu</option>').prop('disabled',true); 
+            els.kel.html('<option value="">Pilih Kecamatan Dulu</option>').prop('disabled',true); 
+        });
+        els.kota.change(function(){ 
+            setH(); 
+            loadR('dw_fetch_districts', $(this).val(), els.kec, null); 
+            els.kel.html('<option value="">Pilih Kecamatan Dulu</option>').prop('disabled',true); 
+        });
+        els.kec.change(function(){ 
+            loadR('dw_fetch_villages', $(this).val(), els.kel, null); 
+        });
+        els.kel.change(setH);
+    });
 </script>
 
 <?php get_footer(); ?>
