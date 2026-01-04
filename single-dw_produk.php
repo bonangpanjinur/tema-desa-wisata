@@ -1,7 +1,7 @@
 <?php
 /**
  * Template Name: Single Produk (Fixed)
- * Description: Menampilkan detail produk dengan fungsi Beli Langsung dan Keranjang yang sudah diperbaiki.
+ * Description: Template produk dengan ID tombol yang sinkron dengan ajax-cart.js
  */
 
 get_header();
@@ -64,11 +64,16 @@ $list_foto    = array_merge([$foto_utama], (is_array($galeri_json) ? $galeri_jso
     .gallery-thumb.active { border-color: #16a34a; opacity: 1; }
     .gallery-thumb { opacity: 0.6; transition: all 0.2s; }
     .gallery-thumb:hover { opacity: 1; }
-    /* Loading Spinner sederhana */
-    .btn-loading { pointer-events: none; opacity: 0.7; position: relative; }
-    .btn-loading span { visibility: hidden; }
-    .btn-loading::after { content: ""; position: absolute; width: 16px; height: 16px; top: 50%; left: 50%; margin: -8px 0 0 -8px; border: 2px solid transparent; border-top-color: currentColor; border-radius: 50%; animation: spin 0.8s linear infinite; }
-    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    
+    /* Loading State Styles */
+    .btn-loading { position: relative; pointer-events: none; opacity: 0.8; }
+    .btn-loading span { opacity: 0; }
+    .btn-loading::after {
+        content: ''; position: absolute; top: 50%; left: 50%; width: 1.2em; height: 1.2em;
+        border: 2px solid transparent; border-top-color: currentColor; border-radius: 50%;
+        animation: spin 0.6s linear infinite; margin-top: -0.6em; margin-left: -0.6em;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 
 <div class="bg-gray-50 min-h-screen font-sans pb-20">
@@ -174,7 +179,8 @@ $list_foto    = array_merge([$foto_utama], (is_array($galeri_json) ? $galeri_jso
                     <h3 class="font-bold text-gray-800 mb-4">Atur Pesanan</h3>
                     
                     <?php if ($stok > 0): ?>
-                    <form id="dw-add-to-cart-form">
+                    <!-- PENTING: ID Form harus 'dw-add-to-cart-form' dan method 'POST' -->
+                    <form id="dw-add-to-cart-form" method="post">
                         <!-- SECURITY NONCE -->
                         <?php wp_nonce_field('dw_cart_action', 'dw_cart_nonce'); ?>
                         
@@ -193,12 +199,12 @@ $list_foto    = array_merge([$foto_utama], (is_array($galeri_json) ? $galeri_jso
                         </div>
 
                         <div class="flex flex-col gap-2">
-                            <!-- TOMBOL KERANJANG -->
+                            <!-- PENTING: ID Button 'btn-add-cart' -->
                             <button type="submit" id="btn-add-cart" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-green-500/20 transition-all flex items-center justify-center gap-2">
                                 <i class="fas fa-cart-plus"></i> <span>Masuk Keranjang</span>
                             </button>
                             
-                            <!-- TOMBOL BELI LANGSUNG -->
+                            <!-- PENTING: ID Button 'btn-buy-now' -->
                             <button type="button" id="btn-buy-now" class="w-full bg-white border border-green-600 text-green-600 font-bold py-3 px-4 rounded-xl hover:bg-green-50 transition-all flex items-center justify-center gap-2">
                                 <i class="fas fa-shopping-bag"></i> <span>Beli Langsung</span>
                             </button>
@@ -227,11 +233,7 @@ $list_foto    = array_merge([$foto_utama], (is_array($galeri_json) ? $galeri_jso
     const basePrice = <?php echo $harga; ?>;
     const stockQty  = <?php echo $stok; ?>;
     
-    // Fallback AJAX URL jika belum ter-localize
-    if (typeof dw_global === 'undefined') {
-        var dw_global = { ajax_url: '<?php echo admin_url('admin-ajax.php'); ?>' };
-    }
-
+    // JS Fallback untuk Galeri & Qty
     function changeImage(src, btn) {
         document.getElementById('main-image').src = src;
         document.querySelectorAll('.gallery-thumb').forEach(b => b.classList.remove('active', 'border-green-600', 'opacity-100'));
