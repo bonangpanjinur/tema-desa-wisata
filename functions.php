@@ -62,20 +62,16 @@ function tema_dw_scripts() {
         wp_enqueue_style('tema-dw-main-css', get_template_directory_uri() . '/assets/css/main.css', array(), filemtime(get_template_directory() . '/assets/css/main.css'));
     }
 
+    // Script Utama Theme
     wp_enqueue_script('tema-dw-main', get_template_directory_uri() . '/assets/js/main.js', array('jquery'), '1.0.8', true);
-
-    // Localize Script: Updated Nonce action name to 'dw_cart_action' for consistency
-    wp_localize_script('tema-dw-main', 'dw_ajax', array(
-        'ajax_url' => admin_url('admin-ajax.php'),
-        'nonce'    => wp_create_nonce('dw_cart_action'), 
-        'ojek_nonce' => wp_create_nonce('dw_ojek_action')
-    ));
     
+    // Data Global untuk Script Utama
     wp_localize_script('tema-dw-main', 'dwData', array(
         'api_url' => home_url('/wp-json/dw/v1/'),
         'home_url' => home_url()
     ));
 
+    // Archive Filters
     if (is_post_type_archive('dw_produk') || is_tax('kategori_produk') || is_post_type_archive('dw_wisata')) {
           wp_enqueue_script('tema-dw-filter', get_template_directory_uri() . '/assets/js/archive-filter.js', array('jquery'), '1.0.0', true);
     }
@@ -97,12 +93,21 @@ function tema_dw_scripts() {
         wp_enqueue_script( 'dw-checkout', get_template_directory_uri() . '/assets/js/dw-checkout.js', array('jquery'), '1.0.0', true );
     }
     
-    // Script AJAX Cart baru (dw-ajax-cart) - Pastikan file ini dimuat di single produk & cart
-    if ( is_singular('dw_produk') || is_page('keranjang') ) {
-        wp_enqueue_script('dw-ajax-cart', get_template_directory_uri() . '/assets/js/ajax-cart.js', array('jquery'), '1.1.0', true);
-        wp_localize_script('dw-ajax-cart', 'dw_global', array(
-            'ajax_url' => admin_url('admin-ajax.php'),
-            'nonce'    => wp_create_nonce('dw_cart_action')
+    // --- INTEGRASI AJAX CART (DIPERBAIKI) ---
+    // Dimuat di halaman produk, keranjang, arsip, dan halaman depan agar tombol beli berfungsi
+    if ( is_singular('dw_produk') || is_page('keranjang') || is_archive() || is_front_page() ) {
+        
+        // SweetAlert2 (Dependency untuk notifikasi cantik)
+        wp_enqueue_script('sweetalert2', 'https://cdn.jsdelivr.net/npm/sweetalert2@11', array(), null, true);
+
+        wp_enqueue_script('dw-ajax-cart', get_template_directory_uri() . '/assets/js/ajax-cart.js', array('jquery', 'sweetalert2'), '1.2.0', true);
+        
+        // PENTING: Menggunakan nama objek 'dw_ajax' agar sesuai dengan file js/ajax-cart.js
+        wp_localize_script('dw-ajax-cart', 'dw_ajax', array(
+            'ajax_url'     => admin_url('admin-ajax.php'),
+            'nonce'        => wp_create_nonce('dw_cart_action'),
+            'cart_url'     => home_url('/keranjang'),
+            'checkout_url' => home_url('/checkout')
         ));
     }
 }
@@ -165,46 +170,28 @@ add_action( 'init', 'dw_add_roles' );
 
 /**
  * ==============================================================================
- * 2.5. SECURE AJAX HANDLERS
- * ==============================================================================
- */
-
-add_action('wp_ajax_dw_ojek_ambil_order', 'dw_ajax_ojek_ambil_order_secure');
-function dw_ajax_ojek_ambil_order_secure() {
-    // 1. Cek Nonce
-    check_ajax_referer( 'dw_ojek_action', 'security' );
-
-    // 2. Cek Capability (Harus Role Ojek atau punya capability bid)
-    if ( ! current_user_can( 'dw_view_orders' ) && ! current_user_can( 'administrator' ) ) {
-        wp_send_json_error( ['message' => 'Akses ditolak. Anda bukan Ojek resmi.'] );
-    }
-
-    global $wpdb;
-    $trx_id = isset($_POST['order_id']) ? intval($_POST['order_id']) : 0;
-    $user_id = get_current_user_id();
-
-    // 3. Logic: Update status transaksi jadi 'menunggu_penjemputan'
-    $table_trx = $wpdb->prefix . 'dw_transaksi';
-    
-    // Pastikan order masih available (status_transaksi = 'menunggu_driver')
-    $updated = $wpdb->query( $wpdb->prepare( 
-        "UPDATE $table_trx SET status_transaksi = 'menunggu_penjemputan', ojek_data = %s WHERE id = %d AND status_transaksi = 'menunggu_driver'", 
-        json_encode(['driver_id' => $user_id, 'timestamp' => time()]), 
-        $trx_id 
-    ));
-
-    if ( $updated ) {
-        wp_send_json_success( ['message' => 'Order berhasil diambil!'] );
-    } else {
-        wp_send_json_error( ['message' => 'Order sudah diambil driver lain atau tidak valid.'] );
-    }
-}
-
-/**
- * ==============================================================================
  * 2. HELPER FUNCTIONS
  * ==============================================================================
  */
+
+/**
+ * HELPER BARU: Ambil Data Produk Langsung dari Tabel dw_produk by ID
+ * Digunakan oleh handler Cart untuk memastikan data valid
+ */
+function dw_get_product_by_id($id) {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'dw_produk';
+    
+    // Pastikan tabel ada
+    if($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+        return false;
+    }
+
+    // Ambil data by ID (Primary Key tabel dw_produk)
+    $product = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE id = %d AND status = 'aktif'", $id));
+
+    return $product;
+}
 
 function tema_dw_format_rupiah($angka) {
     return 'Rp ' . number_format($angka, 0, ',', '.');
@@ -297,9 +284,9 @@ function tema_dw_rewrite_rules() {
     add_rewrite_rule('^checkout/?$', 'index.php?dw_type=checkout', 'top');
     add_rewrite_rule('^pembayaran/?$', 'index.php?dw_type=pembayaran', 'top');
     
-    if (get_option('tema_dw_rules_flushed_v21') !== 'yes') {
+    if (get_option('tema_dw_rules_flushed_v23') !== 'yes') { // Bump version
         flush_rewrite_rules();
-        update_option('tema_dw_rules_flushed_v21', 'yes');
+        update_option('tema_dw_rules_flushed_v23', 'yes');
     }
 }
 add_action('init', 'tema_dw_rewrite_rules');
@@ -358,17 +345,25 @@ add_action( 'wp_enqueue_scripts', 'dw_load_region_scripts' );
  */
 
 // --- CART HANDLER (UPDATED & SECURE) ---
+// Handler disesuaikan dengan js/ajax-cart.js yang memanggil action 'dw_add_to_cart'
 add_action('wp_ajax_dw_add_to_cart', 'dw_handle_add_to_cart');
 add_action('wp_ajax_nopriv_dw_add_to_cart', 'dw_handle_add_to_cart');
 
 function dw_handle_add_to_cart() {
     global $wpdb;
 
-    // 1. Validasi Nonce (Prioritaskan POST field dari form untuk keamanan Beli Langsung)
+    // 1. Validasi Nonce (Mendukung nama param 'nonce' dari dw_ajax.nonce atau POST form biasa)
     $nonce_valid = false;
-    if (isset($_POST['dw_cart_nonce']) && wp_verify_nonce($_POST['dw_cart_nonce'], 'dw_cart_action')) {
+    // Cek parameter 'nonce' (dari JS ajax-cart.js)
+    if (isset($_POST['nonce']) && wp_verify_nonce($_POST['nonce'], 'dw_cart_action')) {
         $nonce_valid = true;
-    } elseif (isset($_POST['security']) && wp_verify_nonce($_POST['security'], 'dw_cart_action')) {
+    } 
+    // Fallback cek parameter 'dw_cart_nonce' (dari form POST biasa)
+    elseif (isset($_POST['dw_cart_nonce']) && wp_verify_nonce($_POST['dw_cart_nonce'], 'dw_cart_action')) {
+        $nonce_valid = true;
+    }
+    // Fallback cek 'security'
+    elseif (isset($_POST['security']) && wp_verify_nonce($_POST['security'], 'dw_cart_action')) {
         $nonce_valid = true;
     }
 
@@ -376,38 +371,43 @@ function dw_handle_add_to_cart() {
         wp_send_json_error(['message' => 'Security check failed. Refresh halaman.']);
     }
 
-    // 2. Setup ID
-    $product_id = intval($_POST['product_id']);
-    $qty = intval($_POST['qty']);
+    // 2. Setup ID & Qty
+    // JS mengirim 'product_id' dan 'quantity', form mengirim 'product_id' dan 'qty'
+    $product_id = isset($_POST['product_id']) ? intval($_POST['product_id']) : 0;
+    $qty        = isset($_POST['quantity']) ? intval($_POST['quantity']) : (isset($_POST['qty']) ? intval($_POST['qty']) : 1);
+    
+    if ($product_id === 0) wp_send_json_error(['message' => 'ID Produk tidak valid']);
     if ($qty < 1) $qty = 1;
     
     // User or Session?
     $user_id = get_current_user_id();
     $session_id = session_id() ?: ($_COOKIE['PHPSESSID'] ?? '');
 
-    // 3. Cek Produk & Stok (Logic Baru)
-    $table_produk = $wpdb->prefix . 'dw_produk';
-    $produk = $wpdb->get_row($wpdb->prepare("SELECT id, id_pedagang, stok, harga FROM $table_produk WHERE id = %d AND status = 'aktif'", $product_id));
+    // 3. Cek Produk & Stok (MENGGUNAKAN HELPER TERBARU)
+    // Ini memastikan kita mengambil data dari tabel dw_produk yang benar
+    $produk = dw_get_product_by_id($product_id);
 
     if (!$produk) {
-        wp_send_json_error(['message' => 'Produk tidak ditemukan atau tidak aktif.']);
+        wp_send_json_error(['message' => 'Produk tidak ditemukan atau tidak aktif di database sistem.']);
     }
 
+    // Cek Stok Database
     if ($produk->stok < $qty) {
-        wp_send_json_error(['message' => 'Stok produk tidak mencukupi.']);
+        wp_send_json_error(['message' => 'Stok produk tidak mencukupi. Sisa: ' . $produk->stok]);
     }
 
-    // 4. Proses DB
-    $table_cart = $wpdb->prefix . 'dw_cart'; // Menggunakan tabel dw_cart yang sudah ada
+    // 4. Proses Insert/Update ke DB CART (Fitur Enterprise)
+    // Kita tetap menggunakan Tabel Cart (Persistent) bukan $_SESSION biasa
+    $table_cart = $wpdb->prefix . 'dw_cart';
     
-    // Construct Where clause based on login status
+    // Validasi apakah user/session sudah punya produk ini di cart
     if ($user_id > 0) {
-        $where = $wpdb->prepare("user_id = %d AND id_produk = %d", $user_id, $product_id);
+        $where_sql = $wpdb->prepare("user_id = %d AND id_produk = %d", $user_id, $product_id);
     } else {
-        $where = $wpdb->prepare("session_id = %s AND id_produk = %d", $session_id, $product_id);
+        $where_sql = $wpdb->prepare("session_id = %s AND id_produk = %d", $session_id, $product_id);
     }
 
-    $existing = $wpdb->get_row("SELECT id, qty FROM $table_cart WHERE $where");
+    $existing = $wpdb->get_row("SELECT id, qty FROM $table_cart WHERE $where_sql");
 
     if ($existing) {
         $new_qty = $existing->qty + $qty;
@@ -418,34 +418,34 @@ function dw_handle_add_to_cart() {
         $wpdb->update($table_cart, ['qty' => $new_qty, 'updated_at' => current_time('mysql')], ['id' => $existing->id]);
     } else {
         $data_insert = [
-            'user_id' => ($user_id > 0) ? $user_id : null,
+            'user_id'    => ($user_id > 0) ? $user_id : null,
             'session_id' => $session_id,
-            'id_produk' => $product_id,
-            'qty' => $qty,
+            'id_produk'  => $product_id, // ID dari tabel dw_produk
+            'qty'        => $qty,
             'created_at' => current_time('mysql')
         ];
         
-        // Note: Idealnya simpan 'id_pedagang' juga di cart untuk grouping checkout.
-        // Jika tabel dw_cart punya kolom 'id_pedagang', uncomment baris di bawah:
-        // $data_insert['id_pedagang'] = $produk->id_pedagang;
-
         $wpdb->insert($table_cart, $data_insert);
     }
 
-    // 5. Hitung Total Item untuk UI Badge
+    // 5. Hitung Total Item untuk UI Badge (Respon ke Ajax)
     if ($user_id > 0) {
         $count = $wpdb->get_var($wpdb->prepare("SELECT SUM(qty) FROM $table_cart WHERE user_id = %d", $user_id));
     } else {
         $count = $wpdb->get_var($wpdb->prepare("SELECT SUM(qty) FROM $table_cart WHERE session_id = %s", $session_id));
     }
 
-    wp_send_json_success(['message' => 'Berhasil masuk keranjang', 'cart_count' => (int)$count]);
+    // Kirim response sukses yang sesuai format ajax-cart.js
+    wp_send_json_success([
+        'message' => 'Produk berhasil ditambahkan!', 
+        'cart_count' => (int)$count
+    ]);
 }
 
 add_action('wp_ajax_dw_update_cart_qty', 'dw_handle_update_cart_qty');
 add_action('wp_ajax_nopriv_dw_update_cart_qty', 'dw_handle_update_cart_qty');
 function dw_handle_update_cart_qty() {
-    check_ajax_referer('dw_cart_action', 'nonce'); // Menggunakan 'nonce' key dari AJAX
+    check_ajax_referer('dw_cart_action', 'nonce');
     global $wpdb;
     $cart_id = intval($_POST['cart_id']);
     $qty = intval($_POST['qty']);
@@ -632,6 +632,40 @@ function dw_handle_toggle_wishlist() {
     wp_send_json_success(['status' => 'added']);
 }
 
+
+// --- OJEK HANDLER ---
+
+add_action('wp_ajax_dw_ojek_ambil_order', 'dw_ajax_ojek_ambil_order_secure');
+function dw_ajax_ojek_ambil_order_secure() {
+    // 1. Cek Nonce
+    check_ajax_referer( 'dw_ojek_action', 'security' );
+
+    // 2. Cek Capability (Harus Role Ojek atau punya capability bid)
+    if ( ! current_user_can( 'dw_view_orders' ) && ! current_user_can( 'administrator' ) ) {
+        wp_send_json_error( ['message' => 'Akses ditolak. Anda bukan Ojek resmi.'] );
+    }
+
+    global $wpdb;
+    $trx_id = isset($_POST['order_id']) ? intval($_POST['order_id']) : 0;
+    $user_id = get_current_user_id();
+
+    // 3. Logic: Update status transaksi jadi 'menunggu_penjemputan'
+    $table_trx = $wpdb->prefix . 'dw_transaksi';
+    
+    // Pastikan order masih available (status_transaksi = 'menunggu_driver')
+    $updated = $wpdb->query( $wpdb->prepare( 
+        "UPDATE $table_trx SET status_transaksi = 'menunggu_penjemputan', ojek_data = %s WHERE id = %d AND status_transaksi = 'menunggu_driver'", 
+        json_encode(['driver_id' => $user_id, 'timestamp' => time()]), 
+        $trx_id 
+    ));
+
+    if ( $updated ) {
+        wp_send_json_success( ['message' => 'Order berhasil diambil!'] );
+    } else {
+        wp_send_json_error( ['message' => 'Order sudah diambil driver lain atau tidak valid.'] );
+    }
+}
+
 /**
  * ==============================================================================
  * 9. PWA INTEGRATION
@@ -700,7 +734,7 @@ add_action('init', function() {
         header('Content-Type: application/javascript; charset=utf-8');
         header('Service-Worker-Allowed: /'); 
         ?>
-        const CACHE_NAME = 'dw-cache-v21';
+        const CACHE_NAME = 'dw-cache-v22';
         const OFFLINE_URL = '<?php echo home_url('/'); ?>';
         self.addEventListener('install', (event) => { event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll([OFFLINE_URL]))); self.skipWaiting(); });
         self.addEventListener('activate', (event) => { event.waitUntil(caches.keys().then((keys) => Promise.all(keys.map((k) => k !== CACHE_NAME && caches.delete(k))))); self.clients.claim(); });

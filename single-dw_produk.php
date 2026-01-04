@@ -9,7 +9,7 @@ get_header();
 global $wpdb;
 $slug = get_query_var('dw_slug');
 
-// 1. Query Data Lengkap
+// 1. Query Data Lengkap (Sesuai kode Anda)
 $table_produk   = $wpdb->prefix . 'dw_produk';
 $table_pedagang = $wpdb->prefix . 'dw_pedagang';
 $table_desa     = $wpdb->prefix . 'dw_desa';
@@ -40,7 +40,7 @@ if (!$produk) {
 $id_produk    = $produk->id;
 $judul        = esc_html($produk->nama_produk);
 $harga        = floatval($produk->harga);
-$harga_fmt    = tema_dw_format_rupiah($harga);
+$harga_fmt    = 'Rp ' . number_format($harga, 0, ',', '.');
 $stok         = intval($produk->stok);
 $deskripsi    = wp_kses_post($produk->deskripsi);
 $kategori     = esc_html($produk->kategori);
@@ -179,7 +179,6 @@ $list_foto    = array_merge([$foto_utama], (is_array($galeri_json) ? $galeri_jso
                     <h3 class="font-bold text-gray-800 mb-4">Atur Pesanan</h3>
                     
                     <?php if ($stok > 0): ?>
-                    <!-- PENTING: ID Form harus 'dw-add-to-cart-form' dan method 'POST' -->
                     <form id="dw-add-to-cart-form" method="post">
                         <!-- SECURITY NONCE -->
                         <?php wp_nonce_field('dw_cart_action', 'dw_cart_nonce'); ?>
@@ -187,9 +186,10 @@ $list_foto    = array_merge([$foto_utama], (is_array($galeri_json) ? $galeri_jso
                         <input type="hidden" name="action" value="dw_add_to_cart">
                         <input type="hidden" name="product_id" value="<?php echo $id_produk; ?>">
                         
+                        <!-- PENTING: ID 'quantity' agar dibaca JS -->
                         <div class="flex items-center justify-between bg-gray-50 rounded-lg p-2 mb-4 border border-gray-200">
                             <button type="button" onclick="updateQty(-1)" class="w-8 h-8 flex items-center justify-center bg-white rounded shadow-sm text-gray-600 hover:text-green-600 transition-colors font-bold">-</button>
-                            <input type="number" name="qty" id="qtyInput" value="1" min="1" max="<?php echo $stok; ?>" class="w-12 text-center bg-transparent border-none p-0 font-bold text-gray-800 focus:ring-0">
+                            <input type="number" name="qty" id="quantity" value="1" min="1" max="<?php echo $stok; ?>" class="w-12 text-center bg-transparent border-none p-0 font-bold text-gray-800 focus:ring-0">
                             <button type="button" onclick="updateQty(1)" class="w-8 h-8 flex items-center justify-center bg-white rounded shadow-sm text-gray-600 hover:text-green-600 transition-colors font-bold">+</button>
                         </div>
 
@@ -199,13 +199,13 @@ $list_foto    = array_merge([$foto_utama], (is_array($galeri_json) ? $galeri_jso
                         </div>
 
                         <div class="flex flex-col gap-2">
-                            <!-- PENTING: ID Button 'btn-add-cart' -->
-                            <button type="submit" id="btn-add-cart" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-green-500/20 transition-all flex items-center justify-center gap-2">
+                            <!-- PENTING: ID 'add-to-cart' dan data-id agar dibaca JS -->
+                            <button type="submit" id="add-to-cart" data-id="<?php echo $id_produk; ?>" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-green-500/20 transition-all flex items-center justify-center gap-2">
                                 <i class="fas fa-cart-plus"></i> <span>Masuk Keranjang</span>
                             </button>
                             
-                            <!-- PENTING: ID Button 'btn-buy-now' -->
-                            <button type="button" id="btn-buy-now" class="w-full bg-white border border-green-600 text-green-600 font-bold py-3 px-4 rounded-xl hover:bg-green-50 transition-all flex items-center justify-center gap-2">
+                            <!-- PENTING: ID 'buy-now' dan data-id agar dibaca JS -->
+                            <button type="button" id="buy-now" data-id="<?php echo $id_produk; ?>" class="w-full bg-white border border-green-600 text-green-600 font-bold py-3 px-4 rounded-xl hover:bg-green-50 transition-all flex items-center justify-center gap-2">
                                 <i class="fas fa-shopping-bag"></i> <span>Beli Langsung</span>
                             </button>
                         </div>
@@ -233,7 +233,7 @@ $list_foto    = array_merge([$foto_utama], (is_array($galeri_json) ? $galeri_jso
     const basePrice = <?php echo $harga; ?>;
     const stockQty  = <?php echo $stok; ?>;
     
-    // JS Fallback untuk Galeri & Qty
+    // JS Fallback untuk Galeri & Qty (Hanya UI, Logika Add to Cart ada di ajax-cart.js)
     function changeImage(src, btn) {
         document.getElementById('main-image').src = src;
         document.querySelectorAll('.gallery-thumb').forEach(b => b.classList.remove('active', 'border-green-600', 'opacity-100'));
@@ -241,7 +241,7 @@ $list_foto    = array_merge([$foto_utama], (is_array($galeri_json) ? $galeri_jso
     }
 
     function updateQty(change) {
-        const input = document.getElementById('qtyInput');
+        const input = document.getElementById('quantity');
         let newVal = parseInt(input.value) + change;
         if (newVal >= 1 && newVal <= stockQty) {
             input.value = newVal;

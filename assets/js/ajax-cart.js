@@ -1,230 +1,92 @@
 jQuery(document).ready(function($) {
     
-    // --- 1. CONFIGURATION ---
-    var config = (typeof dw_global !== 'undefined') ? dw_global : ((typeof dwCartConfig !== 'undefined') ? dwCartConfig : {});
-    
-    // Fallback jika localization belum sempurna
-    var ajaxUrl = config.ajax_url || '/wp-admin/admin-ajax.php';
-    var nonce = config.nonce || ''; 
-
-    // --- 2. GLOBAL TOAST NOTIFICATION ---
-    function showGlobalToast(message, type = 'success') {
-        let $toast = $('#global-toast');
-        if ($toast.length === 0) {
-             $('body').append(`
-                <div id="global-toast" class="fixed top-5 right-5 z-[9999] transform transition-all duration-300 translate-y-[-150%] opacity-0">
-                    <div class="bg-white rounded-xl shadow-2xl border-l-4 p-4 flex items-center gap-3 min-w-[300px]">
-                        <div id="toast-icon"></div>
-                        <div class="text-sm font-bold text-gray-700" id="toast-msg"></div>
-                    </div>
-                </div>
-            `);
-            $toast = $('#global-toast');
-        }
-
-        const iconHtml = (type === 'success') 
-            ? '<i class="fas fa-check-circle text-green-500 text-xl"></i>' 
-            : '<i class="fas fa-exclamation-circle text-red-500 text-xl"></i>';
-        const borderClass = (type === 'success') ? 'border-green-500' : 'border-red-500';
-
-        $toast.find('.bg-white').removeClass('border-green-500 border-red-500').addClass(borderClass);
-        $('#toast-icon').html(iconHtml);
-        $('#toast-msg').text(message);
-
-        // Animate
-        $toast.removeClass('translate-y-[-150%] opacity-0').addClass('translate-y-0 opacity-100');
-        setTimeout(() => {
-            $toast.removeClass('translate-y-0 opacity-100').addClass('translate-y-[-150%] opacity-0');
-        }, 3000);
-    }
-
-    // ============================================================
-    // BAGIAN A: ADD TO CART & BUY NOW (Single Product)
-    // ============================================================
-    
-    function handleCartAction(e, isBuyNow = false) {
-        e.preventDefault(); // Mencegah reload halaman/submit standar
-
-        var $form = $('#dw-add-to-cart-form');
-        var $btn  = isBuyNow ? $('#btn-buy-now') : $('#btn-add-cart');
+    // Fungsi umum untuk menambah ke keranjang
+    function addToCart(productId, quantity, isBuyNow = false) {
         
-        // Cek Login
-        if (!$('body').hasClass('logged-in')) {
-            showGlobalToast('Silakan login terlebih dahulu', 'error');
-            // window.location.href = '/login'; 
-            return;
-        }
+        // Tampilkan loading state (opsional: ubah teks tombol)
+        let btnSelector = isBuyNow ? '#buy-now' : '#add-to-cart';
+        let originalText = $(btnSelector).html();
+        $(btnSelector).html('<i class="fas fa-spinner fa-spin"></i> Proses...').prop('disabled', true);
 
-        // Loading UI
-        $btn.addClass('btn-loading').prop('disabled', true);
-
-        // Siapkan Data
-        var formData = new FormData($form[0]);
-        if(!formData.has('action')) formData.append('action', 'dw_add_to_cart');
-        
-        // AJAX Request
         $.ajax({
-            url: ajaxUrl,
+            url: dw_ajax.ajax_url,
             type: 'POST',
-            data: formData,
-            processData: false,
-            contentType: false,
+            data: {
+                action: 'dw_add_to_cart',
+                product_id: productId,
+                quantity: quantity,
+                nonce: dw_ajax.nonce
+            },
             success: function(response) {
-                // Parsing response (kadang WP mengembalikan string 0/1)
-                var res = response;
-                if (typeof response !== 'object') {
-                    try { res = JSON.parse(response); } catch(e) {}
-                }
+                if (response.success) {
+                    // 1. Update Badge Cart di Header (Cari elemen dengan class .cart-count)
+                    $('.cart-count').text(response.data.cart_count).removeClass('hidden');
 
-                if (res.success) {
                     if (isBuyNow) {
-                        // Redirect ke checkout
-                        window.location.href = '/checkout'; 
+                        // Jika Beli Langsung, redirect ke Checkout/Cart
+                        window.location.href = dw_ajax.cart_url; // Atau checkout_url
                     } else {
-                        showGlobalToast(res.data.message || 'Berhasil masuk keranjang!', 'success');
-                        
-                        // Update Badge Header
-                        if (res.data && res.data.cart_count) {
-                            $('.cart-count, .dw-cart-count').text(res.data.cart_count).removeClass('hidden');
+                        // Jika Tambah Keranjang, tampilkan notifikasi sukses
+                        if (typeof Swal !== 'undefined') {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Berhasil!',
+                                text: response.data.message,
+                                showConfirmButton: false,
+                                timer: 1500
+                            });
+                        } else {
+                            alert(response.data.message);
                         }
                     }
                 } else {
-                    showGlobalToast(res.data.message || 'Gagal menambahkan produk.', 'error');
+                    // Error Handling (Stok habis, dll)
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Gagal',
+                            text: response.data.message
+                        });
+                    } else {
+                        alert(response.data.message);
+                    }
                 }
             },
-            error: function(xhr, status, error) {
-                console.error(error);
-                showGlobalToast('Terjadi kesalahan koneksi.', 'error');
+            error: function() {
+                alert('Terjadi kesalahan koneksi. Silakan coba lagi.');
             },
             complete: function() {
-                $btn.removeClass('btn-loading').prop('disabled', false);
+                // Kembalikan tombol ke kondisi semula
+                $(btnSelector).html(originalText).prop('disabled', false);
             }
         });
     }
 
-    // Listener 1: Form Submit (Tombol Keranjang)
-    $(document).on('submit', '#dw-add-to-cart-form', function(e) {
-        handleCartAction(e, false);
+    // 1. Event Listener: Tombol Tambah ke Keranjang (Halaman Single)
+    $('#add-to-cart').on('click', function(e) {
+        e.preventDefault();
+        var product_id = $(this).data('id');
+        var quantity = $('#quantity').val() || 1;
+        
+        addToCart(product_id, quantity, false);
     });
 
-    // Listener 2: Klik Tombol Beli Langsung
-    $(document).on('click', '#btn-buy-now', function(e) {
-        handleCartAction(e, true);
+    // 2. Event Listener: Tombol Beli Langsung (Halaman Single)
+    $('#buy-now').on('click', function(e) {
+        e.preventDefault();
+        var product_id = $(this).data('id');
+        var quantity = $('#quantity').val() || 1;
+
+        addToCart(product_id, quantity, true);
     });
 
-    // ============================================================
-    // BAGIAN B: HALAMAN KERANJANG (Logic Lama Anda)
-    // ============================================================
-    
-    const cartForm = document.getElementById('cart-form');
-    if (cartForm) {
-        const checkAll = document.getElementById('check-all');
-        const storeChecks = document.querySelectorAll('.check-store');
-        const itemChecks = document.querySelectorAll('.check-item');
-        const qtyButtons = document.querySelectorAll('.btn-qty');
-        
-        // Elemen Ringkasan
-        const summaryTotalItem = document.getElementById('summary-total-item');
-        const summaryGrandTotal = document.getElementById('summary-grand-total');
-        const mobileGrandTotal = document.getElementById('mobile-grand-total');
-        const btnCheckoutDesktop = document.getElementById('btn-checkout-desktop');
-        const btnCheckoutMobile = document.getElementById('btn-checkout-mobile');
-        
-        let debounceTimer;
+    // 3. Event Listener: Tombol di Card Produk (Archive/Home)
+    // Menggunakan delegation 'document' karena card mungkin dimuat via ajax load more
+    $(document).on('click', '.add-to-cart-btn', function(e) {
+        e.preventDefault();
+        var product_id = $(this).data('id');
+        // Untuk tombol di card list, qty biasanya 1
+        addToCart(product_id, 1, false);
+    });
 
-        function formatRupiah(number) {
-            return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number);
-        }
-
-        function recalculateTotal() {
-            let totalItem = 0;
-            let totalPrice = 0;
-
-            itemChecks.forEach(item => {
-                if (item.checked && !item.disabled) {
-                    const qty = parseInt(item.dataset.qty);
-                    const price = parseFloat(item.dataset.price);
-                    totalItem += qty;
-                    totalPrice += (qty * price);
-                }
-            });
-
-            if(summaryTotalItem) summaryTotalItem.innerText = totalItem + ' pcs';
-            if(summaryGrandTotal) summaryGrandTotal.innerText = formatRupiah(totalPrice);
-            if(mobileGrandTotal) mobileGrandTotal.innerText = formatRupiah(totalPrice);
-            
-            const isDisabled = totalItem === 0;
-            if(btnCheckoutDesktop) btnCheckoutDesktop.disabled = isDisabled;
-            if(btnCheckoutMobile) btnCheckoutMobile.disabled = isDisabled;
-        }
-
-        // Event Listeners (Simplified from your code)
-        if(checkAll) {
-            checkAll.addEventListener('change', function() {
-                storeChecks.forEach(el => el.checked = this.checked);
-                itemChecks.forEach(el => { if(!el.disabled) el.checked = this.checked; });
-                recalculateTotal();
-            });
-        }
-
-        storeChecks.forEach(storeCheck => {
-            storeCheck.addEventListener('change', function() {
-                const target = this.dataset.target; 
-                document.querySelectorAll(`.${target}-item .check-item`).forEach(item => {
-                    if(!item.disabled) item.checked = this.checked;
-                });
-                recalculateTotal();
-            });
-        });
-
-        itemChecks.forEach(item => {
-            item.addEventListener('change', recalculateTotal);
-        });
-
-        qtyButtons.forEach(btn => {
-            btn.addEventListener('click', function() {
-                const action = this.dataset.action; 
-                const cartId = this.dataset.id;
-                const input = this.parentElement.querySelector('.input-qty');
-                const checkbox = this.closest(`div[class*="store-"]`).querySelector('.check-item');
-                
-                let currentQty = parseInt(input.value);
-                const maxStock = parseInt(input.dataset.stock);
-
-                if (action === 'increase') {
-                    if (currentQty >= maxStock) { showGlobalToast('Stok maksimal', 'error'); return; }
-                    currentQty++;
-                } else {
-                    if (currentQty <= 1) return;
-                    currentQty--;
-                }
-
-                input.value = currentQty;
-                checkbox.dataset.qty = currentQty;
-                recalculateTotal(); 
-
-                clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(() => {
-                    const fd = new FormData();
-                    fd.append('action', 'dw_update_cart_qty');
-                    fd.append('cart_id', cartId);
-                    fd.append('qty', currentQty);
-                    fd.append('nonce', nonce); // Using config nonce
-                    fetch(ajaxUrl, { method: 'POST', body: fd });
-                }, 500);
-            });
-        });
-
-        window.deleteCartItem = function(cartId) {
-            if(!confirm("Hapus produk ini?")) return;
-            const fd = new FormData();
-            fd.append('action', 'dw_remove_cart_item');
-            fd.append('cart_id', cartId);
-            fd.append('nonce', nonce);
-            
-            fetch(ajaxUrl, { method: 'POST', body: fd })
-            .then(r => r.json())
-            .then(d => { if(d.success) location.reload(); });
-        };
-    }
 });
