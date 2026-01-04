@@ -1,7 +1,7 @@
 <?php
 /**
- * Template Name: Akun Saya (All Roles)
- * Description: Halaman profil terpusat untuk semua user. Menampilkan menu dashboard khusus berdasarkan role.
+ * Template Name: Akun Saya (Fixed & Improved)
+ * Description: Halaman profil terpusat dengan navigasi cerdas ke dashboard khusus role.
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -24,15 +24,29 @@ $roles        = (array) $current_user->roles;
 $msg          = '';
 $msg_type     = '';
 
-/**
- * ROLE DEFINITIONS:
- * 1. administrator (Administrator)
- * 2. admin_kabupaten (Admin Kabupaten)
- * 3. admin_desa (Admin Desa)
- * 4. pedagang (Pedagang)
- * 5. dw_ojek (Ojek Desa)
- * 6. verifikator_umkm (Verifikator UMKM)
- */
+// --- LOGIC: TENTUKAN DASHBOARD UTAMA (FIX NAVIGASI) ---
+$primary_dashboard_url = '';
+$primary_dashboard_label = '';
+
+if ( in_array('administrator', $roles) ) {
+    $primary_dashboard_url = admin_url();
+    $primary_dashboard_label = 'WP Admin';
+} elseif ( in_array('pedagang', $roles) ) {
+    $primary_dashboard_url = home_url('/dashboard-toko');
+    $primary_dashboard_label = 'Dashboard Toko';
+} elseif ( in_array('admin_desa', $roles) ) {
+    $primary_dashboard_url = home_url('/dashboard-desa');
+    $primary_dashboard_label = 'Dashboard Desa';
+} elseif ( in_array('dw_ojek', $roles) ) {
+    $primary_dashboard_url = home_url('/dashboard-ojek');
+    $primary_dashboard_label = 'Dashboard Ojek';
+} elseif ( in_array('verifikator_umkm', $roles) ) {
+    $primary_dashboard_url = home_url('/dashboard-verifikator');
+    $primary_dashboard_label = 'Dashboard Verifikator';
+} elseif ( in_array('admin_kabupaten', $roles) ) {
+    $primary_dashboard_url = home_url('/dashboard-kabupaten');
+    $primary_dashboard_label = 'Dashboard Kab.';
+}
 
 // --- HELPER: FORMAT STATUS BADGE ---
 if (!function_exists('dw_get_status_badge')) {
@@ -287,6 +301,15 @@ get_header();
                         <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border border-transparent shadow-sm <?php echo $role_badge_color; ?>">
                             <i class="fas <?php echo $role_icon; ?>"></i> <?php echo $role_label; ?>
                         </span>
+
+                        <!-- IMPROVED: TOMBOL AKSES CEPAT DASHBOARD -->
+                        <?php if ( !empty($primary_dashboard_url) ) : ?>
+                            <div class="mt-5 pt-4 border-t border-gray-100">
+                                <a href="<?php echo esc_url($primary_dashboard_url); ?>" class="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-gray-900 text-white text-xs font-bold rounded-xl hover:bg-black transition shadow-lg shadow-gray-200 transform hover:-translate-y-0.5">
+                                    <i class="fas fa-rocket text-green-400"></i> <?php echo esc_html($primary_dashboard_label); ?>
+                                </a>
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
 
