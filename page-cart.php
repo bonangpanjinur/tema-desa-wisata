@@ -1,7 +1,7 @@
 <?php
 /**
  * Template Name: Keranjang Belanja (Advanced)
- * Description: Mendukung Checkbox Selection, Real-time Weight Calc, & Multi-vendor
+ * Description: Mendukung Checkbox Selection, Real-time Weight Calc, Multi-vendor & Custom Modal UI
  */
 
 if (!session_id()) session_start();
@@ -13,17 +13,12 @@ $session_id = session_id() ?: ($_COOKIE['PHPSESSID'] ?? '');
 $table_cart = $wpdb->prefix . 'dw_cart';
 
 // --- 1. QUERY DATA KERANJANG (Optimized) ---
-// Menambahkan p.berat_gram ke select statement
 $sql = $wpdb->prepare(
     "SELECT c.id as cart_id, c.qty, c.id_variasi,
             p.id as product_id, p.nama_produk, p.slug as slug_produk, p.foto_utama, p.berat_gram,
-            -- Logic Harga: Prioritas Variasi
             COALESCE(v.harga_variasi, p.harga) as final_price,
-            -- Logic Stok: Prioritas Variasi
             COALESCE(v.stok_variasi, p.stok) as final_stock,
-            -- Logic Varian
             v.deskripsi_variasi as nama_varian, v.foto as foto_varian,
-            -- Info Toko
             t.id as toko_id, t.nama_toko, t.kabupaten_nama, t.slug_toko
      FROM $table_cart c
      JOIN {$wpdb->prefix}dw_produk p ON c.id_produk = p.id
@@ -62,14 +57,14 @@ if ($cart_items) {
                 <i class="fas fa-shopping-cart text-primary"></i> Keranjang
             </h1>
             <?php if (!empty($grouped_items)) : ?>
-            <button type="button" id="btn-bulk-delete" class="text-sm text-red-500 font-medium hover:text-red-700 transition hidden">
-                Hapus Pilihan
+            <button type="button" id="btn-bulk-delete" class="text-sm text-red-500 font-medium hover:text-red-700 transition hidden flex items-center gap-1">
+                <i class="fas fa-trash-alt"></i> Hapus Pilihan
             </button>
             <?php endif; ?>
         </div>
 
         <!-- Notification Toast -->
-        <div id="cart-toast" class="fixed top-5 right-5 z-50 transform transition-all duration-300 translate-y-[-150%] opacity-0 pointer-events-none">
+        <div id="cart-toast" class="fixed top-5 right-5 z-[70] transform transition-all duration-300 translate-y-[-150%] opacity-0 pointer-events-none">
             <div class="bg-gray-800 text-white px-6 py-3 rounded-lg shadow-xl flex items-center gap-3">
                 <i id="toast-icon" class="fas fa-check-circle text-green-400"></i>
                 <span id="toast-message" class="font-medium text-sm">Update berhasil</span>
@@ -78,8 +73,8 @@ if ($cart_items) {
 
         <?php if (empty($grouped_items)) : ?>
             <!-- EMPTY STATE -->
-            <div class="bg-white rounded-2xl p-16 text-center shadow-sm border border-gray-100 flex flex-col items-center">
-                <div class="w-48 h-48 bg-gray-100 rounded-full flex items-center justify-center mb-6 text-gray-300">
+            <div class="bg-white rounded-2xl p-16 text-center shadow-sm border border-gray-100 flex flex-col items-center animate-fade-in-up">
+                <div class="w-48 h-48 bg-gray-50 rounded-full flex items-center justify-center mb-6 text-gray-300">
                     <i class="fas fa-shopping-basket text-6xl"></i>
                 </div>
                 <h2 class="text-2xl font-bold text-gray-800 mb-2">Keranjang Belanjamu Kosong</h2>
@@ -96,23 +91,23 @@ if ($cart_items) {
                 <div class="lg:col-span-2 space-y-6">
                     
                     <!-- GLOBAL CHECKBOX -->
-                    <div class="bg-white px-6 py-4 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
-                        <label class="inline-flex items-center cursor-pointer">
+                    <div class="bg-white px-6 py-4 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4 sticky top-[72px] z-20">
+                        <label class="inline-flex items-center cursor-pointer select-none">
                             <input type="checkbox" id="check-all" class="form-checkbox w-5 h-5 text-green-600 rounded border-gray-300 focus:ring-green-500 transition duration-150 ease-in-out">
-                            <span class="ml-3 text-gray-700 font-medium select-none">Pilih Semua (<?php echo $total_count_all; ?>)</span>
+                            <span class="ml-3 text-gray-700 font-medium">Pilih Semua (<?php echo $total_count_all; ?>)</span>
                         </label>
                     </div>
 
                     <!-- LOOP TOKO -->
                     <?php foreach ($grouped_items as $toko_id => $group) : ?>
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden cart-store-group" id="store-group-<?php echo $toko_id; ?>">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden cart-store-group transition-all duration-300" id="store-group-<?php echo $toko_id; ?>">
                         
                         <!-- Header Toko -->
                         <div class="bg-gray-50/50 px-6 py-3 border-b border-gray-100 flex items-center gap-3">
                             <input type="checkbox" class="check-store form-checkbox w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500" data-target="store-<?php echo $toko_id; ?>">
                             <div class="flex items-center gap-2">
-                                <a href="<?php echo home_url('/toko/'.$group['info']['slug']); ?>" class="font-bold text-gray-800 text-sm hover:text-green-600 transition">
-                                    <i class="fas fa-store mr-1 text-gray-400"></i> <?php echo esc_html($group['info']['nama']); ?>
+                                <a href="<?php echo home_url('/toko/'.$group['info']['slug']); ?>" class="font-bold text-gray-800 text-sm hover:text-green-600 transition flex items-center">
+                                    <i class="fas fa-store mr-2 text-gray-400"></i> <?php echo esc_html($group['info']['nama']); ?>
                                 </a>
                                 <span class="bg-gray-200 text-gray-600 text-[10px] px-2 py-0.5 rounded-full">
                                     <?php echo esc_html($group['info']['lokasi']); ?>
@@ -143,7 +138,7 @@ if ($cart_items) {
                                 </div>
 
                                 <!-- Gambar -->
-                                <a href="<?php echo home_url('/produk/'.$item->slug_produk); ?>" class="shrink-0 w-20 h-20 sm:w-24 sm:h-24 bg-gray-100 rounded-lg overflow-hidden border border-gray-200 relative">
+                                <a href="<?php echo home_url('/produk/'.$item->slug_produk); ?>" class="shrink-0 w-20 h-20 sm:w-24 sm:h-24 bg-gray-100 rounded-lg overflow-hidden border border-gray-200 relative group/img">
                                     <img src="<?php echo esc_url($foto_url); ?>" class="w-full h-full object-cover <?php echo $is_out_of_stock ? 'grayscale opacity-50' : ''; ?>">
                                     <?php if($is_out_of_stock): ?>
                                         <div class="absolute inset-0 flex items-center justify-center bg-black/50">
@@ -155,12 +150,12 @@ if ($cart_items) {
                                 <!-- Detail -->
                                 <div class="flex-grow flex flex-col justify-between">
                                     <div>
-                                        <a href="<?php echo home_url('/produk/'.$item->slug_produk); ?>" class="font-medium text-gray-800 line-clamp-2 hover:text-green-600 transition mb-1">
+                                        <a href="<?php echo home_url('/produk/'.$item->slug_produk); ?>" class="font-medium text-gray-800 line-clamp-2 hover:text-green-600 transition mb-1 text-sm sm:text-base">
                                             <?php echo esc_html($item->nama_produk); ?>
                                         </a>
                                         
                                         <?php if($item->id_variasi > 0): ?>
-                                            <div class="text-xs text-gray-500 bg-gray-100 inline-block px-2 py-1 rounded mb-2">
+                                            <div class="text-xs text-gray-500 bg-gray-100 inline-block px-2 py-1 rounded mb-2 border border-gray-200">
                                                 Variasi: <?php echo esc_html($item->nama_varian); ?>
                                             </div>
                                         <?php endif; ?>
@@ -171,25 +166,25 @@ if ($cart_items) {
                                     </div>
 
                                     <!-- Actions: Qty & Delete -->
-                                    <div class="flex justify-between items-end mt-2">
+                                    <div class="flex justify-between items-end mt-3">
                                         <?php if(!$is_out_of_stock): ?>
                                         <div class="flex items-center border border-gray-300 rounded-lg bg-white h-8 w-28 shadow-sm">
-                                            <button type="button" class="btn-qty w-8 h-full flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-l-lg transition" onclick="updateCartQty(<?php echo $item->cart_id; ?>, -1)">-</button>
+                                            <button type="button" class="btn-qty w-8 h-full flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-l-lg transition active:bg-gray-200" onclick="updateCartQty(<?php echo $item->cart_id; ?>, -1)">-</button>
                                             <input type="number" 
-                                                   class="input-qty w-full h-full text-center border-none text-sm font-bold text-gray-800 p-0 focus:ring-0 appearance-none" 
+                                                   class="input-qty w-full h-full text-center border-none text-sm font-bold text-gray-800 p-0 focus:ring-0 appearance-none bg-transparent" 
                                                    id="qty-<?php echo $item->cart_id; ?>"
                                                    value="<?php echo $item->qty; ?>" 
                                                    min="1" 
                                                    max="<?php echo $item->final_stock; ?>"
                                                    readonly
                                             >
-                                            <button type="button" class="btn-qty w-8 h-full flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-r-lg transition" onclick="updateCartQty(<?php echo $item->cart_id; ?>, 1)">+</button>
+                                            <button type="button" class="btn-qty w-8 h-full flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-r-lg transition active:bg-gray-200" onclick="updateCartQty(<?php echo $item->cart_id; ?>, 1)">+</button>
                                         </div>
                                         <?php else: ?>
-                                            <div class="text-xs text-red-500 italic">Stok habis</div>
+                                            <div class="text-xs text-red-500 italic flex items-center gap-1"><i class="fas fa-times-circle"></i> Stok habis</div>
                                         <?php endif; ?>
 
-                                        <button type="button" onclick="deleteCartItem(<?php echo $item->cart_id; ?>)" class="text-gray-400 hover:text-red-500 transition p-2" title="Hapus">
+                                        <button type="button" onclick="deleteCartItem(<?php echo $item->cart_id; ?>)" class="text-gray-400 hover:text-red-500 transition p-2 rounded-full hover:bg-red-50" title="Hapus">
                                             <i class="fas fa-trash-alt"></i>
                                         </button>
                                     </div>
@@ -224,7 +219,7 @@ if ($cart_items) {
                             </div>
                         </div>
 
-                        <button type="submit" id="btn-checkout-desktop" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-green-500/30 transition-all disabled:bg-gray-300 disabled:shadow-none disabled:cursor-not-allowed" disabled>
+                        <button type="submit" id="btn-checkout-desktop" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-green-500/30 transition-all disabled:bg-gray-300 disabled:shadow-none disabled:cursor-not-allowed transform active:scale-[0.98]" disabled>
                             Beli (<span id="btn-count-desktop">0</span>)
                         </button>
                     </div>
@@ -236,7 +231,7 @@ if ($cart_items) {
                         <span class="text-xs text-gray-500">Total Harga</span>
                         <span class="font-bold text-green-600 text-lg" id="mobile-grand-total">Rp 0</span>
                     </div>
-                    <button type="submit" id="btn-checkout-mobile" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 px-8 rounded-lg shadow-md transition-all disabled:bg-gray-300 disabled:cursor-not-allowed" disabled>
+                    <button type="submit" id="btn-checkout-mobile" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2.5 px-8 rounded-lg shadow-md transition-all disabled:bg-gray-300 disabled:cursor-not-allowed active:scale-95" disabled>
                         Checkout (<span id="btn-count-mobile">0</span>)
                     </button>
                 </div>
@@ -246,8 +241,41 @@ if ($cart_items) {
     </div>
 </div>
 
-<!-- Load Script Handler -->
-<!-- Pastikan script ini dimuat di footer, atau sudah di-enqueue di functions.php -->
+<!-- === CONFIRMATION MODAL === -->
+<div id="confirm-modal" class="fixed inset-0 z-[60] hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <!-- Backdrop -->
+    <div class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity opacity-0 modal-backdrop"></div>
+
+    <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+        <div class="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+            <!-- Modal Panel -->
+            <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-md opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95 modal-panel">
+                <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10 mb-3 sm:mb-0">
+                            <i class="fas fa-trash-alt text-red-600"></i>
+                        </div>
+                        <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
+                            <h3 class="text-lg font-bold leading-6 text-gray-900" id="modal-title">Konfirmasi Hapus</h3>
+                            <div class="mt-2">
+                                <p class="text-sm text-gray-500" id="modal-message">Apakah Anda yakin ingin menghapus item ini?</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 gap-2">
+                    <button type="button" id="modal-confirm-btn" class="inline-flex w-full justify-center rounded-lg bg-red-600 px-3 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-500 sm:w-auto transition-colors focus:ring-2 focus:ring-red-500 focus:ring-offset-1">
+                        Ya, Hapus
+                    </button>
+                    <button type="button" id="modal-cancel-btn" class="mt-2 sm:mt-0 inline-flex w-full justify-center rounded-lg bg-white px-3 py-2.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:w-auto transition-colors">
+                        Batal
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     // Config dari PHP ke JS
     const dwCartConfig = {
@@ -260,7 +288,60 @@ if ($cart_items) {
     document.addEventListener('DOMContentLoaded', function() {
         const $ = jQuery;
         
-        // 1. UPDATE QTY
+        // --- 0. MODAL LOGIC ---
+        const modal = document.getElementById('confirm-modal');
+        const backdrop = modal.querySelector('.modal-backdrop');
+        const panel = modal.querySelector('.modal-panel');
+        const confirmBtn = document.getElementById('modal-confirm-btn');
+        const cancelBtn = document.getElementById('modal-cancel-btn');
+        const modalMessage = document.getElementById('modal-message');
+        let confirmCallback = null;
+
+        function showConfirmModal(message, callback) {
+            modalMessage.textContent = message;
+            confirmCallback = callback;
+            
+            modal.classList.remove('hidden');
+            // Timeout kecil untuk memicu transisi CSS
+            setTimeout(() => {
+                backdrop.classList.remove('opacity-0');
+                panel.classList.remove('opacity-0', 'translate-y-4', 'sm:translate-y-0', 'sm:scale-95');
+                panel.classList.add('opacity-100', 'translate-y-0', 'sm:scale-100');
+            }, 10);
+        }
+
+        function hideModal() {
+            backdrop.classList.add('opacity-0');
+            panel.classList.remove('opacity-100', 'translate-y-0', 'sm:scale-100');
+            panel.classList.add('opacity-0', 'translate-y-4', 'sm:translate-y-0', 'sm:scale-95');
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                confirmCallback = null;
+            }, 300); // Sesuai durasi transisi CSS
+        }
+
+        confirmBtn.addEventListener('click', () => {
+            if (confirmCallback) {
+                // Tampilkan loading di tombol modal
+                const originalText = confirmBtn.innerText;
+                confirmBtn.innerText = 'Memproses...';
+                confirmBtn.disabled = true;
+                
+                // Jalankan callback, lalu tutup modal
+                confirmCallback().then(() => {
+                    hideModal();
+                    confirmBtn.innerText = originalText;
+                    confirmBtn.disabled = false;
+                });
+            } else {
+                hideModal();
+            }
+        });
+
+        cancelBtn.addEventListener('click', hideModal);
+        
+        // --- 1. UPDATE QTY ---
         window.updateCartQty = function(cartId, change) {
             const input = document.getElementById(`qty-${cartId}`);
             let newQty = parseInt(input.value) + change;
@@ -293,70 +374,87 @@ if ($cart_items) {
                     if(!res.success) {
                         showToast(res.data.message, 'error');
                         input.value = newQty - change; // Revert
+                        recalculateTotal();
                     }
                 }
             });
         };
 
-        // 2. DELETE SINGLE ITEM
+        // --- 2. DELETE SINGLE ITEM (Updated with Modal) ---
         window.deleteCartItem = function(cartId) {
-            if(!confirm('Hapus item ini dari keranjang?')) return;
-
-            $.ajax({
-                url: dwCartConfig.ajaxUrl,
-                type: 'POST',
-                data: {
-                    action: 'dw_remove_cart_item',
-                    cart_id: cartId,
-                    nonce: dwCartConfig.nonce
-                },
-                success: function(res) {
-                    if(res.success) {
-                        $(`#cart-item-${cartId}`).fadeOut(300, function() { 
-                            $(this).remove();
-                            checkEmptyState();
-                            recalculateTotal();
-                        });
-                        showToast('Item dihapus');
-                    } else {
-                        showToast('Gagal menghapus item', 'error');
-                    }
-                }
+            showConfirmModal('Apakah Anda yakin ingin menghapus item ini dari keranjang?', async function() {
+                return new Promise((resolve) => {
+                    $.ajax({
+                        url: dwCartConfig.ajaxUrl,
+                        type: 'POST',
+                        data: {
+                            action: 'dw_remove_cart_item',
+                            cart_id: cartId,
+                            nonce: dwCartConfig.nonce
+                        },
+                        success: function(res) {
+                            if(res.success) {
+                                $(`#cart-item-${cartId}`).fadeOut(300, function() { 
+                                    $(this).remove();
+                                    checkEmptyState();
+                                    recalculateTotal();
+                                });
+                                showToast('Item dihapus');
+                            } else {
+                                showToast('Gagal menghapus item', 'error');
+                            }
+                            resolve();
+                        },
+                        error: function() {
+                            showToast('Terjadi kesalahan koneksi', 'error');
+                            resolve();
+                        }
+                    });
+                });
             });
         };
 
-        // 3. BULK DELETE (Opsional, jika tombol ada)
+        // --- 3. BULK DELETE (Updated with Modal) ---
         const btnBulkDelete = document.getElementById('btn-bulk-delete');
         if(btnBulkDelete) {
             btnBulkDelete.addEventListener('click', function() {
                 const checkedIds = Array.from(document.querySelectorAll('.check-item:checked')).map(cb => cb.value);
                 if(checkedIds.length === 0) return;
 
-                if(!confirm(`Hapus ${checkedIds.length} item terpilih?`)) return;
+                showConfirmModal(`Hapus ${checkedIds.length} item terpilih? Tindakan ini tidak dapat dibatalkan.`, async function() {
+                    return new Promise((resolve) => {
+                        let completed = 0;
+                        let errors = 0;
+                        
+                        // Gunakan Promise.all untuk menangani banyak request paralel
+                        const deletePromises = checkedIds.map(id => {
+                            return $.ajax({
+                                url: dwCartConfig.ajaxUrl,
+                                type: 'POST',
+                                data: { action: 'dw_remove_cart_item', cart_id: id, nonce: dwCartConfig.nonce }
+                            }).then(() => {
+                                $(`#cart-item-${id}`).remove();
+                            }).catch(() => {
+                                errors++;
+                            });
+                        });
 
-                // Loop delete (Simple approach) or create new bulk ajax handler
-                // Disini kita loop ajax delete single item untuk simplisitas tanpa ubah backend
-                let completed = 0;
-                checkedIds.forEach(id => {
-                    $.ajax({
-                        url: dwCartConfig.ajaxUrl,
-                        type: 'POST',
-                        data: { action: 'dw_remove_cart_item', cart_id: id, nonce: dwCartConfig.nonce },
-                        success: function() {
-                            $(`#cart-item-${id}`).remove();
-                            completed++;
-                            if(completed === checkedIds.length) {
-                                checkEmptyState();
-                                recalculateTotal();
-                                showToast('Item terpilih dihapus');
+                        Promise.all(deletePromises).then(() => {
+                            checkEmptyState();
+                            recalculateTotal();
+                            if(errors > 0) {
+                                showToast(`${errors} item gagal dihapus`, 'error');
+                            } else {
+                                showToast('Semua item terpilih berhasil dihapus');
                             }
-                        }
+                            resolve();
+                        });
                     });
                 });
             });
         }
 
-        // 4. CHECKBOX LOGIC
+        // --- 4. CHECKBOX LOGIC ---
         // Check All
         $('#check-all').on('change', function() {
             const isChecked = $(this).is(':checked');
@@ -371,7 +469,6 @@ if ($cart_items) {
             const isChecked = $(this).is(':checked');
             $(`.${targetClass}:not(:disabled)`).prop('checked', isChecked);
             
-            // Update Check All status
             updateCheckAllStatus();
             recalculateTotal();
             toggleBulkDeleteBtn();
@@ -382,7 +479,6 @@ if ($cart_items) {
             const storeId = $(this).data('store');
             const storeCheckbox = $(`.check-store[data-target="store-${storeId}"]`);
             
-            // Update Store Checkbox
             const allStoreItems = $(`.check-item.store-${storeId}:not(:disabled)`);
             const checkedStoreItems = $(`.check-item.store-${storeId}:checked`);
             storeCheckbox.prop('checked', allStoreItems.length === checkedStoreItems.length);
@@ -407,7 +503,7 @@ if ($cart_items) {
             }
         }
 
-        // 5. CALCULATION
+        // --- 5. CALCULATION ---
         function recalculateTotal() {
             let totalDto = 0;
             let totalItems = 0;
@@ -416,7 +512,6 @@ if ($cart_items) {
             $('.check-item:checked').each(function() {
                 const price = parseFloat($(this).data('price')) || 0;
                 const weight = parseInt($(this).data('weight')) || 0;
-                // Ambil qty terbaru dari input, bukan data-qty awal
                 const currentQty = parseInt($(`#qty-${this.value}`).val()) || 1; 
 
                 totalDto += price * currentQty;
@@ -424,7 +519,6 @@ if ($cart_items) {
                 totalItems += currentQty;
             });
 
-            // Format Rupiah
             const fmt = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(totalDto);
             
             $('#summary-grand-total, #mobile-grand-total').text(fmt);
@@ -437,15 +531,14 @@ if ($cart_items) {
             $('#btn-checkout-desktop, #btn-checkout-mobile').prop('disabled', btnState);
         }
 
-        // 6. UTILS
+        // --- 6. UTILS ---
         function checkEmptyState() {
             if($('.cart-item-row').length === 0) {
-                location.reload(); // Reload untuk menampilkan empty state HTML dari PHP
+                location.reload(); 
             } else {
-                // Cek jika grup toko kosong
                 $('.cart-store-group').each(function() {
                     if($(this).find('.cart-item-row').length === 0) {
-                        $(this).remove();
+                        $(this).fadeOut(300, function() { $(this).remove(); });
                     }
                 });
             }
