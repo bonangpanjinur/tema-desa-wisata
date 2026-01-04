@@ -8,7 +8,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 // 1. Cek Login
 if ( ! is_user_logged_in() ) {
-    wp_redirect( home_url('/login') );
+    wp_safe_redirect( wp_login_url( get_permalink() ) );
     exit;
 }
 
@@ -23,6 +23,16 @@ $user_id      = $current_user->ID;
 $roles        = (array) $current_user->roles;
 $msg          = '';
 $msg_type     = '';
+
+/**
+ * ROLE DEFINITIONS:
+ * 1. administrator (Administrator)
+ * 2. admin_kabupaten (Admin Kabupaten)
+ * 3. admin_desa (Admin Desa)
+ * 4. pedagang (Pedagang)
+ * 5. dw_ojek (Ojek Desa)
+ * 6. verifikator_umkm (Verifikator UMKM)
+ */
 
 // --- HELPER: FORMAT STATUS BADGE ---
 if (!function_exists('dw_get_status_badge')) {
@@ -83,12 +93,11 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
                     $phone = sanitize_text_field($_POST['billing_phone']);
                     update_user_meta($user_id, 'billing_phone', $phone);
 
-                    // Sinkronisasi data ke tabel custom berdasarkan Role Baru
-                    if ( in_array('pedagang_toko', $roles) ) {
+                    // Sinkronisasi data ke tabel custom berdasarkan Role
+                    if ( in_array('pedagang', $roles) ) {
                         $wpdb->update($wpdb->prefix . 'dw_pedagang', ['nomor_wa' => $phone], ['id_user' => $user_id]);
-                    } elseif ( in_array('verifikator_desa', $roles) ) { 
-                        // Jika ada tabel verifikator/admin desa
-                        // $wpdb->update($wpdb->prefix . 'dw_desa', ['kontak' => $phone], ['id_user_desa' => $user_id]);
+                    } elseif ( in_array('admin_desa', $roles) ) { 
+                        $wpdb->update($wpdb->prefix . 'dw_desa', ['nomor_wa' => $phone], ['id_user_desa' => $user_id]);
                     }
                     
                     if ( ! empty($_FILES['profile_pic']['name']) ) {
@@ -100,10 +109,10 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
                             $foto_url = $movefile['url']; 
                             update_user_meta($user_id, 'dw_custom_avatar_url', $foto_url);
 
-                            if ( in_array('pedagang_toko', $roles) ) {
+                            if ( in_array('pedagang', $roles) ) {
                                 $wpdb->update($wpdb->prefix . 'dw_pedagang', ['foto_admin' => $foto_url], ['id_user' => $user_id]);
-                            } elseif ( in_array('verifikator_desa', $roles) ) {
-                                $wpdb->update($wpdb->prefix . 'dw_desa', ['foto_admin' => $foto_url], ['id_user_desa' => $user_id]);
+                            } elseif ( in_array('admin_desa', $roles) ) {
+                                $wpdb->update($wpdb->prefix . 'dw_desa', ['foto' => $foto_url], ['id_user_desa' => $user_id]);
                             }
                         } else {
                             $msg = 'Gagal upload foto: ' . $movefile['error'];
@@ -163,9 +172,9 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && is_user_logged_in() ) {
             ];
 
             // Sinkronisasi Alamat ke Tabel Role
-            if ( in_array('pedagang_toko', $roles) ) {
+            if ( in_array('pedagang', $roles) ) {
                 $wpdb->update($wpdb->prefix . 'dw_pedagang', $data_wilayah, ['id_user' => $user_id]);
-            } elseif ( in_array('verifikator_desa', $roles) ) {
+            } elseif ( in_array('admin_desa', $roles) ) {
                 $data_desa = $data_wilayah;
                 $data_desa['provinsi']  = $data_wilayah['provinsi_nama']; unset($data_desa['provinsi_nama']);
                 $data_desa['kabupaten'] = $data_wilayah['kabupaten_nama']; unset($data_desa['kabupaten_nama']);
@@ -197,48 +206,40 @@ $saved_kota_name = get_user_meta($user_id, 'billing_city', true);
 $saved_kec_name  = get_user_meta($user_id, 'billing_kecamatan', true);
 $saved_kel_name  = get_user_meta($user_id, 'billing_kelurahan', true);
 
-// Override Data jika Role Khusus (Ambil data dari tabel role jika meta user kosong)
-if ( in_array('pedagang_toko', $roles) ) {
-    $pedagang_data = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->prefix}dw_pedagang WHERE id_user = %d", $user_id));
-    if ($pedagang_data) {
-        if(empty($user_address)) $user_address = $pedagang_data->alamat_lengkap;
-        // Prioritaskan data user meta agar bisa beda alamat toko & rumah, tapi bisa di-fallback
-    }
-}
-
 // --- SET LABEL ROLE & WARNA BADGE ---
-// Default (Member Biasa / Subscriber)
 $role_label       = 'Wisatawan'; 
 $role_badge_color = 'bg-gray-100 text-gray-600'; 
 $role_icon        = 'fa-user';
 
-// Cek Role Tertinggi (Prioritas)
 if ( in_array('administrator', $roles) ) {
     $role_label       = 'Administrator'; 
     $role_badge_color = 'bg-red-100 text-red-600 border border-red-200'; 
     $role_icon        = 'fa-shield-alt';
-} elseif ( in_array('verifikator_desa', $roles) ) {
+} elseif ( in_array('admin_kabupaten', $roles) ) {
+    $role_label       = 'Admin Kabupaten'; 
+    $role_badge_color = 'bg-indigo-100 text-indigo-600 border border-indigo-200'; 
+    $role_icon        = 'fa-city';
+} elseif ( in_array('admin_desa', $roles) ) {
     $role_label       = 'Admin Desa'; 
     $role_badge_color = 'bg-blue-100 text-blue-600 border border-blue-200'; 
     $role_icon        = 'fa-landmark';
-} elseif ( in_array('pedagang_toko', $roles) ) {
+} elseif ( in_array('pedagang', $roles) ) {
     $role_label       = 'Pedagang / UMKM'; 
     $role_badge_color = 'bg-purple-100 text-purple-600 border border-purple-200'; 
     $role_icon        = 'fa-store';
-} elseif ( in_array('pengelola_ojek', $roles) ) {
-    $role_label       = 'Mitra Ojek'; 
+} elseif ( in_array('dw_ojek', $roles) ) {
+    $role_label       = 'Ojek Desa'; 
     $role_badge_color = 'bg-orange-100 text-orange-600 border border-orange-200'; 
     $role_icon        = 'fa-motorcycle';
-} elseif ( in_array('editor', $roles) || in_array('author', $roles) ) {
-    $role_label       = 'Kontributor'; 
-    $role_badge_color = 'bg-teal-100 text-teal-600 border border-teal-200'; 
-    $role_icon        = 'fa-pen-nib';
+} elseif ( in_array('verifikator_umkm', $roles) ) {
+    $role_label       = 'Verifikator UMKM'; 
+    $role_badge_color = 'bg-emerald-100 text-emerald-600 border border-emerald-200'; 
+    $role_icon        = 'fa-user-check';
 }
 
 get_header();
 ?>
 
-<!-- Tailwind CSS & Font Awesome (Fallback jika header tidak memuat) -->
 <style>
     .tab-content { display: none; animation: fadeIn 0.4s ease-out; }
     .tab-content.active { display: block; }
@@ -248,7 +249,6 @@ get_header();
     .nav-link:hover:not(.active) { background-color: #f8fafc; color: #334155; }
     .form-input { transition: all 0.2s; }
     .form-input:focus { border-color: #16a34a; box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15); }
-    
     .dw-modal { transition: opacity 0.3s ease-in-out; opacity: 0; pointer-events: none; }
     .dw-modal.open { opacity: 1; pointer-events: auto; }
     .dw-modal-content { transform: scale(0.95); transition: transform 0.3s ease-in-out; }
@@ -326,7 +326,7 @@ get_header();
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             
                             <!-- SHORTCUT KHUSUS ROLE -->
-                            <?php if ( in_array('pedagang_toko', $roles) || in_array('administrator', $roles) ) : ?>
+                            <?php if ( in_array('pedagang', $roles) || in_array('administrator', $roles) ) : ?>
                             <a href="<?php echo home_url('/dashboard-toko'); ?>" class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-600 to-emerald-700 text-white p-6 shadow-lg transform hover:-translate-y-1 transition duration-300 group">
                                 <div class="absolute right-0 top-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10 group-hover:scale-110 transition"></div>
                                 <div class="relative z-10">
@@ -337,7 +337,7 @@ get_header();
                             </a>
                             <?php endif; ?>
 
-                            <?php if ( in_array('verifikator_desa', $roles) || in_array('administrator', $roles) ) : ?>
+                            <?php if ( in_array('admin_desa', $roles) || in_array('administrator', $roles) ) : ?>
                             <a href="<?php echo home_url('/dashboard-desa'); ?>" class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-600 text-white p-6 shadow-lg transform hover:-translate-y-1 transition duration-300 group">
                                 <div class="absolute right-0 top-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10 group-hover:scale-110 transition"></div>
                                 <div class="relative z-10">
@@ -348,13 +348,35 @@ get_header();
                             </a>
                             <?php endif; ?>
 
-                            <?php if ( in_array('pengelola_ojek', $roles) || in_array('administrator', $roles) ) : ?>
+                            <?php if ( in_array('dw_ojek', $roles) || in_array('administrator', $roles) ) : ?>
                             <a href="<?php echo home_url('/dashboard-ojek'); ?>" class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 text-white p-6 shadow-lg transform hover:-translate-y-1 transition duration-300 group">
                                 <div class="absolute right-0 top-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10 group-hover:scale-110 transition"></div>
                                 <div class="relative z-10">
                                     <div class="w-12 h-12 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center mb-4"><i class="fas fa-motorcycle text-2xl"></i></div>
                                     <h3 class="text-xl font-bold mb-1">Dashboard Ojek</h3>
-                                    <p class="text-orange-100 text-sm">Kelola pesanan ojek dan tarif.</p>
+                                    <p class="text-orange-100 text-sm">Kelola pesanan ojek dan pengantaran.</p>
+                                </div>
+                            </a>
+                            <?php endif; ?>
+
+                            <?php if ( in_array('verifikator_umkm', $roles) || in_array('administrator', $roles) ) : ?>
+                            <a href="<?php echo home_url('/dashboard-verifikator'); ?>" class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white p-6 shadow-lg transform hover:-translate-y-1 transition duration-300 group">
+                                <div class="absolute right-0 top-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10 group-hover:scale-110 transition"></div>
+                                <div class="relative z-10">
+                                    <div class="w-12 h-12 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center mb-4"><i class="fas fa-user-check text-2xl"></i></div>
+                                    <h3 class="text-xl font-bold mb-1">Verifikator UMKM</h3>
+                                    <p class="text-emerald-100 text-sm">Verifikasi pedagang binaan dan laporan komisi.</p>
+                                </div>
+                            </a>
+                            <?php endif; ?>
+
+                            <?php if ( in_array('admin_kabupaten', $roles) || in_array('administrator', $roles) ) : ?>
+                            <a href="<?php echo home_url('/dashboard-kabupaten'); ?>" class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-700 text-white p-6 shadow-lg transform hover:-translate-y-1 transition duration-300 group">
+                                <div class="absolute right-0 top-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10 group-hover:scale-110 transition"></div>
+                                <div class="relative z-10">
+                                    <div class="w-12 h-12 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center mb-4"><i class="fas fa-city text-2xl"></i></div>
+                                    <h3 class="text-xl font-bold mb-1">Admin Kabupaten</h3>
+                                    <p class="text-indigo-100 text-sm">Pengawasan tingkat kabupaten dan moderasi.</p>
                                 </div>
                             </a>
                             <?php endif; ?>
@@ -374,130 +396,75 @@ get_header();
                     </div>
                 </div>
 
-                <!-- 2. TAB PESANAN (UNTUK SEMUA ROLE YG MEMBELI) -->
+                <!-- 2. TAB PESANAN -->
                 <div id="tab-orders" class="tab-content">
-                    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden min-h-[500px]">
-                        <div class="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                            <h2 class="text-xl font-bold text-gray-800">Riwayat Pesanan</h2>
-                            <a href="<?php echo home_url('/keranjang'); ?>" class="text-xs font-bold text-green-600 hover:underline">Ke Keranjang</a>
-                        </div>
-
-                        <div class="p-6 space-y-4">
-                            <?php
-                            // Ambil transaksi dimana user ini adalah PEMBELI
-                            $transactions = $wpdb->get_results($wpdb->prepare(
-                                "SELECT * FROM {$wpdb->prefix}dw_transaksi WHERE id_pembeli = %d ORDER BY created_at DESC", 
-                                $user_id
-                            ));
-
-                            if ($transactions): ?>
-                                <div class="space-y-4">
-                                    <?php foreach ($transactions as $trx): 
-                                        $tgl = date_i18n('d M Y, H:i', strtotime($trx->created_at));
-                                        
-                                        // Ambil Detail untuk Modal
-                                        $sub_orders = $wpdb->get_results($wpdb->prepare("SELECT * FROM {$wpdb->prefix}dw_transaksi_sub WHERE id_transaksi = %d", $trx->id));
-                                        $payload_subs = [];
-                                        foreach($sub_orders as $sub) {
-                                            $items = $wpdb->get_results($wpdb->prepare("SELECT * FROM {$wpdb->prefix}dw_transaksi_items WHERE id_sub_transaksi = %d", $sub->id));
-                                            $payload_subs[] = ['data' => $sub, 'items' => $items];
-                                        }
-                                        $json_data = json_encode(['master' => $trx, 'subs' => $payload_subs]);
-                                    ?>
-                                    <div class="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all group">
-                                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-                                            <div class="flex items-center gap-3">
-                                                <div class="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-green-600 group-hover:bg-green-600 group-hover:text-white transition-colors">
-                                                    <i class="fas fa-receipt"></i>
-                                                </div>
-                                                <div>
-                                                    <p class="text-[10px] text-gray-400 font-mono uppercase tracking-widest leading-none mb-1">ID: <?php echo esc_html($trx->kode_unik); ?></p>
-                                                    <p class="text-xs text-gray-500 font-bold"><?php echo $tgl; ?></p>
-                                                </div>
-                                            </div>
-                                            <div class="flex flex-col items-end gap-1">
-                                                <span class="text-[8px] font-black text-gray-300 uppercase tracking-tighter">Status Transaksi</span>
-                                                <?php echo dw_get_status_badge($trx->status_transaksi); ?>
+                    <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-8">
+                        <h2 class="text-xl font-bold text-gray-800 mb-8">Riwayat Pesanan</h2>
+                        <?php
+                        $table_trx = $wpdb->prefix . 'dw_transaksi';
+                        $orders = $wpdb->get_results($wpdb->prepare("SELECT * FROM $table_trx WHERE id_pembeli = %d ORDER BY created_at DESC LIMIT 20", $user_id));
+                        
+                        if ( $orders ) : ?>
+                            <div class="space-y-4">
+                                <?php foreach ( $orders as $order ) : ?>
+                                    <div class="p-5 rounded-2xl border border-gray-100 hover:border-green-200 transition-all flex flex-col md:flex-row justify-between items-center gap-4">
+                                        <div class="flex items-center gap-4">
+                                            <div class="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400"><i class="fas fa-receipt text-xl"></i></div>
+                                            <div>
+                                                <p class="text-[10px] font-mono text-gray-400 uppercase tracking-widest">#<?php echo esc_html($order->kode_unik); ?></p>
+                                                <h4 class="font-bold text-gray-800"><?php echo esc_html(date('d M Y', strtotime($order->created_at))); ?></h4>
+                                                <p class="text-xs font-black text-green-600"><?php echo esc_html(tema_dw_format_rupiah($order->total_transaksi)); ?></p>
                                             </div>
                                         </div>
-                                        
-                                        <div class="bg-gray-50/50 rounded-xl p-4 flex flex-wrap justify-between items-end border border-gray-100">
-                                            <div class="flex items-center gap-3">
-                                                <div class="text-gray-400"><i class="fas fa-credit-card"></i></div>
-                                                <div>
-                                                    <p class="text-[9px] text-gray-400 font-bold uppercase mb-0.5">Metode Bayar</p>
-                                                    <p class="text-xs font-black text-gray-700 uppercase italic tracking-tighter">
-                                                        <?php echo str_replace('_', ' ', $trx->metode_pembayaran); ?>
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <div class="text-right">
-                                                <p class="text-[9px] text-gray-400 font-bold uppercase mb-1">Total Tagihan</p>
-                                                <p class="font-black text-lg text-green-600 leading-none"><?php echo 'Rp ' . number_format($trx->total_transaksi, 0, ',', '.'); ?></p>
-                                            </div>
-                                        </div>
-
-                                        <div class="mt-4 flex justify-end gap-3">
-                                            <?php if($trx->status_transaksi == 'menunggu_pembayaran'): ?>
-                                                <a href="<?php echo home_url('/pembayaran?id=' . $trx->kode_unik); ?>" class="px-6 py-2.5 rounded-xl text-xs font-black bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-100 transition-all flex items-center gap-2">
-                                                    <i class="fas fa-wallet"></i> Bayar Sekarang
-                                                </a>
-                                            <?php endif; ?>
-                                            <button onclick='openDetailTrx(<?php echo $json_data; ?>)' class="px-6 py-2.5 rounded-xl text-xs font-black bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-green-600 transition-all shadow-sm flex items-center gap-2">
-                                                <i class="fas fa-list-ul"></i> Detail Pesanan
-                                            </button>
+                                        <div class="flex items-center gap-3">
+                                            <?php echo dw_get_status_badge($order->status_transaksi); ?>
+                                            <button onclick='openDetailTrx(<?php echo json_encode(["master" => $order, "subs" => []]); ?>)' class="px-4 py-2 rounded-xl bg-gray-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-black transition">Detail</button>
                                         </div>
                                     </div>
-                                    <?php endforeach; ?>
-                                </div>
-                            <?php else: ?>
-                                <div class="text-center py-24">
-                                    <div class="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-300">
-                                        <i class="fas fa-shopping-basket text-3xl"></i>
-                                    </div>
-                                    <h3 class="text-lg font-bold text-gray-700">Belum ada pesanan</h3>
-                                    <p class="text-gray-500 text-sm mb-8">Ayo mulai belanja produk desa kami!</p>
-                                    <a href="<?php echo home_url('/produk'); ?>" class="bg-green-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-green-100 hover:bg-green-700 transition">Buka Toko</a>
-                                </div>
-                            <?php endif; ?>
-                        </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php else : ?>
+                            <div class="text-center py-20">
+                                <div class="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-200"><i class="fas fa-shopping-cart text-3xl"></i></div>
+                                <p class="text-gray-400 font-medium">Belum ada riwayat pesanan.</p>
+                                <a href="<?php echo home_url('/produk'); ?>" class="text-green-600 font-bold text-sm mt-2 inline-block hover:underline">Mulai Belanja Sekarang</a>
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
 
                 <!-- 3. ADDRESS TAB -->
                 <div id="tab-address" class="tab-content">
                     <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-8">
-                        <h2 class="text-xl font-bold text-gray-800 mb-6">Informasi Alamat</h2>
+                        <h2 class="text-xl font-bold text-gray-800 mb-8">Alamat Pengiriman</h2>
                         <form method="post" action="">
                             <?php wp_nonce_field('dw_save_address', 'dw_address_nonce'); ?>
                             <input type="hidden" name="dw_action" value="update_address">
-                            <input type="hidden" name="provinsi_nama" id="input_provinsi_nama" value="<?php echo esc_attr($saved_prov_name); ?>">
-                            <input type="hidden" name="kota_nama" id="input_kota_nama" value="<?php echo esc_attr($saved_kota_name); ?>">
-                            <input type="hidden" name="kecamatan_nama" id="input_kecamatan_nama" value="<?php echo esc_attr($saved_kec_name); ?>">
-                            <input type="hidden" name="kelurahan_nama" id="input_kelurahan_nama" value="<?php echo esc_attr($saved_kel_name); ?>">
-                            <div id="region-data" data-prov="<?php echo esc_attr($saved_prov_id); ?>" data-kota="<?php echo esc_attr($saved_kota_id); ?>" data-kec="<?php echo esc_attr($saved_kec_id); ?>" data-kel="<?php echo esc_attr($saved_kel_id); ?>"></div>
-
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                                 <div>
                                     <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Provinsi</label>
-                                    <select name="api_provinsi_id" id="dw_provinsi" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:bg-white outline-none appearance-none font-bold"></select>
+                                    <select name="api_provinsi_id" id="provinsi" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm outline-none font-bold" data-selected="<?php echo esc_attr($saved_prov_id); ?>"><option value="">Pilih Provinsi</option></select>
+                                    <input type="hidden" name="provinsi_nama" id="provinsi_nama" value="<?php echo esc_attr($saved_prov_name); ?>">
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Kota / Kabupaten</label>
-                                    <select name="api_kabupaten_id" id="dw_kota" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:bg-white outline-none appearance-none disabled:opacity-50 font-bold" disabled></select>
+                                    <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Kota/Kabupaten</label>
+                                    <select name="api_kabupaten_id" id="kota" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm outline-none font-bold" data-selected="<?php echo esc_attr($saved_kota_id); ?>"><option value="">Pilih Kota</option></select>
+                                    <input type="hidden" name="kota_nama" id="kota_nama" value="<?php echo esc_attr($saved_kota_name); ?>">
                                 </div>
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                                 <div>
                                     <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Kecamatan</label>
-                                    <select name="api_kecamatan_id" id="dw_kecamatan" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:bg-white outline-none appearance-none disabled:opacity-50 font-bold" disabled></select>
+                                    <select name="api_kecamatan_id" id="kecamatan" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm outline-none font-bold" data-selected="<?php echo esc_attr($saved_kec_id); ?>"><option value="">Pilih Kecamatan</option></select>
+                                    <input type="hidden" name="kecamatan_nama" id="kecamatan_nama" value="<?php echo esc_attr($saved_kec_name); ?>">
                                 </div>
                                 <div>
-                                    <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Kelurahan / Desa</label>
-                                    <select name="api_kelurahan_id" id="dw_kelurahan" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm bg-gray-50 focus:bg-white outline-none appearance-none disabled:opacity-50 font-bold" disabled></select>
+                                    <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Kelurahan</label>
+                                    <select name="api_kelurahan_id" id="kelurahan" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm outline-none font-bold" data-selected="<?php echo esc_attr($saved_kel_id); ?>"><option value="">Pilih Kelurahan</option></select>
+                                    <input type="hidden" name="kelurahan_nama" id="kelurahan_nama" value="<?php echo esc_attr($saved_kel_name); ?>">
                                 </div>
                             </div>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
                                 <div class="md:col-span-2">
                                     <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Detail Alamat</label>
                                     <textarea name="alamat_lengkap" rows="2" class="form-input w-full border-gray-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-green-500 outline-none font-bold" placeholder="Nama Jalan, No. Rumah..."><?php echo esc_textarea($user_address); ?></textarea>
@@ -632,7 +599,6 @@ get_header();
         $('#tab-' + tabId).addClass('active');
         $('.nav-link').removeClass('active');
         $(btn).addClass('active');
-        // Simple hash logic
     }
 
     function previewImage(input) {
@@ -643,7 +609,6 @@ get_header();
         }
     }
 
-    // MODAL LOGIC
     function openDetailTrx(payload) {
         const master = payload.master;
         const subs = payload.subs;
@@ -658,126 +623,31 @@ get_header();
         
         document.getElementById('modal-invoice-btn').href = '<?php echo home_url('/pembayaran?id='); ?>' + master.kode_unik + '&invoice=1';
 
-        const buktiSec = document.getElementById('modal-bukti-section');
-        const buktiImg = document.getElementById('modal-bukti-img');
-        if (master.bukti_pembayaran) {
-            buktiSec.classList.remove('hidden');
-            buktiImg.src = master.bukti_pembayaran;
-        } else {
-            buktiSec.classList.add('hidden');
-        }
-
-        const container = document.getElementById('modal-subs-container');
-        container.innerHTML = '';
-
-        subs.forEach(row => {
-            let itemsHtml = '';
-            row.items.forEach(it => {
-                itemsHtml += `
-                    <div class="flex items-center gap-4 py-3 border-b border-gray-50 last:border-0">
-                        <img src="${it.foto_snapshot}" class="w-12 h-12 rounded-xl object-cover bg-gray-50 border border-gray-100 shadow-sm">
-                        <div class="flex-grow">
-                            <p class="text-[11px] font-black text-gray-800 line-clamp-1 leading-tight mb-1">${it.nama_produk}</p>
-                            <p class="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">${it.jumlah} Unit x ${formatRupiah(it.harga_satuan)}</p>
-                        </div>
-                        <div class="text-right">
-                            <p class="text-xs font-black text-gray-900 leading-none">${formatRupiah(it.total_harga)}</p>
-                        </div>
-                    </div>
-                `;
-            });
-
-            let deliveryIcon = '<i class="fas fa-truck text-blue-600"></i>';
-            if(row.data.metode_pengiriman.toLowerCase().includes('ojek')) deliveryIcon = '<i class="fas fa-motorcycle text-teal-600"></i>';
-            if(row.data.metode_pengiriman.toLowerCase().includes('ambil')) deliveryIcon = '<i class="fas fa-store-alt text-amber-600"></i>';
-
-            container.innerHTML += `
-                <div class="rounded-[2rem] border border-gray-100 overflow-hidden shadow-sm bg-white hover:border-green-100 transition-colors">
-                    <div class="px-6 py-4 bg-gray-50/80 flex flex-wrap items-center justify-between border-b gap-3">
-                        <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-xl bg-green-100 text-green-600 flex items-center justify-center text-xs shadow-sm"><i class="fas fa-store"></i></div>
-                            <span class="text-sm font-black text-gray-800 tracking-tight leading-none">${row.data.nama_toko}</span>
-                        </div>
-                        ${getBadge(row.data.status_pesanan)}
-                    </div>
-                    <div class="p-6">
-                        <div class="flex items-center justify-between mb-5 bg-gray-50/50 px-4 py-3 rounded-2xl border border-gray-100">
-                            <span class="text-[9px] font-black text-gray-400 uppercase tracking-widest">Pengiriman</span>
-                            <span class="text-xs font-black text-gray-700 flex items-center gap-2">${deliveryIcon} ${row.data.metode_pengiriman}</span>
-                        </div>
-                        <div class="space-y-1">${itemsHtml}</div>
-                        <div class="mt-5 pt-5 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                            <div class="text-[10px] text-gray-400 font-bold italic tracking-tighter">Biaya Kirim: ${formatRupiah(row.data.ongkir)}</div>
-                            <div class="text-sm font-black text-gray-900 tracking-tighter">Subtotal: ${formatRupiah(row.data.total_pesanan_toko)}</div>
-                        </div>
-                        ${row.data.no_resi ? `<div class="mt-4 text-[9px] font-black text-indigo-600 bg-indigo-50 px-4 py-2 rounded-full w-fit border border-indigo-100 flex items-center gap-2"><i class="fas fa-barcode"></i> Resi: ${row.data.no_resi}</div>` : ''}
-                    </div>
-                </div>
-            `;
-        });
-
-        $('#trx-modal').removeClass('hidden').addClass('open');
+        const modal = document.getElementById('trx-modal');
+        modal.classList.remove('hidden');
+        setTimeout(() => modal.classList.add('open'), 10);
     }
 
-    function closeTrxModal() { $('#trx-modal').removeClass('open'); setTimeout(()=>$('#trx-modal').addClass('hidden'),300); }
-    function formatRupiah(n) { return 'Rp ' + new Intl.NumberFormat('id-ID').format(n); }
+    function closeTrxModal() {
+        const modal = document.getElementById('trx-modal');
+        modal.classList.remove('open');
+        setTimeout(() => modal.classList.add('hidden'), 300);
+    }
+
+    function formatRupiah(angka) {
+        return 'Rp ' + new Intl.NumberFormat('id-ID').format(angka);
+    }
 
     function getBadge(status) {
         const config = {
-            'menunggu_pembayaran': {l: 'BELUM BAYAR', c: 'bg-amber-50 text-amber-600 border-amber-200', i: 'fa-wallet'},
-            'pembayaran_dikonfirmasi': {l: 'SUDAH BAYAR', c: 'bg-emerald-50 text-emerald-600 border-emerald-200', i: 'fa-check-circle'},
-            'menunggu_konfirmasi': {l: 'KONFIRMASI TOKO', c: 'bg-orange-50 text-orange-600 border-orange-100', i: 'fa-store-alt'},
-            'diproses': {l: 'DIPROSES', c: 'bg-blue-50 text-blue-600 border-blue-200', i: 'fa-box-open'},
-            'menunggu_driver': {l: 'CARI DRIVER', c: 'bg-fuchsia-50 text-fuchsia-600 border-fuchsia-200', i: 'fa-user-clock'},
-            'dalam_perjalanan': {l: 'KURIR DI JALAN', c: 'bg-teal-50 text-teal-600 border-teal-200', i: 'fa-motorcycle'},
-            'dikirim': {l: 'DIKIRIM', c: 'bg-indigo-50 text-indigo-600 border-indigo-200', i: 'fa-truck'},
-            'selesai': {l: 'SELESAI', c: 'bg-green-600 text-white border-green-700 shadow-sm', i: 'fa-check-double'},
-            'dibatalkan': {l: 'BATAL', c: 'bg-rose-50 text-rose-600 border-rose-200', i: 'fa-ban'},
-            'expired': {l: 'EXPIRED', c: 'bg-gray-50 text-gray-400 border-gray-200', i: 'fa-clock'}
+            'menunggu_pembayaran': 'bg-amber-50 text-amber-600 border-amber-200',
+            'pembayaran_dikonfirmasi': 'bg-emerald-50 text-emerald-600 border-emerald-200',
+            'selesai': 'bg-green-600 text-white border-green-700',
+            'dibatalkan': 'bg-gray-100 text-gray-500 border-gray-200'
         };
-        const res = config[status] || {l: status.toUpperCase().replace('_',' '), c: 'bg-gray-50 text-gray-500 border-gray-200', i: 'fa-info-circle'};
-        return `<span class="px-3 py-1 rounded-lg text-[8px] font-black border tracking-tighter flex items-center ${res.c}"><i class="fas ${res.i} mr-1.5"></i>${res.l}</span>`;
+        const cls = config[status] || 'bg-gray-50 text-gray-600 border-gray-200';
+        return `<span class="px-2 py-1 rounded-full text-[8px] font-black border uppercase ${cls}">${status.replace('_', ' ')}</span>`;
     }
-
-    // REGION API
-    jQuery(document).ready(function($) {
-        var els = { prov: $('#dw_provinsi'), kota: $('#dw_kota'), kec: $('#dw_kecamatan'), kel: $('#dw_kelurahan') };
-        var data = $('#region-data').data();
-
-        function loadR(act, pid, el, sel, cb) {
-            el.html('<option>Memuat...</option>').prop('disabled', true);
-            $.get(ajaxurl, { action: act, province_id: pid, regency_id: pid, district_id: pid }, function(res){
-                if(res.success) {
-                    var o = '<option value="">-- Pilih --</option>';
-                    $.each(res.data, function(i,v){ o+='<option value="'+(v.id||v.code)+'" '+((v.id||v.code)==sel?'selected':'')+'>'+(v.name||v.nama)+'</option>'; });
-                    el.html(o).prop('disabled', false); if(cb) cb();
-                }
-            });
-        }
-        function setH() {
-            $('#input_provinsi_nama').val(els.prov.find('option:selected').text());
-            $('#input_kota_nama').val(els.kota.find('option:selected').text());
-            $('#input_kecamatan_nama').val(els.kec.find('option:selected').text());
-            $('#input_kelurahan_nama').val(els.kel.find('option:selected').text());
-        }
-
-        loadR('dw_fetch_provinces', null, els.prov, data.prov, function(){
-            if(data.prov) loadR('dw_fetch_regencies', data.prov, els.kota, data.kota, function(){
-                if(data.kota) loadR('dw_fetch_districts', data.kota, els.kec, data.kec, function(){
-                    if(data.kec) loadR('dw_fetch_villages', data.kec, els.kel, data.kel, setH);
-                });
-            });
-        });
-
-        els.prov.change(function(){ setH(); loadR('dw_fetch_regencies', $(this).val(), els.kota, null); els.kec.html('').prop('disabled',true); els.kel.html('').prop('disabled',true); });
-        els.kota.change(function(){ setH(); loadR('dw_fetch_districts', $(this).val(), els.kec, null); els.kel.html('').prop('disabled',true); });
-        els.kec.change(function(){ loadR('dw_fetch_villages', $(this).val(), els.kel, null); });
-        els.kel.change(setH);
-        
-        // Tab switching from URL hash
-        var hash = window.location.hash.replace('#','');
-        if(hash && $('#tab-'+hash).length) switchTab(hash, $('button[onclick*="'+hash+'"]'));
-    });
 </script>
 
 <?php get_footer(); ?>
