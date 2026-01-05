@@ -1,4 +1,3 @@
-<?php if ( ! defined( "ABSPATH" ) ) { exit; } ?>
 <?php get_header(); ?>
 
 <!-- WRAPPER UTAMA (Background Abu-abu ala Marketplace) -->
@@ -16,7 +15,6 @@
                 $banners = [];
                 // Cek tabel & ambil data
                 if($wpdb->get_var("SHOW TABLES LIKE '$table_banner'") == $table_banner) {
-                    // Optimasi: Gunakan cache jika memungkinkan (manual via transient jika di server asli)
                     $banners = $wpdb->get_results("SELECT * FROM $table_banner WHERE status = 'aktif' ORDER BY prioritas ASC");
                 }
 
@@ -179,20 +177,19 @@
                 $table_wisata = $wpdb->prefix . 'dw_wisata';
                 $table_desa   = $wpdb->prefix . 'dw_desa';
                 
-                $list_wisata = get_transient( 'dw_home_wisata' );
-                if ( false === $list_wisata ) {
-                    if($wpdb->get_var("SHOW TABLES LIKE '$table_wisata'") == $table_wisata) {
-                        $query_wisata = "
-                            SELECT w.*, d.nama_desa 
-                            FROM $table_wisata w
-                            LEFT JOIN $table_desa d ON w.id_desa = d.id
-                            WHERE w.status = 'aktif'
-                            ORDER BY w.rating_avg DESC
-                            LIMIT 4
-                        ";
-                        $list_wisata = $wpdb->get_results($query_wisata);
-                        set_transient( 'dw_home_wisata', $list_wisata, 4 * HOUR_IN_SECONDS );
-                    }
+                // Query: Ambil Wisata + Nama Desa
+                $query_wisata = "
+                    SELECT w.*, d.nama_desa 
+                    FROM $table_wisata w
+                    LEFT JOIN $table_desa d ON w.id_desa = d.id
+                    WHERE w.status = 'aktif'
+                    ORDER BY w.rating_avg DESC, w.created_at DESC
+                    LIMIT 4
+                ";
+                
+                $list_wisata = [];
+                if($wpdb->get_var("SHOW TABLES LIKE '$table_wisata'") == $table_wisata) {
+                    $list_wisata = $wpdb->get_results($query_wisata);
                 }
 
                 if (!empty($list_wisata)) :
@@ -210,70 +207,111 @@
         </div>
     </section>
 
-    <!-- 4. PRODUK UNGGULAN SECTION -->
-    <section class="py-6 md:py-10 bg-white">
+    <!-- 4. PRODUK DESA SECTION -->
+    <section class="py-6 md:py-10 bg-white border-t border-gray-100">
         <div class="container mx-auto px-4">
-            <div class="flex justify-between items-end mb-6">
+            <div class="flex justify-between items-center mb-6">
                 <div>
-                    <h2 class="text-xl md:text-3xl font-bold text-gray-900 mb-1">Produk Unggulan</h2>
-                    <p class="text-gray-500 text-sm md:text-base">Karya terbaik dari UMKM desa kami</p>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="bg-orange-100 text-orange-600 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">Produk Lokal</span>
+                    </div>
+                    <h2 class="text-xl md:text-3xl font-bold text-gray-900">Oleh-oleh Khas Desa</h2>
                 </div>
-                <a href="<?php echo home_url('/produk'); ?>" class="text-orange-600 font-semibold text-sm hover:text-orange-700 flex items-center gap-1 transition">
-                    Lihat Semua <i class="fas fa-arrow-right text-xs"></i>
+                <a href="<?php echo home_url('/produk'); ?>" class="text-orange-600 font-semibold text-sm hover:text-orange-700 transition">
+                    Lihat Semua
                 </a>
             </div>
 
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-6">
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-6">
                 <?php 
-                $table_produk = $wpdb->prefix . 'dw_produk';
-                
-                $list_produk = get_transient( 'dw_home_produk' );
-                if ( false === $list_produk ) {
-                    if($wpdb->get_var("SHOW TABLES LIKE '$table_produk'") == $table_produk) {
-                        $query_produk = "
-                            SELECT p.*, t.nama_toko 
-                            FROM $table_produk p
-                            LEFT JOIN {$wpdb->prefix}dw_pedagang t ON p.id_pedagang = t.id
-                            WHERE p.status = 'aktif'
-                            ORDER BY p.terjual DESC
-                            LIMIT 8
-                        ";
-                        $list_produk = $wpdb->get_results($query_produk);
-                        set_transient( 'dw_home_produk', $list_produk, 4 * HOUR_IN_SECONDS );
-                    }
-                }
+                $table_produk   = $wpdb->prefix . 'dw_produk';
+                $table_pedagang = $wpdb->prefix . 'dw_pedagang';
+                // Penting: Table desa harus ada di query ini agar 'nama_desa' tersedia di card produk
+                $table_desa_prod = $wpdb->prefix . 'dw_desa';
 
+                // Query: Produk + Info Toko + Info Desa
+                $query_produk = "
+                    SELECT p.*, pd.nama_toko, pd.kabupaten_nama, d.nama_desa 
+                    FROM $table_produk p
+                    LEFT JOIN $table_pedagang pd ON p.id_pedagang = pd.id
+                    LEFT JOIN $table_desa_prod d ON pd.id_desa = d.id 
+                    WHERE p.status = 'aktif' AND p.stok > 0
+                    ORDER BY p.created_at DESC
+                    LIMIT 12
+                ";
+                
+                $list_produk = [];
+                if($wpdb->get_var("SHOW TABLES LIKE '$table_produk'") == $table_produk) {
+                    $list_produk = $wpdb->get_results($query_produk);
+                }
+                
                 if (!empty($list_produk)) :
                     foreach ($list_produk as $produk) :
                         get_template_part('template-parts/card', 'produk', array('data' => $produk));
                     endforeach;
                 else :
-                    echo '<div class="col-span-full py-8 text-center bg-gray-50 rounded-xl border border-dashed border-gray-300 text-gray-500">Belum ada produk tersedia.</div>';
+                    echo '<div class="col-span-full py-12 text-center text-gray-400 italic">Belum ada produk yang dijual saat ini.</div>';
                 endif; 
                 ?>
+            </div>
+            
+            <div class="mt-8 text-center md:hidden">
+                <a href="<?php echo home_url('/produk'); ?>" class="inline-block w-full py-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-600 font-medium text-sm hover:bg-gray-100">
+                    Jelajahi Produk Lainnya
+                </a>
             </div>
         </div>
     </section>
 
-    <!-- 5. CTA SECTION -->
-    <section class="py-12 md:py-20">
-        <div class="container mx-auto px-4">
-            <div class="bg-primary rounded-3xl p-8 md:p-16 text-center text-white relative overflow-hidden shadow-xl">
-                <!-- Background Decor -->
-                <div class="absolute top-0 left-0 w-64 h-64 bg-white/10 rounded-full -translate-x-1/2 -translate-y-1/2"></div>
-                <div class="absolute bottom-0 right-0 w-96 h-96 bg-black/5 rounded-full translate-x-1/3 translate-y-1/3"></div>
-                
-                <div class="relative z-10 max-w-3xl mx-auto">
-                    <h2 class="text-2xl md:text-4xl font-bold mb-4">Punya Produk Desa atau Destinasi Wisata?</h2>
-                    <p class="text-white/90 text-sm md:text-lg mb-8">Bergabunglah bersama ribuan pengelola desa lainnya dan mulai pasarkan potensi desamu secara digital.</p>
-                    <div class="flex flex-col md:flex-row gap-4 justify-center">
-                        <a href="<?php echo home_url('/register'); ?>" class="bg-white text-primary font-bold px-8 py-4 rounded-xl hover:bg-gray-100 transition shadow-lg">Daftar Sekarang</a>
-                        <a href="<?php echo home_url('/tentang'); ?>" class="bg-primaryDark text-white font-bold px-8 py-4 rounded-xl hover:bg-primaryDark/80 transition border border-white/20">Pelajari Lebih Lanjut</a>
-                    </div>
+    <!-- 5. ABOUT / SEO TEXT -->
+    <section class="py-12 md:py-16 bg-gray-50 border-t border-gray-200">
+        <div class="container mx-auto px-4 text-center">
+            <div class="max-w-3xl mx-auto">
+                <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-100 text-green-600 mb-4">
+                    <i class="fas fa-leaf text-xl"></i>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-900 mb-3">Tentang Desa Wisata</h3>
+                <p class="text-gray-500 leading-relaxed mb-6">
+                    Platform digital terintegrasi yang menghubungkan Anda langsung dengan keautentikan desa-desa di Indonesia. 
+                    Dukung ekonomi lokal dengan berwisata dan membeli produk asli dari UMKM desa.
+                </p>
+                <div class="flex justify-center gap-4">
+                    <a href="<?php echo home_url('/tentang'); ?>" class="text-green-600 font-medium hover:underline">Pelajari Lebih Lanjut</a>
                 </div>
             </div>
         </div>
     </section>
+
+    <!-- 6. FLOATING UP BUTTON -->
+    <!-- Updated: Hidden on Mobile (md:flex) -->
+    <button id="scrollToTopBtn" class="fixed bottom-10 right-10 w-12 h-12 rounded-full bg-primary hover:bg-primaryDark text-white shadow-lg transition-all duration-300 opacity-0 invisible translate-y-4 z-50 hidden md:flex items-center justify-center group" aria-label="Kembali ke atas">
+        <i class="fas fa-arrow-up text-lg group-hover:-translate-y-1 transition-transform"></i>
+    </button>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const scrollBtn = document.getElementById('scrollToTopBtn');
+            
+            // Show/Hide button on scroll
+            window.addEventListener('scroll', function() {
+                if (window.scrollY > 300) {
+                    scrollBtn.classList.remove('opacity-0', 'invisible', 'translate-y-4');
+                    scrollBtn.classList.add('opacity-100', 'visible', 'translate-y-0');
+                } else {
+                    scrollBtn.classList.add('opacity-0', 'invisible', 'translate-y-4');
+                    scrollBtn.classList.remove('opacity-100', 'visible', 'translate-y-0');
+                }
+            });
+
+            // Smooth scroll to top
+            scrollBtn.addEventListener('click', function() {
+                window.scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            });
+        });
+    </script>
 
 </div>
 
