@@ -102,3 +102,4 @@ function tema_dw_get_cached_part($slug, $name = null) {
     }
     echo $output;
 }
+   
