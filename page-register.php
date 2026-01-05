@@ -93,20 +93,20 @@ if ( $_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['dw_register_nonce']) 
                 $opt_verif   = get_option('dw_quota_free_via_verif', 5);
 
                 if (!empty($referral_code_used)) {
-                     // 1. Cek apakah kode milik DESA
-                     $is_ref_desa = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}dw_desa WHERE kode_referral = %s", $referral_code_used));
-                     if ($is_ref_desa) {
-                         $quota_free = $opt_desa;
-                     } else {
-                         // 2. Cek apakah kode milik VERIFIKATOR
-                         $is_ref_verif = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}dw_verifikator WHERE kode_referral = %s", $referral_code_used));
-                         if ($is_ref_verif) {
-                             $quota_free = $opt_verif;
-                         } else {
-                             // Kode tidak valid -> Anggap organik
-                             $quota_free = $opt_default;
-                         }
-                     }
+                      // 1. Cek apakah kode milik DESA
+                      $is_ref_desa = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}dw_desa WHERE kode_referral = %s", $referral_code_used));
+                      if ($is_ref_desa) {
+                          $quota_free = $opt_desa;
+                      } else {
+                          // 2. Cek apakah kode milik VERIFIKATOR
+                          $is_ref_verif = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$wpdb->prefix}dw_verifikator WHERE kode_referral = %s", $referral_code_used));
+                          if ($is_ref_verif) {
+                              $quota_free = $opt_verif;
+                          } else {
+                              // Kode tidak valid -> Anggap organik
+                              $quota_free = $opt_default;
+                          }
+                      }
                 } else {
                     // Mendaftar sendiri (Organik)
                     $quota_free = $opt_default;

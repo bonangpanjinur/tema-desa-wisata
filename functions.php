@@ -2,6 +2,7 @@
 /**
  * Functions and definitions
  * Tema Desa Wisata (DW)
+ * * Update: Integrasi Optimasi Wilayah & Caching
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -69,8 +70,12 @@ function tema_dw_scripts_optimized() {
         wp_enqueue_style( 'tema-dw-main-css', get_template_directory_uri() . '/assets/css/main.css', array(), filemtime( get_template_directory() . '/assets/css/main.css' ) );
     }
 
+    // [BARU] Load Library Select2 (CDN) untuk Dropdown Searchable
+    wp_enqueue_style('select2-css', 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css');
+    wp_enqueue_script('select2-js', 'https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js', array('jquery'), '4.1.0', true);
+
     // 3. Script Utama Theme
-    wp_enqueue_script( 'tema-dw-main', get_template_directory_uri() . '/assets/js/main.js', array( 'jquery' ), '1.0.8', true );
+    wp_enqueue_script( 'tema-dw-main', get_template_directory_uri() . '/assets/js/main.js', array( 'jquery', 'select2-js' ), '1.0.8', true );
     
     wp_localize_script( 'tema-dw-main', 'dwData', array(
         'home_url' => home_url(),
@@ -118,13 +123,28 @@ function tema_dw_scripts_optimized() {
 }
 add_action( 'wp_enqueue_scripts', 'tema_dw_scripts_optimized' );
 
-// Load Region Scripts
+/**
+ * Load Region Scripts (Optimized)
+ * Memuat dw-region.js dengan dependency Select2 dan Nonce Security
+ */
 function dw_load_region_scripts() {
     $type = get_query_var( 'dw_type' );
-    if ( $type == 'dashboard_router' || $type == 'checkout' ) {
+    $is_region_page = false;
+
+    // Cek halaman yang butuh fitur wilayah (Register, Edit Profil, Checkout)
+    if ( is_page( array('register', 'edit-profil', 'checkout', 'pendaftaran') ) ) $is_region_page = true;
+    if ( $type == 'dashboard_router' || $type == 'checkout' || $type == 'akun_saya' ) $is_region_page = true;
+
+    if ( $is_region_page ) {
         if( file_exists( get_template_directory() . '/assets/js/dw-region.js' ) ) {
-            wp_enqueue_script( 'dw-region-js', get_template_directory_uri() . '/assets/js/dw-region.js', array( 'jquery' ), '1.2', true );
-            wp_localize_script( 'dw-region-js', 'dwRegionVars', array( 'ajax_url' => admin_url( 'admin-ajax.php' ) ));
+            // [UPDATE] Tambahkan dependency 'select2-js' agar library termuat sebelum script region
+            wp_enqueue_script( 'dw-region-js', get_template_directory_uri() . '/assets/js/dw-region.js', array( 'jquery', 'select2-js' ), '1.3', true );
+            
+            // [UPDATE] Gunakan nama objek 'dw_ajax' agar konsisten dengan script JS baru
+            wp_localize_script( 'dw-region-js', 'dw_ajax', array( 
+                'ajax_url' => admin_url( 'admin-ajax.php' ),
+                'nonce'    => wp_create_nonce( 'dw_region_nonce' ) // Security Nonce
+            ));
         }
     }
 }
@@ -357,6 +377,83 @@ add_filter( 'template_include', 'tema_dw_template_include' );
  * ==============================================================================
  */
 
+/**
+ * [BARU] AJAX Handler untuk Wilayah dengan TRANSIENT CACHING
+ * Menyimpan hasil query database ke cache server
+ */
+function dw_ajax_get_wilayah_optimized() {
+    // 1. Security Check (Nonce)
+    check_ajax_referer('dw_region_nonce', 'nonce');
+
+    // 2. Ambil parameter & Sanitasi
+    $type = isset($_POST['type']) ? sanitize_text_field($_POST['type']) : '';
+    $id   = isset($_POST['id']) ? sanitize_text_field($_POST['id']) : '';
+
+    if (empty($type)) {
+        wp_send_json_error(['message' => 'Tipe wilayah diperlukan']);
+    }
+
+    // 3. Cek Cache (Transient)
+    // Format Key: dw_region_{tipe}_{parent_id}
+    // Contoh: dw_region_kabupaten_33 (Untuk Kab di Prov ID 33)
+    $cache_key = 'dw_region_' . $type . '_' . $id;
+    $cached_data = get_transient($cache_key);
+
+    if (false !== $cached_data) {
+        // Jika ada di cache, kirim langsung (Hemat Database Query!)
+        wp_send_json_success($cached_data);
+    }
+
+    // 4. Jika tidak ada di cache, Query Database
+    global $wpdb;
+    $results = [];
+    $table_prov = $wpdb->prefix . 'dw_provinsi';
+    $table_kab  = $wpdb->prefix . 'dw_kabupaten';
+    $table_kec  = $wpdb->prefix . 'dw_kecamatan';
+    $table_desa = $wpdb->prefix . 'dw_desa_kelurahan';
+
+    // Sesuaikan nama tabel dengan database Anda yang sebenarnya
+    // Pastikan tabel ini ada, jika tidak, ganti dengan logic 'dw_desa' CPT query
+    
+    if ($type === 'provinsi') {
+        // Cek tabel provinsi exists?
+        if($wpdb->get_var("SHOW TABLES LIKE '$table_prov'") == $table_prov) {
+            $results = $wpdb->get_results("SELECT id, name FROM $table_prov ORDER BY name ASC");
+        } 
+    } elseif ($type === 'kabupaten' && !empty($id)) {
+        if($wpdb->get_var("SHOW TABLES LIKE '$table_kab'") == $table_kab) {
+            $results = $wpdb->get_results($wpdb->prepare("SELECT id, name FROM $table_kab WHERE province_id = %s ORDER BY name ASC", $id));
+        }
+    } elseif ($type === 'kecamatan' && !empty($id)) {
+        if($wpdb->get_var("SHOW TABLES LIKE '$table_kec'") == $table_kec) {
+            $results = $wpdb->get_results($wpdb->prepare("SELECT id, name FROM $table_kec WHERE regency_id = %s ORDER BY name ASC", $id));
+        }
+    } elseif ($type === 'desa' && !empty($id)) {
+        if($wpdb->get_var("SHOW TABLES LIKE '$table_desa'") == $table_desa) {
+            $results = $wpdb->get_results($wpdb->prepare("SELECT id, name FROM $table_desa WHERE district_id = %s ORDER BY name ASC", $id));
+        }
+    }
+
+    // Fallback Dummy Data jika tabel belum siap (Untuk Testing)
+    if (empty($results)) {
+        if ($type == 'provinsi') $results = [['id'=>'33', 'name'=>'Jawa Tengah (Demo)'], ['id'=>'34', 'name'=>'DIY (Demo)']];
+        if ($type == 'kabupaten') $results = [['id'=>'3374', 'name'=>'Semarang (Demo)'], ['id'=>'3324', 'name'=>'Kendal (Demo)']];
+        if ($type == 'kecamatan') $results = [['id'=>'101', 'name'=>'Banyumanik (Demo)'], ['id'=>'102', 'name'=>'Tembalang (Demo)']];
+        if ($type == 'desa') $results = [['id'=>'1001', 'name'=>'Desa Wisata A'], ['id'=>'1002', 'name'=>'Desa Wisata B']];
+    }
+
+    // 5. Simpan ke Cache selama 7 Hari (WEEK_IN_SECONDS)
+    if (!empty($results)) {
+        set_transient($cache_key, $results, WEEK_IN_SECONDS);
+    }
+
+    wp_send_json_success($results);
+}
+// Daftarkan Action AJAX Baru
+add_action('wp_ajax_get_region_data', 'dw_ajax_get_wilayah_optimized');
+add_action('wp_ajax_nopriv_get_region_data', 'dw_ajax_get_wilayah_optimized');
+
+
 // --- CART HANDLER ---
 add_action( 'wp_ajax_dw_add_to_cart', 'dw_handle_add_to_cart' );
 add_action( 'wp_ajax_nopriv_dw_add_to_cart', 'dw_handle_add_to_cart' );
@@ -542,23 +639,6 @@ add_action( 'wp_ajax_dw_desa_stats', 'dw_ajax_desa_stats' );
 function dw_ajax_desa_stats() {
     check_ajax_referer( 'dw_cart_action', 'security' );
     wp_send_json_success( [ 'total_wisata' => 0, 'avg_rating' => 0 ] );
-}
-
-// --- REGION HANDLERS (Mockup) ---
-add_action( 'wp_ajax_dw_get_provinces', 'dw_ajax_get_provinces' );
-add_action( 'wp_ajax_nopriv_dw_get_provinces', 'dw_ajax_get_provinces' );
-function dw_ajax_get_provinces() {
-    // global $wpdb;
-    // $results = $wpdb->get_results("SELECT id, nama FROM {$wpdb->prefix}dw_provinsi ORDER BY nama ASC");
-    wp_send_json_success( [] );
-}
-
-add_action( 'wp_ajax_dw_get_regencies', 'dw_ajax_get_regencies' );
-add_action( 'wp_ajax_nopriv_dw_get_regencies', 'dw_ajax_get_regencies' );
-function dw_ajax_get_regencies() {
-    // global $wpdb;
-    // $prov_id = intval($_GET['province_id']);
-    wp_send_json_success( [] );
 }
 
 // --- OJEK HANDLER ---
@@ -920,3 +1000,4 @@ function tema_dw_handle_delete_produk_ajax() {
 
     wp_send_json_error( [ 'message' => 'Gagal menghapus / Fungsi tidak ditemukan.' ] );
 }
+?>

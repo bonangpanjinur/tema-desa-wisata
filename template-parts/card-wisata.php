@@ -56,17 +56,27 @@ if (stripos($kategori, 'alam') !== false) $badge_bg = 'bg-green-100 text-green-6
             <?php 
             $is_fav = false;
             if (is_user_logged_in()) {
+                // Pastikan path plugin benar atau class sudah di-load
                 if (!class_exists('DW_Favorites')) {
-                    require_once WP_PLUGIN_DIR . '/desa-wisata-core/includes/class-dw-favorites.php';
+                    $fav_class_path = WP_PLUGIN_DIR . '/desa-wisata-core/includes/class-dw-favorites.php';
+                    if (file_exists($fav_class_path)) {
+                        require_once $fav_class_path;
+                    }
                 }
-                $fav_obj = new DW_Favorites();
-                $is_fav = $fav_obj->is_favorited(get_current_user_id(), $wisata->id, 'wisata');
+                
+                if (class_exists('DW_Favorites')) {
+                    $fav_obj = new DW_Favorites();
+                    // Pastikan properti id ada pada objek wisata
+                    $wisata_id_check = isset($wisata->id) ? $wisata->id : (isset($wisata->id_post) ? $wisata->id_post : 0);
+                    $is_fav = $fav_obj->is_favorited(get_current_user_id(), $wisata_id_check, 'wisata');
+                }
             }
             ?>
             <button type="button" 
-                    class="js-toggle-favorite w-8 h-8 rounded-full bg-white/90 backdrop-blur flex items-center justify-center shadow-sm hover:bg-white transition-all"
-                    data-id="<?php echo $wisata->id; ?>"
-                    data-type="wisata">
+                    class="js-toggle-favorite w-8 h-8 rounded-full bg-white/90 backdrop-blur flex items-center justify-center shadow-sm hover:bg-white transition-all relative z-30"
+                    data-id="<?php echo isset($wisata->id) ? $wisata->id : 0; ?>"
+                    data-type="wisata"
+                    onclick="event.preventDefault(); /* Mencegah link card terpicu */">
                 <i class="<?php echo $is_fav ? 'fas text-red-500' : 'far'; ?> fa-heart text-xs"></i>
             </button>
         </div>
