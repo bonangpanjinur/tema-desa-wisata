@@ -1,128 +1,153 @@
-<?php
-/**
- * The template for displaying the footer
- *
- * Contains the closing of the #content div and all content after.
- *
- * @link https://developer.wordpress.org/themes/basics/template-files/#template-partials
- *
- * @package Tema_Desa_Wisata
- */
-
-?>
-
-    </div><!-- #content -->
-
-    <?php 
-    // Tampilan Footer Desktop (Sederhana)
-    ?>
-    <footer id="colophon" class="site-footer hidden md:block bg-white border-t mt-12 py-8">
+<?php if ( ! defined( "ABSPATH" ) ) { exit; } ?>
+<!-- Main Footer (Desktop Focused, Simplified on Mobile) -->
+    <footer class="bg-gray-900 text-gray-300 pt-16 pb-24 md:pb-8 border-t-4 border-primary mt-auto hidden md:block">
         <div class="container mx-auto px-4">
-            <div class="site-info text-center text-gray-500 text-sm">
-                <a href="<?php echo esc_url( home_url( '/' ) ); ?>" class="text-gray-900 font-bold hover:underline">
-                    <?php bloginfo( 'name' ); ?>
-                </a>
-                <span class="sep"> | </span>
-                <?php
-                /* translators: 1: Theme name, 2: Theme author. */
-                printf( esc_html__( 'Theme: %1$s by %2$s.', 'tema-desa-wisata' ), 'tema-desa-wisata', '<a href="#" class="hover:underline">Desa Wisata</a>' );
-                ?>
-                <br>
-                &copy; <?php echo date('Y'); ?> All rights reserved.
-            </div><!-- .site-info -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
+                
+                <!-- Brand -->
+                <div class="space-y-4">
+                    <h2 class="text-2xl font-bold text-white mb-4 flex items-center gap-2">
+                        <i class="fas fa-leaf text-primary"></i> <?php bloginfo('name'); ?>
+                    </h2>
+                    <p class="text-sm leading-relaxed text-gray-400">
+                        Platform Desa Wisata terintegrasi yang menghubungkan potensi lokal, alam yang indah, dan produk UMKM kreatif kepada dunia.
+                    </p>
+                    <div class="flex space-x-4 pt-4">
+                        <a href="#" class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center hover:bg-primary hover:text-white transition"><i class="fab fa-facebook-f"></i></a>
+                        <a href="#" class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center hover:bg-pink-600 hover:text-white transition"><i class="fab fa-instagram"></i></a>
+                        <a href="#" class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center hover:bg-green-500 hover:text-white transition"><i class="fab fa-whatsapp"></i></a>
+                    </div>
+                </div>
+
+                <!-- Link Cepat -->
+                <div>
+                    <h3 class="text-white font-bold text-lg mb-6 border-b border-gray-700 pb-2 inline-block">Jelajahi</h3>
+                    <ul class="space-y-3 text-sm">
+                        <li><a href="<?php echo home_url('/wisata'); ?>" class="hover:text-primary transition flex items-center gap-2"><i class="fas fa-chevron-right text-[10px] text-primary"></i> Destinasi Wisata</a></li>
+                        <li><a href="<?php echo home_url('/produk'); ?>" class="hover:text-primary transition flex items-center gap-2"><i class="fas fa-chevron-right text-[10px] text-primary"></i> Produk UMKM</a></li>
+                        <li><a href="<?php echo home_url('/blog'); ?>" class="hover:text-primary transition flex items-center gap-2"><i class="fas fa-chevron-right text-[10px] text-primary"></i> Berita Desa</a></li>
+                        <li><a href="<?php echo home_url('/tentang'); ?>" class="hover:text-primary transition flex items-center gap-2"><i class="fas fa-chevron-right text-[10px] text-primary"></i> Tentang Kami</a></li>
+                    </ul>
+                </div>
+
+                <!-- Kontak -->
+                <div>
+                    <h3 class="text-white font-bold text-lg mb-6 border-b border-gray-700 pb-2 inline-block">Hubungi Kami</h3>
+                    <ul class="space-y-4 text-sm">
+                        <li class="flex items-start">
+                            <i class="fas fa-map-marked-alt mt-1 mr-3 text-primary"></i>
+                            <span class="text-gray-400">Kantor Kepala Desa Sejahtera, Kec. Alam Indah, Kab. Wisata, Indonesia 40123</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-phone-alt mr-3 text-primary"></i>
+                            <span class="text-gray-400">+62 812-3456-7890</span>
+                        </li>
+                        <li class="flex items-center">
+                            <i class="fas fa-envelope mr-3 text-primary"></i>
+                            <span class="text-gray-400">halo@desawisata.id</span>
+                        </li>
+                    </ul>
+                </div>
+                
+                <!-- Newsletter -->
+                <div>
+                    <h3 class="text-white font-bold text-lg mb-6 border-b border-gray-700 pb-2 inline-block">Info Terbaru</h3>
+                    <p class="text-xs text-gray-400 mb-4">Dapatkan update promo wisata dan produk terbaru.</p>
+                    <form class="flex">
+                        <input type="email" placeholder="Email Anda" class="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-l-lg focus:outline-none focus:border-primary text-sm">
+                        <button class="bg-primary hover:bg-primaryDark px-4 py-2 rounded-r-lg text-white font-bold transition"><i class="fas fa-paper-plane"></i></button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="border-t border-gray-800 pt-8 text-center md:text-left flex flex-col md:flex-row justify-between items-center text-xs text-gray-500">
+                <p>&copy; <?php echo date('Y'); ?> <strong><?php bloginfo('name'); ?></strong>. Hak Cipta Dilindungi.</p>
+            </div>
         </div>
     </footer>
 
-    <?php 
-    // Tampilan Bottom Navigation Bar (Mobile Only)
-    // Diubah menjadi grid-cols-4 karena menu favorit dihapus
-    ?>
-    <div class="fixed bottom-0 left-0 z-50 w-full h-16 bg-white border-t border-gray-200 md:hidden pb-safe">
-        <div class="grid h-full max-w-lg grid-cols-4 mx-auto font-medium">
-            
-            <!-- 1. Menu Beranda -->
-            <a href="<?php echo esc_url( home_url( '/' ) ); ?>" type="button" class="inline-flex flex-col items-center justify-center px-5 hover:bg-gray-50 group <?php echo is_front_page() ? 'text-blue-600' : 'text-gray-500'; ?>">
-                <svg class="w-6 h-6 mb-1 <?php echo is_front_page() ? 'text-blue-600' : 'text-gray-500 group-hover:text-blue-600'; ?>" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                    <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"></path>
-                </svg>
-                <span class="text-xs <?php echo is_front_page() ? 'text-blue-600' : 'text-gray-500 group-hover:text-blue-600'; ?>">Beranda</span>
-            </a>
-
-            <!-- 2. Menu Wisata (Explore) -->
-            <?php 
-            $wisata_link = get_post_type_archive_link('dw_wisata'); 
-            $is_wisata = is_post_type_archive('dw_wisata') || is_singular('dw_wisata');
-            ?>
-            <a href="<?php echo esc_url($wisata_link); ?>" type="button" class="inline-flex flex-col items-center justify-center px-5 hover:bg-gray-50 group <?php echo $is_wisata ? 'text-blue-600' : 'text-gray-500'; ?>">
-                <svg class="w-6 h-6 mb-1 <?php echo $is_wisata ? 'text-blue-600' : 'text-gray-500 group-hover:text-blue-600'; ?>" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                    <path clip-rule="evenodd" fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v11a3 3 0 106 0V4a2 2 0 00-2-2H4zm1 14a1 1 0 100-2 1 1 0 000 2zm5-1.757l4.9-4.9a2 2 0 000-2.828L13.485 5.1a2 2 0 00-2.828 0L10 5.757v8.486zM16 18H9.071l6-6H16a2 2 0 012 2v2a2 2 0 01-2 2z"></path>
-                </svg>
-                <span class="text-xs <?php echo $is_wisata ? 'text-blue-600' : 'text-gray-500 group-hover:text-blue-600'; ?>">Wisata</span>
-            </a>
-
-            <!-- MENU FAVORIT DIHAPUS DI SINI -->
-
-            <!-- 3. Menu Transaksi -->
-            <?php 
-            // Mencari halaman Transaksi berdasarkan template atau slug
-            $transaksi_page = get_pages(array(
-                'meta_key' => '_wp_page_template',
-                'meta_value' => 'page-transaksi.php'
-            ));
-            $transaksi_link = $transaksi_page ? get_permalink($transaksi_page[0]->ID) : home_url('/transaksi');
-            $is_transaksi = is_page_template('page-transaksi.php') || is_singular('dw_transaksi');
-            ?>
-            <a href="<?php echo esc_url($transaksi_link); ?>" type="button" class="inline-flex flex-col items-center justify-center px-5 hover:bg-gray-50 group <?php echo $is_transaksi ? 'text-blue-600' : 'text-gray-500'; ?>">
-                <svg class="w-6 h-6 mb-1 <?php echo $is_transaksi ? 'text-blue-600' : 'text-gray-500 group-hover:text-blue-600'; ?>" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                    <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"></path>
-                    <path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd"></path>
-                </svg>
-                <span class="text-xs <?php echo $is_transaksi ? 'text-blue-600' : 'text-gray-500 group-hover:text-blue-600'; ?>">Transaksi</span>
-            </a>
-
-            <!-- 4. Menu Akun -->
-            <?php 
-            // Mencari halaman Akun Saya / Dashboard
-            $akun_page = get_pages(array(
-                'meta_key' => '_wp_page_template',
-                'meta_value' => 'page-akun-saya.php'
-            ));
-            
-            // Fallback jika user belum login, arahkan ke login, jika sudah ke dashboard/akun
-            if ( is_user_logged_in() ) {
-                $user = wp_get_current_user();
-                // Cek role untuk redirect dashboard yang tepat jika diperlukan
-                if ( in_array( 'dw_pedagang', (array) $user->roles ) ) {
-                    $dashboard_slug = 'dashboard-toko';
-                } elseif ( in_array( 'dw_verifikator', (array) $user->roles ) ) {
-                    $dashboard_slug = 'dashboard-verifikator';
-                } elseif ( in_array( 'dw_ojek', (array) $user->roles ) ) {
-                    $dashboard_slug = 'dashboard-ojek';
-                } elseif ( in_array( 'dw_desa', (array) $user->roles ) ) {
-                    $dashboard_slug = 'dashboard-desa';
-                } else {
-                    $dashboard_slug = 'akun-saya';
-                }
-                $akun_link = site_url('/' . $dashboard_slug);
-            } else {
-                $akun_link = site_url('/login');
-            }
-
-            $is_akun = is_page('akun-saya') || is_page('login') || is_page('dashboard-toko') || is_page('dashboard-desa') || is_page('dashboard-verifikator') || is_page('dashboard-ojek');
-            ?>
-            <a href="<?php echo esc_url($akun_link); ?>" type="button" class="inline-flex flex-col items-center justify-center px-5 hover:bg-gray-50 group <?php echo $is_akun ? 'text-blue-600' : 'text-gray-500'; ?>">
-                <svg class="w-6 h-6 mb-1 <?php echo $is_akun ? 'text-blue-600' : 'text-gray-500 group-hover:text-blue-600'; ?>" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                    <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path>
-                </svg>
-                <span class="text-xs <?php echo $is_akun ? 'text-blue-600' : 'text-gray-500 group-hover:text-blue-600'; ?>">Akun</span>
-            </a>
-
+    <!-- MOBILE BOTTOM NAVIGATION BAR (App Like Experience) -->
+    <!-- PWA Install Prompt (Mobile) -->
+    <div id="pwa-install-prompt" class="fixed bottom-24 left-4 right-4 bg-white rounded-2xl shadow-2xl p-4 border border-primary/20 z-[60] hidden transform translate-y-full transition-transform duration-500">
+        <div class="flex items-center gap-4">
+            <div class="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary flex-shrink-0">
+                <i class="fas fa-mobile-alt text-2xl"></i>
+            </div>
+            <div class="flex-1">
+                <h4 class="text-sm font-bold text-gray-800">Instal Aplikasi Desa Wisata</h4>
+                <p class="text-[11px] text-gray-500">Akses lebih cepat dan mudah langsung dari layar utama Anda.</p>
+            </div>
+            <div class="flex gap-2">
+                <button id="pwa-install-btn" class="bg-primary text-white text-xs font-bold px-4 py-2 rounded-lg shadow-sm">Instal</button>
+                <button id="pwa-close-prompt" class="text-gray-400 p-2"><i class="fas fa-times"></i></button>
+            </div>
         </div>
     </div>
 
-</div><!-- #page -->
+    <nav class="mobile-bottom-nav md:hidden">
+        <a href="<?php echo home_url(); ?>" class="<?php echo is_front_page() ? 'active' : ''; ?>">
+            <i class="fas fa-home"></i>
+            <span>Beranda</span>
+        </a>
+
+        <a href="<?php echo home_url('/wisata'); ?>" class="<?php echo is_post_type_archive('dw_wisata') || is_singular('dw_wisata') ? 'active' : ''; ?>">
+            <i class="fas fa-map-marked-alt"></i>
+            <span>Wisata</span>
+        </a>
+
+        <a href="<?php echo home_url('/produk'); ?>" class="<?php echo is_post_type_archive('dw_produk') || is_singular('dw_produk') ? 'active' : ''; ?>">
+            <i class="fas fa-shopping-bag"></i>
+            <span>Produk</span>
+        </a>
+
+  
+        <?php 
+        $akun_link = is_user_logged_in() ? home_url('/akun-saya') : home_url('/login');
+        $is_akun_active = is_page('akun-saya') || is_page('login') || is_page('dashboard-desa') || is_page('dashboard-toko');
+        ?>
+        <a href="<?php echo $akun_link; ?>" class="<?php echo $is_akun_active ? 'active' : ''; ?>">
+            <i class="fas fa-user"></i>
+            <span>Akun</span>
+        </a>
+    </nav>
+
+    <!-- Floating Cart Button -->
+    <?php 
+    global $wpdb;
+    $cart_count = 0;
+    $table_cart = $wpdb->prefix . 'dw_cart';
+    if($wpdb->get_var("SHOW TABLES LIKE '$table_cart'") == $table_cart) {
+        $user_id = get_current_user_id();
+        $session_id = session_id();
+        if($user_id) {
+            $cart_count = $wpdb->get_var($wpdb->prepare("SELECT SUM(qty) FROM $table_cart WHERE user_id = %d", $user_id));
+        } else {
+            $cart_count = $wpdb->get_var($wpdb->prepare("SELECT SUM(qty) FROM $table_cart WHERE session_id = %s", $session_id));
+        }
+    }
+    $cart_count = intval($cart_count);
+    ?>
+    <a href="<?php echo home_url('/keranjang'); ?>" class="floating-cart-btn">
+        <i class="fas fa-shopping-bag"></i>
+        <?php if ( $cart_count > 0 ) : ?>
+            <span class="cart-count"><?php echo $cart_count; ?></span>
+        <?php endif; ?>
+    </a>
+
+<script>
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+        // Mengarah ke service-worker.js yang ada di root tema
+        navigator.serviceWorker.register('<?php echo get_template_directory_uri(); ?>/service-worker.js')
+        .then(function(registration) {
+            console.log('PWA ServiceWorker registration successful with scope: ', registration.scope);
+        }, function(err) {
+            console.log('PWA ServiceWorker registration failed: ', err);
+        });
+    });
+}
+</script>
 
 <?php wp_footer(); ?>
-
 </body>
 </html>
