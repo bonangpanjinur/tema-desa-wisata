@@ -698,10 +698,10 @@ function dw_add_pwa_tags() {
     </script>
     <?php
 }
-add_action( 'wp_head', 'dw_add_pwa_tags' );
+// add_action( 'wp_head', 'dw_add_pwa_tags' );
 
 // B. Generate Manifest JSON
-add_action( 'init', 'dw_pwa_generate_manifest' );
+// add_action( 'init', 'dw_pwa_generate_manifest' );
 function dw_pwa_generate_manifest() {
     if ( isset( $_GET['dw-manifest'] ) ) {
         header( 'Content-Type: application/json; charset=utf-8' );
@@ -743,7 +743,7 @@ function dw_pwa_generate_manifest() {
 }
 
 // C. Generate Service Worker (Updated with Modern Async/Await)
-add_action( 'init', 'dw_pwa_generate_sw' );
+// add_action( 'init', 'dw_pwa_generate_sw' );
 function dw_pwa_generate_sw() {
     if ( isset( $_GET['dw-sw'] ) ) {
         header( 'Content-Type: application/javascript; charset=utf-8' );

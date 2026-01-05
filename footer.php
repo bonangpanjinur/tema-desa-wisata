@@ -142,6 +142,20 @@
         <?php endif; ?>
     </a>
 
+<script>
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+        // Mengarah ke service-worker.js yang ada di root tema
+        navigator.serviceWorker.register('<?php echo get_template_directory_uri(); ?>/service-worker.js')
+        .then(function(registration) {
+            console.log('PWA ServiceWorker registration successful with scope: ', registration.scope);
+        }, function(err) {
+            console.log('PWA ServiceWorker registration failed: ', err);
+        });
+    });
+}
+</script>
+
 <?php wp_footer(); ?>
 </body>
 </html>

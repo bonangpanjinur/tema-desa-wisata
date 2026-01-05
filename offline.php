@@ -1,36 +1,28 @@
 <?php
 /**
  * Template Name: Offline Page
- * Description: Tampilan khusus saat user tidak ada internet
  */
-
-get_header(); ?>
-
-<div class="container my-5 py-5 text-center">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <!-- Icon Sinyal Hilang (SVG Inline) -->
-            <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" fill="currentColor" class="bi bi-wifi-off text-muted mb-4" viewBox="0 0 16 16">
-                <path d="M10.706 3.294A12.545 12.545 0 0 0 8 3C5.259 3 2.723 3.882.663 5.379a.485.485 0 0 0-.048.736.518.518 0 0 0 .668.05A11.448 11.448 0 0 1 8 4c.63 0 1.249.05 1.852.148l.854-.854zM8 6c-1.905 0-3.68.56-5.166 1.526a.48.48 0 0 0-.063.745.525.525 0 0 0 .652.065 8.448 8.448 0 0 1 3.51-1.27L8 6zm2.596 1.404.785-.785c.63.24 1.227.545 1.785.907a.482.482 0 0 1 .063.745.525.525 0 0 1-.652.065 8.462 8.462 0 0 0-1.98-.932zM8 10l.933-.933a6.455 6.455 0 0 1 2.013.637c.285.145.326.524.1.75l-.015.015a.532.532 0 0 1-.611.09A5.478 5.478 0 0 0 8 10zm4.905-4.905.747-.747c.59.3 1.153.645 1.685 1.03a.485.485 0 0 1 .047.737.518.518 0 0 1-.668.05 11.493 11.493 0 0 0-1.811-1.07zM9.02 11.78c.238.14.236.464.04.66l-.707.706a.5.5 0 0 1-.707 0l-.707-.707c-.195-.195-.197-.518.04-.66A1.99 1.99 0 0 1 8 11.5c.374 0 .723.102 1.021.28zm4.355-9.905a.5.5 0 1 1 .707.707l-13 13a.5.5 0 1 1-.707-.707l13-13z"/>
-            </svg>
-
-            <h1 class="display-4">Ups, Koneksi Terputus</h1>
-            <p class="lead">Sepertinya Anda sedang berada di area susah sinyal. Jangan khawatir, halaman yang pernah Anda buka sebelumnya masih bisa diakses.</p>
-            
-            <div class="mt-4">
-                <a href="<?php echo home_url('/'); ?>" class="btn btn-primary">Coba Muat Ulang</a>
-                <a href="javascript:history.back()" class="btn btn-outline-secondary">Kembali</a>
-            </div>
-
-            <div class="alert alert-info mt-5 text-start">
-                <strong>Tips Wisata:</strong>
-                <ul class="mb-0">
-                    <li>Gunakan kesempatan ini untuk menikmati pemandangan desa secara langsung!</li>
-                    <li>Screenshot tiket wisata Anda saat ada sinyal.</li>
-                </ul>
-            </div>
-        </div>
-    </div>
-</div>
-
-<?php get_footer(); ?>
+?>
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anda Sedang Offline - Desa Wisata</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 50px; color: #333; background-color: #f8fafc; }
+        h1 { font-size: 24px; margin-bottom: 20px; color: #2c3e50; }
+        p { font-size: 16px; color: #666; line-height: 1.6; }
+        .btn { display: inline-block; padding: 12px 24px; background: #16a34a; color: #fff; text-decoration: none; border-radius: 50px; margin-top: 20px; font-weight: bold; transition: background 0.3s; }
+        .btn:hover { background: #15803d; }
+        .icon { font-size: 64px; color: #cbd5e1; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="icon">📡</div>
+    <h1>Koneksi Terputus</h1>
+    <p>Sepertinya Anda tidak terhubung ke internet.</p>
+    <p>Halaman yang Anda minta tidak tersedia secara offline, namun Anda masih bisa mengakses halaman yang pernah Anda buka sebelumnya.</p>
+    <a href="<?php echo home_url(); ?>" class="btn">Coba Muat Ulang</a>
+</body>
+</html>

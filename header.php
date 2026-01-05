@@ -13,7 +13,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="profile" href="https://gmpg.org/xfn/11">
 
-    <!-- PWA Integration handled by functions.php dw_add_pwa_tags() -->
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#16a34a"> <!-- Sesuaikan dengan warna brand desa -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Desa Wisata">
+
+    <!-- Manifest Link -->
+    <link rel="manifest" href="<?php echo get_template_directory_uri(); ?>/manifest.json">
+
+    <!-- iOS Icons (Fallback) -->
+    <link rel="apple-touch-icon" href="<?php echo get_template_directory_uri(); ?>/assets/images/icon-192.png">
 
     <?php wp_head(); ?>
 </head>
