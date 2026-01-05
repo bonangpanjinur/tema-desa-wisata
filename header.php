@@ -13,24 +13,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="profile" href="https://gmpg.org/xfn/11">
 
-    <?php if ( get_theme_mod('dw_pwa_enabled', '1') ) : ?>
-        <meta name="theme-color" content="<?php echo get_theme_mod('dw_pwa_theme_color', '#16a34a'); ?>">
-        <link rel="manifest" href="<?php echo home_url('/?dw-manifest=1'); ?>">
-        <link rel="apple-touch-icon" href="<?php echo get_site_icon_url(180); ?>">
-        <script>
-            if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                    // Menambahkan { scope: '/' } sangat penting jika menggunakan URL dinamis
-                    navigator.serviceWorker.register('<?php echo home_url('/?dw-sw=1'); ?>', { scope: '/' })
-                    .then(function(registration) {
-                        console.log('PWA: ServiceWorker terdaftar dengan scope: ', registration.scope);
-                    }, function(err) {
-                        console.log('PWA: Registrasi gagal: ', err);
-                    });
-                });
-            }
-        </script>
-    <?php endif; ?>
+    <!-- PWA Integration handled by functions.php dw_add_pwa_tags() -->
 
     <?php wp_head(); ?>
 </head>

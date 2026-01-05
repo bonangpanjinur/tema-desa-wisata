@@ -67,6 +67,23 @@
     </footer>
 
     <!-- MOBILE BOTTOM NAVIGATION BAR (App Like Experience) -->
+    <!-- PWA Install Prompt (Mobile) -->
+    <div id="pwa-install-prompt" class="fixed bottom-24 left-4 right-4 bg-white rounded-2xl shadow-2xl p-4 border border-primary/20 z-[60] hidden transform translate-y-full transition-transform duration-500">
+        <div class="flex items-center gap-4">
+            <div class="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary flex-shrink-0">
+                <i class="fas fa-mobile-alt text-2xl"></i>
+            </div>
+            <div class="flex-1">
+                <h4 class="text-sm font-bold text-gray-800">Instal Aplikasi Desa Wisata</h4>
+                <p class="text-[11px] text-gray-500">Akses lebih cepat dan mudah langsung dari layar utama Anda.</p>
+            </div>
+            <div class="flex gap-2">
+                <button id="pwa-install-btn" class="bg-primary text-white text-xs font-bold px-4 py-2 rounded-lg shadow-sm">Instal</button>
+                <button id="pwa-close-prompt" class="text-gray-400 p-2"><i class="fas fa-times"></i></button>
+            </div>
+        </div>
+    </div>
+
     <nav class="mobile-bottom-nav md:hidden">
         <a href="<?php echo home_url(); ?>" class="<?php echo is_front_page() ? 'active' : ''; ?>">
             <i class="fas fa-home"></i>

@@ -706,8 +706,14 @@ function dw_add_pwa_tags() {
     <meta name="theme-color" content="<?php echo esc_attr($theme_color); ?>">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <?php if ($site_icon) : ?>
-    <link rel="apple-touch-icon" href="<?php echo esc_url(wp_get_attachment_image_url($site_icon, 'full')); ?>">
+    <meta name="apple-mobile-web-app-title" content="<?php echo esc_attr(get_theme_mod('dw_pwa_short_name', get_bloginfo('name'))); ?>">
+    <meta name="mobile-web-app-capable" content="yes">
+    <?php if ($site_icon) : 
+        $icon_url = wp_get_attachment_image_url($site_icon, 'full');
+    ?>
+    <link rel="apple-touch-icon" href="<?php echo esc_url($icon_url); ?>">
+    <!-- Splash Screen iOS -->
+    <link rel="apple-touch-startup-image" href="<?php echo esc_url($icon_url); ?>">
     <?php endif; ?>
     <script>
         if ('serviceWorker' in navigator) {
@@ -805,18 +811,88 @@ add_action('init', function() {
                 if ($icon_data) $icons[] = [ "src" => $icon_data[0], "sizes" => "{$size}x{$size}", "type" => "image/png", "purpose" => "any maskable" ];
             }
         }
-        echo json_encode([ "name" => $name, "short_name" => get_theme_mod('dw_pwa_short_name', $name), "start_url" => home_url('/'), "display" => "standalone", "background_color" => get_theme_mod('dw_pwa_bg_color', '#ffffff'), "theme_color" => $theme_color, "icons" => $icons ]);
+        $manifest = [
+            "name"             => $name,
+            "short_name"       => get_theme_mod('dw_pwa_short_name', $name),
+            "description"      => get_bloginfo('description'),
+            "start_url"        => home_url('/'),
+            "display"          => "standalone",
+            "orientation"      => "portrait",
+            "background_color" => get_theme_mod('dw_pwa_bg_color', '#ffffff'),
+            "theme_color"      => $theme_color,
+            "icons"            => $icons
+        ];
+        
+        // Tambahkan fitur splash screen otomatis untuk iOS/Android
+        // PWA modern menggunakan background_color + icons untuk splash screen
+        
+        echo json_encode($manifest);
         exit;
     }
     if (isset($_GET['dw-sw'])) {
         header('Content-Type: application/javascript; charset=utf-8');
         header('Service-Worker-Allowed: /'); 
         ?>
-        const CACHE_NAME = 'dw-cache-v22';
+        const CACHE_NAME = 'dw-pwa-cache-v<?php echo time(); ?>';
         const OFFLINE_URL = '<?php echo home_url('/'); ?>';
-        self.addEventListener('install', (event) => { event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll([OFFLINE_URL]))); self.skipWaiting(); });
-        self.addEventListener('activate', (event) => { event.waitUntil(caches.keys().then((keys) => Promise.all(keys.map((k) => k !== CACHE_NAME && caches.delete(k))))); self.clients.claim(); });
-        self.addEventListener('fetch', (event) => { if (event.request.mode === 'navigate') event.respondWith(fetch(event.request).catch(() => caches.match(OFFLINE_URL))); });
+        const ASSETS_TO_CACHE = [
+            OFFLINE_URL,
+            '<?php echo get_stylesheet_uri(); ?>',
+            '<?php echo get_template_directory_uri(); ?>/assets/css/main.css',
+            '<?php echo get_template_directory_uri(); ?>/assets/js/main.js',
+            'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
+            'https://cdn.tailwindcss.com'
+        ];
+
+        self.addEventListener('install', (event) => {
+            event.waitUntil(
+                caches.open(CACHE_NAME).then((cache) => {
+                    return cache.addAll(ASSETS_TO_CACHE);
+                })
+            );
+            self.skipWaiting();
+        });
+
+        self.addEventListener('activate', (event) => {
+            event.waitUntil(
+                caches.keys().then((keys) => {
+                    return Promise.all(
+                        keys.map((key) => {
+                            if (key !== CACHE_NAME) {
+                                return caches.delete(key);
+                            }
+                        })
+                    );
+                })
+            );
+            self.clients.claim();
+        });
+
+        self.addEventListener('fetch', (event) => {
+            if (event.request.mode === 'navigate') {
+                event.respondWith(
+                    fetch(event.request).catch(() => {
+                        return caches.match(OFFLINE_URL);
+                    })
+                );
+                return;
+            }
+
+            event.respondWith(
+                caches.match(event.request).then((response) => {
+                    return response || fetch(event.request).then((fetchResponse) => {
+                        // Cache images and fonts dynamically
+                        if (event.request.destination === 'image' || event.request.destination === 'font') {
+                            return caches.open(CACHE_NAME).then((cache) => {
+                                cache.put(event.request, fetchResponse.clone());
+                                return fetchResponse;
+                            });
+                        }
+                        return fetchResponse;
+                    });
+                })
+            );
+        });
         <?php
         exit;
     }

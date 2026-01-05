@@ -658,3 +658,65 @@ jQuery(document).ready(function($) {
         loadMerchantSummary();
     }
 });
+/**
+ * PWA Installation Logic
+ */
+(function($) {
+    let deferredPrompt;
+    const installPrompt = document.getElementById('pwa-install-prompt');
+    const installBtn = document.getElementById('pwa-install-btn');
+    const closePrompt = document.getElementById('pwa-close-prompt');
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        // Prevent Chrome 67 and earlier from automatically showing the prompt
+        e.preventDefault();
+        // Stash the event so it can be triggered later.
+        deferredPrompt = e;
+        
+        // Show the custom install prompt after a short delay
+        setTimeout(() => {
+            if (installPrompt) {
+                installPrompt.classList.remove('hidden');
+                setTimeout(() => {
+                    installPrompt.classList.remove('translate-y-full');
+                }, 100);
+            }
+        }, 3000);
+    });
+
+    if (installBtn) {
+        installBtn.addEventListener('click', (e) => {
+            if (deferredPrompt) {
+                // Show the prompt
+                deferredPrompt.prompt();
+                // Wait for the user to respond to the prompt
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        console.log('User accepted the A2HS prompt');
+                    } else {
+                        console.log('User dismissed the A2HS prompt');
+                    }
+                    deferredPrompt = null;
+                    if (installPrompt) installPrompt.classList.add('hidden');
+                });
+            }
+        });
+    }
+
+    if (closePrompt) {
+        closePrompt.addEventListener('click', () => {
+            if (installPrompt) {
+                installPrompt.classList.add('translate-y-full');
+                setTimeout(() => {
+                    installPrompt.classList.add('hidden');
+                }, 500);
+            }
+        });
+    }
+
+    // Handle app installed event
+    window.addEventListener('appinstalled', (evt) => {
+        console.log('Desa Wisata App was installed');
+        if (installPrompt) installPrompt.classList.add('hidden');
+    });
+})(jQuery);
