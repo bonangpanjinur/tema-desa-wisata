@@ -100,7 +100,6 @@
             <span>Produk</span>
         </a>
 
-  
         <?php 
         $akun_link = is_user_logged_in() ? home_url('/akun-saya') : home_url('/login');
         $is_akun_active = is_page('akun-saya') || is_page('login') || is_page('dashboard-desa') || is_page('dashboard-toko');
