@@ -1,5 +1,5 @@
 jQuery(document).ready(function($) {
-    const restUrl = dw_pedagang_data.rest_url;
+    const ajaxUrl = dw_pedagang_data.ajax_url;
     const nonce = dw_pedagang_data.nonce;
 
     // --- 1. Preview Gambar ---
@@ -35,21 +35,15 @@ jQuery(document).ready(function($) {
         // Tentukan endpoint (Create atau Update)
         // Catatan: Di REST API plugin, kita perlu endpoint 'POST /produk' yang handle multipart/form-data
         // Endpoint ini harus sesuai dengan yang didaftarkan di api-pedagang.php plugin
-        let endpoint = restUrl + 'produk'; 
-        let method = 'POST';
+        formData.append('action', 'dw_save_produk_ajax');
+        formData.append('security', nonce);
 
-        // Jika Edit, biasanya endpoint butuh ID, tapi bisa juga dihandle POST dengan field ID
-        // Mari kita asumsikan satu endpoint handle keduanya based on ID yang dikirim
-        
         $.ajax({
-            url: endpoint,
-            type: method,
+            url: ajaxUrl,
+            type: 'POST',
             data: formData,
             processData: false, // Wajib false untuk upload file
-            contentType: false, // Wajib false untuk upload file
-            beforeSend: function(xhr) {
-                xhr.setRequestHeader('X-WP-Nonce', nonce);
-            },
+            contentType: false, // Wajib false untuk upload file,
             success: function(response) {
                 btn.prop('disabled', false);
                 spinner.addClass('d-none');
@@ -83,10 +77,12 @@ jQuery(document).ready(function($) {
             btn.prop('disabled', true);
 
             $.ajax({
-                url: restUrl + 'produk/' + produkId, // Endpoint DELETE /produk/{id}
-                type: 'DELETE',
-                beforeSend: function(xhr) {
-                    xhr.setRequestHeader('X-WP-Nonce', nonce);
+                url: ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'dw_delete_produk_ajax',
+                    id: produkId,
+                    security: nonce
                 },
                 success: function(response) {
                     if (response.success) {

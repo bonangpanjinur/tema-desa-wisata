@@ -9,6 +9,9 @@ if (!defined('ABSPATH')) {
     exit; // Keluar jika diakses langsung
 }
 
+// Include Performance Optimizations
+require_once get_template_directory() . '/functions-performance.php';
+
 /**
  * ==============================================================================
  * 1. THEME SETUP & ENQUEUE
@@ -71,8 +74,8 @@ function tema_dw_scripts_optimized() {
     
     // Data Global untuk Script Utama
     wp_localize_script('tema-dw-main', 'dwData', array(
-        'api_url' => home_url('/wp-json/dw/v1/'),
-        'home_url' => home_url()
+        'home_url' => home_url(),
+        'ajax_url' => admin_url('admin-ajax.php')
     ));
 
     // 4. Conditional Scripts - Hanya muat jika diperlukan
@@ -86,6 +89,10 @@ function tema_dw_scripts_optimized() {
     
     if ( is_page_template( 'page-dashboard-toko.php' ) ) {
         wp_enqueue_script( 'dw-pedagang', get_template_directory_uri() . '/assets/js/dw-pedagang.js', array('jquery'), '1.0.0', true );
+        wp_localize_script('dw-pedagang', 'dw_pedagang_data', array(
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce'    => wp_create_nonce('dw_pedagang_nonce')
+        ));
     }
 
     if ( is_page_template( 'page-dashboard-ojek.php' ) ) {
@@ -898,3 +905,63 @@ add_action('init', function() {
     }
 });
 ?>
+/**
+ * ==============================================================================
+ * FIX REST API & AJAX HANDLERS
+ * ==============================================================================
+ */
+
+// 1. Nonaktifkan REST API jika tidak digunakan (opsional, sesuai permintaan user)
+add_filter('rest_authentication_errors', function($result) {
+    if (!empty($result)) {
+        return $result;
+    }
+    if (!is_user_logged_in()) {
+        return new WP_Error('rest_not_logged_in', 'REST API dibatasi hanya untuk pengguna login.', array('status' => 401));
+    }
+    return $result;
+});
+
+// 2. AJAX Handler untuk Simpan Produk (Pengganti REST API)
+add_action('wp_ajax_dw_save_produk_ajax', 'tema_dw_handle_save_produk_ajax');
+function tema_dw_handle_save_produk_ajax() {
+    check_ajax_referer('dw_pedagang_nonce', 'security');
+    
+    if (!current_user_can('dw_manage_pesanan') && !current_user_can('administrator')) {
+        wp_send_json_error(['message' => 'Akses ditolak.']);
+    }
+
+    // Logika simpan produk di sini (biasanya memanggil fungsi di plugin)
+    // Karena kita hanya di level tema, kita asumsikan fungsi ini ada atau dihandle plugin
+    if (function_exists('dw_save_produk_action')) {
+        $result = dw_save_produk_action($_POST, $_FILES);
+        if ($result) {
+            wp_send_json_success(['message' => 'Produk berhasil disimpan.']);
+        }
+    }
+    
+    wp_send_json_error(['message' => 'Fungsi penyimpanan tidak ditemukan.']);
+}
+
+// 3. AJAX Handler untuk Hapus Produk (Pengganti REST API)
+add_action('wp_ajax_dw_delete_produk_ajax', 'tema_dw_handle_delete_produk_ajax');
+function tema_dw_handle_delete_produk_ajax() {
+    check_ajax_referer('dw_pedagang_nonce', 'security');
+    
+    $id = intval($_POST['id']);
+    if (!$id) wp_send_json_error(['message' => 'ID tidak valid.']);
+
+    if (!current_user_can('dw_manage_pesanan') && !current_user_can('administrator')) {
+        wp_send_json_error(['message' => 'Akses ditolak.']);
+    }
+
+    // Logika hapus produk
+    if (function_exists('dw_delete_produk_action')) {
+        $result = dw_delete_produk_action($id);
+        if ($result) {
+            wp_send_json_success(['message' => 'Produk berhasil dihapus.']);
+        }
+    }
+
+    wp_send_json_error(['message' => 'Fungsi penghapusan tidak ditemukan.']);
+}

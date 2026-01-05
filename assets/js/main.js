@@ -14,15 +14,8 @@ jQuery(document).ready(function($) {
     const AJAX_URL = (typeof dw_ajax !== 'undefined') ? dw_ajax.ajax_url : ((typeof dwData !== 'undefined') ? dwData.home_url + '/wp-admin/admin-ajax.php' : '');
     const NONCE = (typeof dw_ajax !== 'undefined') ? dw_ajax.nonce : '';
     
-    // API Setup untuk Merchant (Opsional jika pakai REST API terpisah)
-    const API_BASE = (typeof dwData !== 'undefined') ? dwData.api_url : '/wp-json/dw/v1/'; 
+    // API Setup (Menggunakan AJAX karena tema & plugin dalam satu website)
     const JWT_TOKEN = localStorage.getItem('dw_jwt_token');
-
-    // Headers untuk request API yang butuh Auth
-    const authHeaders = {};
-    if(JWT_TOKEN) {
-        authHeaders['Authorization'] = 'Bearer ' + JWT_TOKEN;
-    }
 
     /* =========================================
        1. UI GLOBAL HANDLERS (Menu & Header)

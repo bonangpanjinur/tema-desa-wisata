@@ -37,8 +37,8 @@ function tema_dw_scripts_optimized() {
     
     // Data Global untuk Script Utama
     wp_localize_script('tema-dw-main', 'dwData', array(
-        'api_url' => home_url('/wp-json/dw/v1/'),
-        'home_url' => home_url()
+        'home_url' => home_url(),
+        'ajax_url' => admin_url('admin-ajax.php')
     ));
 
     // 4. Conditional Scripts - Hanya muat jika diperlukan
