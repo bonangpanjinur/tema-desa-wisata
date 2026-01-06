@@ -14,6 +14,11 @@ if ( file_exists( get_template_directory() . '/functions-performance.php' ) ) {
     require_once get_template_directory() . '/functions-performance.php';
 }
 
+// Include POS Extension
+if ( file_exists( get_template_directory() . '/functions-pos-extension.php' ) ) {
+    require_once get_template_directory() . '/functions-pos-extension.php';
+}
+
 /**
  * ==============================================================================
  * 1. THEME SETUP & ENQUEUE

@@ -65,6 +65,7 @@ $count_pending = $wpdb->get_var($wpdb->prepare("SELECT COUNT(id) FROM $table_sub
             ['id' => 'ringkasan', 'icon' => 'fa-chart-line', 'label' => 'Ringkasan'],
             ['id' => 'produk', 'icon' => 'fa-box-open', 'label' => 'Produk Saya'],
             ['id' => 'pesanan', 'icon' => 'fa-shopping-basket', 'label' => 'Pesanan Masuk', 'badge' => $count_pending],
+            ['id' => 'kasir', 'icon' => 'fa-cash-register', 'label' => 'Kasir (POS)'],
             ['id' => 'paket', 'icon' => 'fa-ticket-alt', 'label' => 'Kuota & Paket'],
             ['id' => 'pengaturan', 'icon' => 'fa-cog', 'label' => 'Pengaturan Toko'],
         ];

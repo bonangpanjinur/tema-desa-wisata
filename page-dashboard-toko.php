@@ -963,6 +963,11 @@ get_header();
             </div>
         </div>
 
+        <!-- VIEW: KASIR (POS) -->
+        <div id="view-kasir" class="tab-content hidden">
+             <?php get_template_part('template-parts/dashboard/panel-pedagang-kasir', null, ['pedagang' => $pedagang]); ?>
+        </div>
+
         <!-- VIEW 4: PAKET -->
         <div id="view-paket" class="tab-content hidden">
             <h1 class="text-2xl font-bold text-gray-900 mb-2">Paket & Kuota</h1>
